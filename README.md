@@ -6,9 +6,7 @@ Align a trace of coordinates to a map (represented as a graph).
 
 ## Usage
 
-See [examples/route.ipynb](examples/route.ipynb).  
-See [examples/route_latlon.ipynb](examples/route_latlon.ipynb).
-
+[leuvenmapmatching.readthedocs.io](https://leuvenmapmatching.readthedocs.io)
 
 ## Dependencies
 
