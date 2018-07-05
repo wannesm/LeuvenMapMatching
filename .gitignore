@@ -1,0 +1,17 @@
+.cache
+.eggs
+.idea
+dist
+*.egg-info
+venv*
+README
+.ipynb_checkpoints
+*.zip
+*.gv
+*.gv.pdf
+*.xml
+tests/route.gpx
+examples/Leuven\ Stadswandeling*
+.git-old
+.pytest_cache
+docs/_build
