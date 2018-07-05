@@ -1,10 +1,14 @@
 # Leuven.MapMatching
 
-Align a trace of coordinates to a map (represented as a graph).
+Align a trace of GPS measurements to a map or road segments.
 
 ![example](http://people.cs.kuleuven.be/wannes.meert/dtaimapmatching/example1.png)
 
-## Usage
+## Installation and usage
+
+    $ pip install leuvenmapmatching
+
+More information and examples:
 
 [leuvenmapmatching.readthedocs.io](https://leuvenmapmatching.readthedocs.io)
 
@@ -16,8 +20,6 @@ Align a trace of coordinates to a map (represented as a graph).
 - [numpy](http://www.numpy.org)
 - [scipy](https://www.scipy.org)
 - [matplotlib](http://matplotlib.org)
-
-See LICENSE file for further details.
 
 
 ## Contact
