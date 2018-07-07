@@ -2,7 +2,16 @@
 
 Align a trace of GPS measurements to a map or road segments.
 
+The matching is based on a Hidden Markov Model (HMM) with non-emitting 
+states. The model can deal with missing data and you can plug in custom
+transition and emission probability distributions.
+
 ![example](http://people.cs.kuleuven.be/wannes.meert/dtaimapmatching/example1.png)
+
+Reference:
+
+> Meert Wannes, Mathias Verbeke, "HMM with Non-Emitting States for Map Matching",
+> European Conference on Data Analysis (ECDA), Paderborn, Germany, 2018.
 
 ## Installation and usage
 
