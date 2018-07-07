@@ -6,7 +6,17 @@
 Welcome to Leuven.MapMatching's documentation!
 ==============================================
 
-Align a trace of coordinates to a map (represented as a graph).
+Align a trace of coordinates (e.g. GPS measurements) to a map of road segments.
+
+The matching is based on a Hidden Markov Model (HMM) with non-emitting
+states. The model can deal with missing data and you can plug in custom
+transition and emission probability distributions.
+
+Reference:
+
+   Meert Wannes, Mathias Verbeke, "HMM with Non-Emitting States for Map Matching",
+   European Conference on Data Analysis (ECDA), Paderborn, Germany, 2018.
+
 
 .. figure:: http://people.cs.kuleuven.be/wannes.meert/dtaimapmatching/example1.png
    :alt: example
