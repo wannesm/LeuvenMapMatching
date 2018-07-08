@@ -210,7 +210,7 @@ class Matching(object):
     def __hash__(self):
         return self.cname.__hash__()
 
-    def logprob_trans(self, next_label=None, next_latlon=None):
+    def logprob_trans(self, next_label=None, next_pos=None):
         """Properties about the movement and the transition probability starting from this state.
         """
         return 0  # All probabilities are 1 (thus technically not a distribution)
@@ -247,8 +247,8 @@ class MatchingSpeed(Matching):
             self.avg_dist = 0.8 * m_prev.avg_dist + 0.2 * dist
             self.var_dist = 0.8 * m_prev.var_dist + 0.2 * (dist - m_prev.avg_dist) ** 2
 
-    def logprob_trans(self, next_label=None, next_latlon=None):
-        dist = self.matcher.map.distance(self.edge_o.pi, next_latlon)
+    def logprob_trans(self, next_label=None, next_pos=None):
+        dist = self.matcher.map.distance(self.edge_o.pi, next_pos)
         stddev = 1 if self.var_dist == 0 else math.sqrt(self.var_dist)
         logprob_trans = norm.logpdf(dist, loc=self.avg_dist, scale=stddev) + math.log(stddev) + math.log(2)
         # logger.debug("logprob_trans = {} = f({}, {}, {})".format(self.logprob_trans, dist, self.avg_dist, stddev))

@@ -18,7 +18,7 @@ Reference:
    European Conference on Data Analysis (ECDA), Paderborn, Germany, 2018.
 
 
-.. figure:: http://people.cs.kuleuven.be/wannes.meert/dtaimapmatching/example1.png
+.. figure:: https://people.cs.kuleuven.be/wannes.meert/dtaimapmatching/example1.png
    :alt: example
 
 
@@ -32,6 +32,7 @@ Reference:
 
 
    usage/installation
+   usage/customdistributions
 
 
 .. toctree::
