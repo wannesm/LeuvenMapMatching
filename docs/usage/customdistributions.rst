@@ -2,7 +2,8 @@ Custom probability distributions
 ================================
 
 You can use your own custom probability distributions for the transition and emission probabilities.
-This is achieved by inheriting from the :class:`Matching` class.
+This is achieved by inheriting from the :class:`Matching` class. This new class can be passed to the
+:class:`Matcher` object.
 
 Transition probability distribution
 -----------------------------------
@@ -44,3 +45,15 @@ Note that an emission probability can be given for a non-emitting node. This all
 even when no observations are available. It will then insert pseudo-observations on the line between the previous
 and next observations.
 To have a pure non-emitting node, the `logprob_obs_ne` method should always return 0.
+
+
+Passing your matching object to the matcher
+-------------------------------------------
+
+.. code-block:: python
+
+   class MyMatching(Matching):
+       ...
+
+   matcher = mm.matching.Matcher(mapdb, non_emitting_states=True, only_edges=True, matching=MyMatching)
+
