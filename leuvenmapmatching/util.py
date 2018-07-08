@@ -415,6 +415,11 @@ class Segment(object):
     def is_point(self):
         return self.p2 is None
 
+    def last_point(self):
+        if self.p2 is None:
+            return self.p1
+        return self.p2
+
     def __str__(self):
         if self.p2 is None:
             return f"{self.l1}"

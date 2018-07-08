@@ -14,7 +14,7 @@ For example, if you want to use a uniform distribution over the possible road se
 .. code-block:: python
 
    def logprob_trans(self, next_label=None, next_pos=None):
-       return -math.log(len(self.matcher.map.nodes_nbrto(next_label)))
+       return -math.log(len(self.matcher.map.nodes_nbrto(self.edge_m.last_point())))
 
 
 Emission probability distribution
