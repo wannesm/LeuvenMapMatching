@@ -19,8 +19,8 @@ from typing import Optional, Set
 import numpy as np
 from scipy.stats import halfnorm, norm
 
-from . import util
-from .util import Segment, approx_equal
+from .util.segment import Segment
+from .util import approx_equal
 
 
 logger = logging.getLogger("be.kuleuven.cs.dtai.mapmatching")
@@ -336,7 +336,8 @@ class Matcher:
 
     def match_gpx(self, gpx_file, unique=True):
         """Map matching from a gpx file"""
-        path = util.gpx_to_path(gpx_file)
+        from .util.gpx import gpx_to_path
+        path = gpx_to_path(gpx_file)
         return self.match(path, unique=unique)
 
     def do_stop(self, logprob_norm, dist):

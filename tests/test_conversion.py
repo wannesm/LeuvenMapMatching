@@ -1,19 +1,17 @@
 #!/usr/bin/env python3
 # encoding: utf-8
-
-import os, sys, logging
+import sys
+import logging
 from datetime import datetime
 
-try:
-    import leuvenmapmatching as mm
-except ImportError:
-    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir)))
-    import leuvenmapmatching as mm
+
+import leuvenmapmatching as mm
+from leuvenmapmatching.util.gpx import path_to_gpx
 
 
 def test_path_to_gpx():
     path = [(i, i, datetime.fromtimestamp(i)) for i in range(0, 10)]
-    gpx = mm.util.path_to_gpx(path)
+    gpx = path_to_gpx(path)
 
     assert len(path) == len(gpx.tracks[0].segments[0].points)
     assert path[0][0] == gpx.tracks[0].segments[0].points[0].latitude

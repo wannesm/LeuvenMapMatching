@@ -16,8 +16,6 @@ import matplotlib.pyplot as plt
 from matplotlib import colors as mcolors
 import smopy
 
-from . import util
-
 
 logger = logging.getLogger("be.kuleuven.cs.dtai.mapmatching")
 match_color = mcolors.CSS4_COLORS['olive']
@@ -69,6 +67,8 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
     width = 10
 
     if use_osm:
+        from .util import dist_latlon
+        project = dist_latlon.project
         if bb is None:
             bb = [lat_min, lon_min, lat_max, lon_max]
             # logger.debug("bb = [{}, {}, {}, {}]".format(*bb))
@@ -86,6 +86,9 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
         fig = None
 
     else:
+        from .util import dist_euclidean
+        project = dist_euclidean.project
+
         lat_max += (lat_max - lat_min) * 0.1
         lon_min -= (lon_max - lon_min) * 0.1
         lat_min -= (lat_max - lat_min) * 0.1
@@ -179,7 +182,7 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
             x, y = coord_trans(*loc)
             if type(node) == tuple and (len(node) == 4 or len(node) == 2):
                 latlon2, latlon3 = graph[node[0]][0], graph[node[1]][0]
-                latlon4, _ = util.project(latlon2, latlon3, loc)
+                latlon4, _ = project(latlon2, latlon3, loc)
                 x4, y4 = coord_trans(*latlon4)
                 ax.plot((x, x4), (y, y4), '-', color=match_color, linewidth=linewidth, alpha=0.75)
             elif type(node) == tuple and len(node) == 3:

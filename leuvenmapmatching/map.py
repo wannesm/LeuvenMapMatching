@@ -10,8 +10,6 @@ leuvenmapmatching.map
 from abc import abstractmethod
 import logging
 
-from . import util
-
 
 logger = logging.getLogger("be.kuleuven.cs.dtai.mapmatching")
 
@@ -33,13 +31,15 @@ class Map(object):
     def use_latlon(self, value):
         self._use_latlon = value
         if self._use_latlon:
-            self.distance = util.distance_latlon
-            self.distance_point_to_segment = util.distance_point_to_segment_latlon
-            self.distance_segment_to_segment = util.distance_segment_to_segment_latlon
+            from .util import dist_latlon
+            self.distance = dist_latlon.distance
+            self.distance_point_to_segment = dist_latlon.distance_point_to_segment
+            self.distance_segment_to_segment = dist_latlon.distance_segment_to_segment
         else:
-            self.distance = util.distance
-            self.distance_point_to_segment = util.distance_point_to_segment
-            self.distance_segment_to_segment = util.distance_segment_to_segment
+            from .util import dist_euclidean
+            self.distance = dist_euclidean.distance
+            self.distance_point_to_segment = dist_euclidean.distance_point_to_segment
+            self.distance_segment_to_segment = dist_euclidean.distance_segment_to_segment
 
     @abstractmethod
     def get_graph(self):

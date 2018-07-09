@@ -54,7 +54,8 @@ Or if you want to define from and to projections:
 Option 2: Use Latitude-Longitude directly
 -----------------------------------------
 
-Set the `use_latlon` flag in the :class:`Map` to true.
+Set the `use_latlon` flag in the :class:`Map` to true. The Leuven.MapMatching toolbox will use
+the `nvector` package to compute distance between latitude-longitude coordinates.
 
 For example to read in an OpenStreetMap file directly to a :class:`InMemMap` object:
 
