@@ -4,6 +4,21 @@ Examples
 Example 1: Simple
 -----------------
 
+A first, simple example. Some parameters are given to tune the algorithm.
+The `max_dist` and `obs_noise` are distances that indicate the maximal distance between observation and road
+segment and the expected noise in the measurements, respectively.
+The `min_prob_norm` prunes the lattice in that it drops paths that drop below 0.5 normalized probability.
+The probability is normalized to allow for easier reasoning about the probability of a path.
+It is computed as the exponential smoothed log probability components instead of the sum as would be the case
+for log likelihood.
+
+Most HMM based matching algorithms only use edges as states (`only_edges`).
+This toolbox also allows a mix of edges
+and nodes on a map.
+The advantage of this is that it forces the path to follow the road over crossroads and allow
+for a more accurate matching.
+But it is slightly less efficient because more possible states are tried.
+
 .. code-block:: python
 
     import leuvenmapmatching as mm
@@ -26,7 +41,7 @@ Example 1: Simple
             (2.3, 3.5), (2.4, 3.2), (2.6, 3.1), (2.9, 3.1), (3.0, 3.2),
             (3.1, 3.8), (3.0, 4.0), (3.1, 4.3), (3.1, 4.6), (3.0, 4.9)]
 
-    matcher = mm.matching.Matcher(map_con, max_dist=2, obs_noise=1, min_prob_norm=0.5)
+    matcher = mm.matching.Matcher(map_con, only_edges=False, max_dist=2, obs_noise=1, min_prob_norm=0.5)
     states, _ = matcher.match(path)
     nodes = matcher.path_pred_onlynodes
 
@@ -40,6 +55,16 @@ Example 1: Simple
 
 Example 2: Non-emitting states
 ------------------------------
+
+In case there are less observations that states (an assumption of HMMs), non-emittings states allow you
+to deal with this. States will be inserted that are not associated with any of the given observations if
+this improves the probability of the path.
+
+It is possible to also associate a distribtion over the distance between observations and the non-emitting
+states (`obs_noise_ne`). This allows the algorithm to prefer nearby road segments. This value should be
+larger than `obs_noise` as it is mapped to the line between the previous and next observation, which does
+not necessarily run over the relevant segment. Setting this to infinity is the same as using pure
+non-emitting states that ignore observations completely.
 
 .. code-block:: python
 
@@ -77,6 +102,9 @@ Example 2: Non-emitting states
 
 Example 3: Incremental matching
 -------------------------------
+
+If the observations are collected in a streaming setting. The matching can also be invoked incrementally.
+The lattice will be built further every time a new subsequence of the path is given.
 
 .. code-block:: python
 

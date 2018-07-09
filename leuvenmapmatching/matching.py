@@ -275,7 +275,7 @@ class Matcher:
             visiting all possible nodes in the graph.
         :param max_lattice_width: Restrict the lattice (or possible candidate states per observation) to this value.
             If there are more possible next states, the states with the best likelihood so far are selected.
-        :param only_edges: Do not include nodes as states, only edges.
+        :param only_edges: Do not include nodes as states, only edges. This is the typical setting for HMM methods.
         :param matching: Matching type
 
         To define a custom transition and/or emission probabiility distribtion, overwrite the following functions:
