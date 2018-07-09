@@ -6,7 +6,7 @@ The matching is based on a Hidden Markov Model (HMM) with non-emitting
 states. The model can deal with missing data and you can plug in custom
 transition and emission probability distributions.
 
-![example](http://people.cs.kuleuven.be/wannes.meert/dtaimapmatching/example1.png)
+![example](http://people.cs.kuleuven.be/wannes.meert/leuvenmapmatching/example1.png?v=1)
 
 Reference:
 

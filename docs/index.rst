@@ -3,8 +3,8 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to Leuven.MapMatching's documentation!
-==============================================
+Leuven.MapMatching's documentation
+==================================
 
 Align a trace of coordinates (e.g. GPS measurements) to a map of road segments.
 
@@ -18,7 +18,7 @@ Reference:
    European Conference on Data Analysis (ECDA), Paderborn, Germany, 2018.
 
 
-.. figure:: https://people.cs.kuleuven.be/wannes.meert/dtaimapmatching/example1.png
+.. figure:: https://people.cs.kuleuven.be/wannes.meert/leuvenmapmatching/example1.png?v=1
    :alt: example
 
 
@@ -33,6 +33,7 @@ Reference:
 
    usage/installation
    usage/customdistributions
+   usage/latitudelongitude
 
 
 .. toctree::
