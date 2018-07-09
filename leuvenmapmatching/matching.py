@@ -411,7 +411,7 @@ class Matcher:
         # Backtrack to find best path
         if early_stop_idx:
             if early_stop_idx <= 1:
-                return None, 0
+                return [], 0
             start_idx = early_stop_idx - 2
         else:
             start_idx = len(self.path) - 1
@@ -483,7 +483,7 @@ class Matcher:
         # Backtrack to find best path
         if early_stop_idx:
             if early_stop_idx <= 1:
-                return None, 0
+                return [], 0
             start_idx = early_stop_idx - 2
         else:
             start_idx = len(self.path) - 1
@@ -921,26 +921,30 @@ class Matcher:
 
     def _cleanup_lattice(self, obs_idx):
         """Remove all lattice entries that cannot be part of a backtracking path starting at obs_idx."""
-        if obs_idx <= 1:
-            return
-        all_prev = set()
-        for m in self.lattice[obs_idx].values():
-            all_prev.update(m.prev)
-        lattice_col = self.lattice[obs_idx - 1]
-        for label, m in lattice_col.items():
-            if m not in all_prev:
-                del lattice_col[label]
+        # TODO make lattice smaller. Current version does not work as it creates gaps.
+        # if obs_idx <= 1:
+        #     return
+        # all_prev = set()
+        # for m in self.lattice[obs_idx].values():
+        #     all_prev.update(m.prev)
+        #
+        # lattice_col = self.lattice[obs_idx - 1]
+        # to_del = []
+        # for label, m in lattice_col.items():
+        #     if m not in all_prev:
+        #         to_del.append(label)
+        # for label in to_del:
+        #     del lattice_col[label]
 
     def _build_node_path(self, start_idx, unique=True, max_depth=None):
         self.lattice_best = []
         node_max = None
         cur_depth = 0
         for m in self.lattice[start_idx].values():
-            if node_max is None or m.logprob > node_max.logprob:
+            if node_max is None or m.logprobema > node_max.logprobema:
                 node_max = m
         if node_max is None:
-            logger.info("Did not find a matching node for path point at index {}".format(start_idx))
-            return None
+            raise Exception("Did not find a matching node for path point at index {}".format(start_idx))
         logger.debug("Start: {}".format(node_max))
         node_path_rev = [node_max.shortkey]
         self.lattice_best.append(node_max)
@@ -953,11 +957,10 @@ class Matcher:
             node_max_last = node_max
             node_max: Optional[Matching] = None
             for prev_m in node_max_last.prev:
-                if prev_m is not None and (node_max is None or prev_m.logprob > node_max.logprob):
+                if prev_m is not None and (node_max is None or prev_m.logprobema > node_max.logprobema):
                     node_max = prev_m
             if node_max is None:
-                logger.info("Did not find a matching node for path point at index {}".format(node_max_last.obs))
-                return None
+                raise Exception("Did not find a matching node for path point at index {}".format(node_max_last.obs))
             logger.debug("Max ({}): {}".format(node_max_last.obs, node_max))
             node_path_rev.append(node_max.shortkey)
             self.lattice_best.append(node_max)

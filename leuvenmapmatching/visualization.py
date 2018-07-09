@@ -145,7 +145,7 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
 
     if path:
         logger.debug('Plot path ...')
-        px, py = zip(*[coord_trans(p) for p in path])
+        px, py = zip(*[coord_trans(p[:2]) for p in path])
         ax.plot(px, py, 'o-', linewidth=linewidth, markersize=linewidth * 2, alpha=0.75,
                 linestyle="--", color=path_color)
         if show_labels:
@@ -223,17 +223,17 @@ def plot_lattice(ax, coord_trans, matcher):
                 else:
                     alpha = 0.3
                     linewidth = 3
-                if mp.loc2 is None:
-                    prv = mp.loc1
+                if mp.edge_m.p2 is None:
+                    prv = mp.edge_m.p1
                 else:
-                    prv = mp.loc2
-                nxt = m.loc1
+                    prv = mp.edge_m.p2
+                nxt = m.edge_m.p1
                 x1, y1 = coord_trans(*prv)
                 x2, y2 = coord_trans(*nxt)
                 ax.plot((x1, x2), (y1, y2), '.-', color=lattice_color, linewidth=linewidth, alpha=alpha)
-                if m.loc2 is not None:
-                    x1, y1 = coord_trans(*m.loc1)
-                    x2, y2 = coord_trans(*m.loc2)
+                if m.edge_m.p2 is not None:
+                    x1, y1 = coord_trans(*m.edge_m.p1)
+                    x2, y2 = coord_trans(*m.edge_m.p2)
                     ax.plot((x1, x2), (y1, y2), '.-', color=lattice_color, linewidth=linewidth, alpha=alpha)
 
 

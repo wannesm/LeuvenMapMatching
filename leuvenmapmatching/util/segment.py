@@ -18,8 +18,8 @@ class Segment(object):
     __slots__ = ["l1", "p1", "l2", "p2", "_pi", "_ti"]
 
     def __init__(self, l1, p1, l2=None, p2=None, pi=None, ti=None):
-        self.l1 = l1  # Start of segment
-        self.p1 = p1
+        self.l1 = l1  # Start of segment, label
+        self.p1 = p1  # point
         self.l2 = l2  # End of segment, if None the segment is a point
         self.p2 = p2
         self.pi = pi  # Interpolated point

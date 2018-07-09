@@ -16,6 +16,8 @@ import osmread
 import pytest
 import leuvenmapmatching as mm
 import leuvenmapmatching.visualization as mm_viz
+from leuvenmapmatching.util.gpx import gpx_to_path
+from leuvenmapmatching.util.dist_latlon import interpolate_path
 
 this_path = Path(os.path.realpath(__file__)).parent / "rsrc"
 osm_fn = this_path / "osm_downloaded.xml"
@@ -51,7 +53,7 @@ def prepare_files(verbose=False):
 def create_map():
     map_con = mm.map.InMemMap(use_latlon=True)
     cnt = 0
-    for entity in osmread.parse_file(osm_fn):
+    for entity in osmread.parse_file(str(osm_fn)):
         if isinstance(entity, osmread.Way) and 'highway' in entity.tags:
             for node_a, node_b in zip(entity.nodes, entity.nodes[1:]):
                 map_con.add_edge(node_a, None, node_b, None)
@@ -66,7 +68,7 @@ def create_map():
 def create_map2():
     map_con = mm.map.InMemMap(use_latlon=True)
     cnt = 0
-    for entity in osmread.parse_file(osm2_fn):
+    for entity in osmread.parse_file(str(osm2_fn)):
         if isinstance(entity, osmread.Way) and 'highway' in entity.tags:
             for node_a, node_b in zip(entity.nodes, entity.nodes[1:]):
                 map_con.add_edge(node_a, None, node_b, None)
@@ -80,7 +82,7 @@ def create_map2():
 
 def plot_path(max_nodes=None):
     prepare_files()
-    track = mm.util.gpx_to_path(track2_fn)
+    track = gpx_to_path(track2_fn)
     if max_nodes is not None:
         track = track[:max_nodes]
     path = [(lat, lon) for lat, lon, _ in track]
@@ -96,15 +98,15 @@ def plot_path(max_nodes=None):
 @pytest.mark.skip(reason="Ignore LatLon for now")
 def test_path1():
     prepare_files()
-    track = mm.util.gpx_to_path(track_fn)
+    track = gpx_to_path(track_fn)
     track = track[:3]
-    track_int = mm.util.interpolate_path(track, 5)
+    track_int = interpolate_path(track, 5)
     map_con = create_map()
 
     matcher = mm.matching.Matcher(map_con, max_dist=50, obs_noise=50, min_prob_norm=0.1)
-    nodes = matcher.match(track_int, unique=False)
+    nodes, last_idx = matcher.match(track_int, unique=False)
     if len(nodes) < len(track_int):
-        raise Exception("Could not find a match for the full path.")
+        raise Exception(f"Could not find a match for the full path. Last index = {last_idx}")
     if directory:
         matcher.print_lattice_stats()
         path = [(lat, lon) for lat, lon, _ in track]
@@ -117,7 +119,7 @@ def test_path1():
 @pytest.mark.skip(reason="Ignore LatLon for now")
 def test_path2():
     prepare_files()
-    track = mm.util.gpx_to_path(track2_fn)
+    track = gpx_to_path(track2_fn)
     # track = track[:3]
     # track = mm.util.interpolate_path(track, 5)
     map_con = create_map2()
@@ -125,9 +127,9 @@ def test_path2():
                                   obs_noise=50, min_prob_norm=0.1,
                                   max_lattice_width=5,
                                   non_emitting_states=True)
-    nodes = matcher.match(track, unique=False)
+    nodes, last_idx = matcher.match(track, unique=False)
     if len(nodes) < len(track):
-        raise Exception("Could not find a match for the full path.")
+        raise Exception(f"Could not find a match for the full path. Last index = {last_idx}")
     if directory:
         matcher.print_lattice_stats()
         path = [(lat, lon) for lat, lon, _ in track]
@@ -140,6 +142,6 @@ if __name__ == "__main__":
     mm.matching.logger.addHandler(logging.StreamHandler(sys.stdout))
     directory = Path(os.environ.get('TESTDIR', Path(__file__).parent))
     print(f"Saving files to {directory}")
-    # test_path1(verbose=True)
-    # plot_path(max_nodes=None)
-    test_path2(verbose=True)
+    test_path1()
+    plot_path(max_nodes=None)
+    # test_path2()
