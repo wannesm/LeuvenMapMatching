@@ -35,7 +35,7 @@ def test_path1():
     ], use_latlon=False)
 
     matcher = mm.matching.Matcher(mapdb, max_dist=None, min_prob_norm=None)
-    path_pred = matcher.match(path, unique=True)
+    path_pred, _ = matcher.match(path, unique=True)
     if directory:
         matcher.print_lattice_stats()
         matcher.print_lattice()
@@ -67,7 +67,7 @@ def test_path2():
     ], use_latlon=False)
 
     matcher = mm.matching.Matcher(mapdb, max_dist=None, min_prob_norm=0.001)
-    path_pred = matcher.match(path, unique=True)
+    path_pred, _ = matcher.match(path, unique=True)
     if directory:
         matcher.print_lattice_stats()
         matcher.print_lattice()

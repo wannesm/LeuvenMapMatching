@@ -140,6 +140,12 @@ class Matching(object):
         self.stop = m_other.stop
         self.length = m_other.length
 
+    def is_nonemitting(self):
+        return self.obs_ne != 0
+
+    def is_emitting(self):
+        return self.obs_ne == 0
+
     def __str__(self, label_width=None):
         stop = "x" if self.stop else ""
         if label_width is None:
@@ -328,12 +334,6 @@ class Matcher:
         # print("logprob_obs: {} -> {:.5f} = {:.5f}".format(dist, result, math.exp(result)))
         return result
 
-    def _init_lattice(self, path):
-        self.lattice = dict()
-        for idx in range(len(path)):
-            self.lattice[idx] = dict()
-        self.lattice_best = []
-
     def match_gpx(self, gpx_file, unique=True):
         """Map matching from a gpx file"""
         path = util.gpx_to_path(gpx_file)
@@ -358,19 +358,22 @@ class Matcher:
     def match(self, path, unique=True, tqdm=None):
         """Dynamic Programming based (HMM-like) map matcher.
 
+        If the matcher fails to match the entire path, the last matched index is returned.
+        This index can be used to run the matcher again from that observation onwards.
+
         :param path: list[Union[tuple[lat, lon], tuple[lat, lon, time]]
         :param unique: Only retain unique nodes in the sequence (avoid repetitions)
         :param tqdm: Use a tqdm progress reporter (default is None)
-        :return: Sequence of [node, observation, observation-iterations] and
-            [segment-node, segment-node, observation, observation-iterations]
-        :rtype: list[Union[tuple[str,int,int],tuple[str,str,int,int]]]
+        :return: Tuple of (List of state keys, index of last observation that was matched)
         """
         if __debug__:
             logger.debug("Start matching path of length {}".format(len(path)))
 
         # Initialisation
         self.path = path
-        self._create_start_nodes()
+        nb_start_nodes = self._create_start_nodes()
+        if nb_start_nodes == 0:
+            return [], 0
 
         # Start iterating over observations 1..end
         t_start = time.time()
@@ -380,7 +383,7 @@ class Matcher:
         early_stop_idx = None
         for obs_idx in iterator:
             if __debug__:
-                logger.debug("--- obs {} --- {} ---".format(obs_idx, path[obs_idx]))
+                logger.debug("--- obs {} --- {} ---".format(obs_idx, self.path[obs_idx]))
             cnt_lat_size_not_zero = False
             for m_tmp in self.lattice[obs_idx - 1].values():
                 if not m_tmp.stop:
@@ -393,10 +396,10 @@ class Matcher:
                 early_stop_idx = obs_idx
                 logger.info(f'Stopped early at observation {early_stop_idx}')
                 break
-            self._match_states(obs_idx, path)
+            self._match_states(obs_idx)
             if self.non_emitting_states:
                 # Fill in non-emitting states between previous and current observation
-                self._match_non_emitting_states(obs_idx - 1, path)
+                self._match_non_emitting_states(obs_idx - 1)
             if __debug__:
                 if logger.isEnabledFor(logging.DEBUG):
                     self.print_lattice(obs_idx=obs_idx, label_width=default_label_width)
@@ -407,17 +410,102 @@ class Matcher:
         # Backtrack to find best path
         if early_stop_idx:
             if early_stop_idx <= 1:
-                return None
+                return None, 0
             start_idx = early_stop_idx - 2
         else:
-            start_idx = len(path) - 1
+            start_idx = len(self.path) - 1
         node_path = self._build_node_path(start_idx, unique)
-        return node_path
+        return node_path, start_idx
+
+    def match_incremental(self, path, unique=True, tqdm=None, backtrace_len=None):
+        """Dynamic Programming based (HMM-like) map matcher, continue building lattice with the new path.
+
+        If the matcher fails to match the entire path, the last matched index is returned.
+        This index can be used to run the matcher again from that observation onwards.
+
+        :param path: list[Union[tuple[lat, lon], tuple[lat, lon, time]]
+        :param unique: Only retain unique nodes in the sequence (avoid repetitions)
+        :param tqdm: Use a tqdm progress reporter (default is None)
+        :param backtrace_len: Length of the computed path throught the lattice.
+          If None the path through the lattice will the length of the last given path.
+          If -1, the full path is computed.
+        :return: Tuple of (List of state keys, index of last observation that was matched)
+        """
+        if __debug__:
+            logger.debug("Incrementally match path of length {}".format(len(path)))
+
+        # Initialisation
+        if self.path is None:
+            start_obs_idx = 1
+            self.path = path
+            nb_start_nodes = self._create_start_nodes()
+            if nb_start_nodes == 0:
+                return [], 0
+        else:
+            start_obs_idx = len(self.path)
+            for idx in range(len(self.path)):
+                self.lattice[start_obs_idx + idx] = dict()
+            self.path += path
+
+        # Start iterating over observations 1..end
+        t_start = time.time()
+        iterator = range(start_obs_idx, len(self.path))
+        if tqdm:
+            iterator = tqdm(iterator)
+        early_stop_idx = None
+        for obs_idx in iterator:
+            if __debug__:
+                logger.debug(f"--- obs {obs_idx} --- {self.path[obs_idx]} ---")
+            cnt_lat_size_not_zero = False
+            for m_tmp in self.lattice[obs_idx - 1].values():
+                if not m_tmp.stop:
+                    cnt_lat_size_not_zero = True
+                    break
+            # if len(self.lattice[obs_idx - 1]) == 0:
+            if not cnt_lat_size_not_zero:
+                if __debug__:
+                    logger.debug("No solutions found anymore")
+                early_stop_idx = obs_idx
+                logger.info(f'Stopped early at observation {early_stop_idx}')
+                break
+            self._match_states(obs_idx)
+            if self.non_emitting_states:
+                # Fill in non-emitting states between previous and current observation
+                self._match_non_emitting_states(obs_idx - 1)
+            if __debug__:
+                if logger.isEnabledFor(logging.DEBUG):
+                    self.print_lattice(obs_idx=obs_idx, label_width=default_label_width)
+
+        t_delta = time.time() - t_start
+        logger.info("Build lattice in {} seconds".format(t_delta))
+
+        # Backtrack to find best path
+        if early_stop_idx:
+            if early_stop_idx <= 1:
+                return None, 0
+            start_idx = early_stop_idx - 2
+        else:
+            start_idx = len(self.path) - 1
+        if backtrace_len is None:
+            max_depth = len(path)
+        elif backtrace_len == -1:
+            max_depth = None
+        else:
+            max_depth = backtrace_len
+        node_path = self._build_node_path(start_idx, unique, max_depth=max_depth)
+        return node_path, start_idx
 
     def _create_start_nodes(self):
+        """
+
+        :return: Number of created start points.
+        """
         # Initialisation on first observation
         t_start = time.time()
-        self._init_lattice(self.path)
+        self.lattice = dict()
+        for idx in range(len(self.path)):
+            self.lattice[idx] = dict()
+
         nodes = self.map.nodes_closeto(self.path[0], max_dist=self.max_dist_init)
         if __debug__:
             logger.debug("--- obs {} --- {} ---".format(0, self.path[0]))
@@ -427,8 +515,7 @@ class Matcher:
             logger.info(f'Stopped early at observation 0'
                         f', no starting points x found for which '
                         f'|x - ({self.path[0][0]:.2f},{self.path[0][1]:.2f})| < {self.max_dist_init}')
-            self.node_path = []
-            return self.node_path
+            return 0
         if __debug__:
             logger.debug(self.matching.repr_header())
         logprob_init = 0  # math.log(1.0/len(nodes))
@@ -469,12 +556,12 @@ class Matcher:
             self._prune_lattice(0)
             # if self.non_emitting_states:
             #     self._match_non_emitting_states(0, path)
+        return len(self.lattice[0])
 
-    def _match_states(self, obs_idx, path):
+    def _match_states(self, obs_idx):
         """
 
         :param obs_idx:
-        :param path:
         :return: True is new states have been found, False otherwise.
         """
         prev_lattice = self.lattice[obs_idx - 1].values()
@@ -498,7 +585,7 @@ class Matcher:
                     # === Move from node to node (or stay on node) ===
                     if not self.only_edges:
                         edge_m = Segment(nbr_label, nbr_loc)
-                        edge_o = Segment(f"O{obs_idx}", path[obs_idx])
+                        edge_o = Segment(f"O{obs_idx}", self.path[obs_idx])
                         m_next = m.next(edge_m, edge_o, obs=obs_idx)
                         if m_next is not None:
                             self._insert(m_next)
@@ -508,7 +595,7 @@ class Matcher:
                     # === Move from node to edge ===
                     if m.edge_m.l1 != nbr_label:
                         edge_m = Segment(m.edge_m.l1, m.edge_m.p1, nbr_label, nbr_loc)
-                        edge_o = Segment(f"O{obs_idx}", path[obs_idx])
+                        edge_o = Segment(f"O{obs_idx}", self.path[obs_idx])
                         m_next = m.next(edge_m, edge_o, obs=obs_idx)
                         if m_next is not None:
                             self._insert(m_next)
@@ -526,7 +613,7 @@ class Matcher:
 
                 # === Stay on edge ===
                 edge_m = Segment(m.edge_m.l1, m.edge_m.p1, m.edge_m.l2, m.edge_m.p2)
-                edge_o = Segment(f"O{obs_idx}", path[obs_idx])
+                edge_o = Segment(f"O{obs_idx}", self.path[obs_idx])
                 m_next = m.next(edge_m, edge_o, obs=obs_idx)
                 if m_next is not None:
                     self._insert(m_next)
@@ -536,7 +623,7 @@ class Matcher:
                 # === Move from edge to node ===
                 if not self.only_edges:
                     edge_m = Segment(m.edge_m.l2, m.edge_m.p2)
-                    edge_o = Segment(f"O{obs_idx}", path[obs_idx])
+                    edge_o = Segment(f"O{obs_idx}", self.path[obs_idx])
                     m_next = m.next(edge_m, edge_o, obs=obs_idx)
                     if m_next is not None:
                         self._insert(m_next)
@@ -553,7 +640,7 @@ class Matcher:
                     for nbr_label, nbr_loc in nbrs:
                         if m.edge_m.l2 != nbr_label and m.edge_m.l1 != nbr_label:
                             edge_m = Segment(m.edge_m.l2, m.edge_m.p2, nbr_label, nbr_loc)
-                            edge_o = Segment(f"O{obs_idx}", path[obs_idx])
+                            edge_o = Segment(f"O{obs_idx}", self.path[obs_idx])
                             m_next = m.next(edge_m, edge_o, obs=obs_idx)
                             if m_next is not None:
                                 self._insert(m_next)
@@ -567,19 +654,18 @@ class Matcher:
             return False
         return True
 
-    def _match_non_emitting_states(self, obs_idx, path):
+    def _match_non_emitting_states(self, obs_idx):
         """Match sequences of nodes that all refer to the same observation at obs_idx.
 
         Assumptions:
         This method assumes that the lattice is filled up for both obs_idx and obs_idx + 1.
 
         :param obs_idx: Index of the first observation used (the second will be obs_idx + 1)
-        :param path: List of all observations
         :return: None
         """
-        obs = path[obs_idx]
-        if obs_idx < len(path) - 1:
-            obs_next = path[obs_idx + 1]
+        obs = self.path[obs_idx]
+        if obs_idx < len(self.path) - 1:
+            obs_next = self.path[obs_idx + 1]
         else:
             obs_next = None
         # The current states are the current observation's states
@@ -844,9 +930,10 @@ class Matcher:
             if m not in all_prev:
                 del lattice_col[label]
 
-
-    def _build_node_path(self, start_idx, unique=True):
+    def _build_node_path(self, start_idx, unique=True, max_depth=None):
+        self.lattice_best = []
         node_max = None
+        cur_depth = 0
         for m in self.lattice[start_idx].values():
             if node_max is None or m.logprob > node_max.logprob:
                 node_max = m
@@ -856,17 +943,15 @@ class Matcher:
         logger.debug("Start: {}".format(node_max))
         node_path_rev = [node_max.shortkey]
         self.lattice_best.append(node_max)
+        if node_max.is_emitting():
+            cur_depth += 1
         # for obs_idx in reversed(range(start_idx)):
-        while len(node_max.prev) > 0:
+        if max_depth is None:
+            max_depth = len(self.lattice) + 1
+        while cur_depth < max_depth and len(node_max.prev) > 0:
             node_max_last = node_max
             node_max: Optional[Matching] = None
-            if __debug__:
-                logger.debug("Prev ({}):".format(node_max_last.obs))
             for prev_m in node_max_last.prev:
-                logger.debug(prev_m)
-                # if prev_m.obs != obs_idx:
-                #     raise Exception("Previous matching node index {} and path index do not match {}."
-                #                     .format(prev_m.obs, obs_idx))
                 if prev_m is not None and (node_max is None or prev_m.logprob > node_max.logprob):
                     node_max = prev_m
             if node_max is None:
@@ -875,6 +960,8 @@ class Matcher:
             logger.debug("Max ({}): {}".format(node_max_last.obs, node_max))
             node_path_rev.append(node_max.shortkey)
             self.lattice_best.append(node_max)
+            if node_max.is_emitting():
+                cur_depth += 1
 
         self.lattice_best = list(reversed(self.lattice_best))
         if unique:

@@ -58,8 +58,8 @@ def test_path1():
 
     matcher = mm.matching.Matcher(mapdb, max_dist_init=1, min_prob_norm=0.8, obs_noise=0.5,
                                   non_emitting_states=True)
-    path_pred = matcher.match(path1, unique=True)
-    print(path_pred)
+    matcher.match(path1, unique=True)
+    path_pred = matcher.path_pred
     if directory:
         from leuvenmapmatching import visualization as mmviz
         matcher.print_lattice_stats()
@@ -76,8 +76,8 @@ def test_path2():
 
     matcher = mm.matching.Matcher(mapdb, max_dist_init=1, min_prob_norm=0.8, obs_noise=0.5,
                                   non_emitting_states=True)
-    path_pred = matcher.match(path2, unique=True)
-    print(path_pred)
+    matcher.match(path2, unique=True)
+    path_pred = matcher.path_pred
     if directory:
         from leuvenmapmatching import visualization as mmviz
         matcher.print_lattice_stats()
@@ -86,6 +86,27 @@ def test_path2():
             matcher.lattice_dot(file=ofile)
         mmviz.plot_map(mapdb, matcher=matcher, show_labels=True, show_matching=True,
                        filename=str(directory / "test_nonemitting_test_path2.png"))
+    assert path_pred == path_sol, "Nodes not equal:\n{}\n{}".format(path_pred, path_sol)
+
+
+def test_path2_incremental():
+    mapdb, path1, path2, path_sol = setup_map()
+
+    matcher = mm.matching.Matcher(mapdb, max_dist_init=1, min_prob_norm=0.8, obs_noise=0.5,
+                                  non_emitting_states=True)
+    matcher.match_incremental(path2[:2])
+    path_pred_1 = matcher.path_pred
+    matcher.match_incremental(path2[2:], backtrace_len=len(path2))
+    path_pred = matcher.path_pred
+    if directory:
+        from leuvenmapmatching import visualization as mmviz
+        matcher.print_lattice_stats()
+        matcher.print_lattice()
+        with (directory / 'lattice_path2.gv').open('w') as ofile:
+            matcher.lattice_dot(file=ofile)
+        mmviz.plot_map(mapdb, matcher=matcher, show_labels=True, show_matching=True,
+                       filename=str(directory / "test_nonemitting_test_path2.png"))
+    assert path_pred_1 == path_sol[:2], "Nodes not equal:\n{}\n{}".format(path_pred, path_sol)
     assert path_pred == path_sol, "Nodes not equal:\n{}\n{}".format(path_pred, path_sol)
 
 
@@ -217,7 +238,8 @@ if __name__ == "__main__":
     # visualize_map(pathnb=1)
     # test_path1()
     # test_path2()
+    test_path2_incremental()
     # test_path_duplicate()
     # test_path3_many_obs()
     # test_path3_few_obs_en()
-    test_path3_few_obs_e()
+    # test_path3_few_obs_e()

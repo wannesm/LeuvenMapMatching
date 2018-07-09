@@ -27,7 +27,7 @@ Example 1: Simple
             (3.1, 3.8), (3.0, 4.0), (3.1, 4.3), (3.1, 4.6), (3.0, 4.9)]
 
     matcher = mm.matching.Matcher(map_con, max_dist=2, obs_noise=1, min_prob_norm=0.5)
-    states = matcher.match(path)
+    states, _ = matcher.match(path)
     nodes = matcher.path_pred_onlynodes
 
     print("States\n------")
@@ -60,7 +60,7 @@ Example 2: Non-emitting states
     ], use_latlon=False)
     matcher = mm.matching.Matcher(mapdb, max_dist_init=0.2, obs_noise=1, obs_noise_ne=10,
                                   non_emitting_states=True, only_edges=True)
-    states = matcher.match(path)
+    states, _ = matcher.match(path)
     nodes = matcher.path_pred_onlynodes
 
     print("States\n------")
@@ -74,3 +74,40 @@ Example 2: Non-emitting states
                   show_labels=True, show_matching=True
                   filename="output.png"))
 
+
+Example 3: Incremental matching
+-------------------------------
+
+.. code-block:: python
+
+    import leuvenmapmatching as mm
+
+    map_con = mm.map.InMemMap(graph=[
+        ("A", (1, 1), ["B", "C", "X"]),
+        ("B", (1, 3), ["A", "C", "D", "K"]),
+        ("C", (2, 2), ["A", "B", "D", "E", "X", "Y"]),
+        ("D", (2, 4), ["B", "C", "D", "E", "K", "L"]),
+        ("E", (3, 3), ["C", "D", "F", "Y"]),
+        ("F", (3, 5), ["D", "E", "L"]),
+        ("X", (2, 0), ["A", "C", "Y"]),
+        ("Y", (3, 1), ["X", "C", "E"]),
+        ("K", (1, 5), ["B", "D", "L"]),
+        ("L", (2, 6), ["K", "D", "F"])
+    ], use_latlon=False)
+
+    path = [(0.8, 0.7), (0.9, 0.7), (1.1, 1.0), (1.2, 1.5), (1.2, 1.6), (1.1, 2.0),
+            (1.1, 2.3), (1.3, 2.9), (1.2, 3.1), (1.5, 3.2), (1.8, 3.5), (2.0, 3.7),
+            (2.3, 3.5), (2.4, 3.2), (2.6, 3.1), (2.9, 3.1), (3.0, 3.2),
+            (3.1, 3.8), (3.0, 4.0), (3.1, 4.3), (3.1, 4.6), (3.0, 4.9)]
+
+    matcher = mm.matching.Matcher(map_con, max_dist=2, obs_noise=1, min_prob_norm=0.5)
+    states, _ = matcher.match_incremental(path[:5])
+    states, _ = matcher.match_incremental(path[5:], backtrace_len=-1)
+    nodes = matcher.path_pred_onlynodes
+
+    print("States\n------")
+    print(states)
+    print("Nodes\n------")
+    print(nodes)
+    print("")
+    matcher.print_lattice_stats()
