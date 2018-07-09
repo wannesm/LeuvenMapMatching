@@ -30,15 +30,7 @@ default_label_width = 25
 
 
 class Matching(object):
-    """Matching object that represents a node in the Viterbi lattice.
-
-    To enable alternative emission and transition functions overwrite the following functions:
-    - `logprob_trans(self, next_label=None, next_latlon=None)`
-    - `logprob_obs(self, dist, edge_m, edge_o)`
-    - `logprob_obs_ne(self, dist, edge_m, edge_o)`
-
-    If a deeper change is required, overwrite the `next` function.
-    """
+    """Matching object that represents a node in the Viterbi lattice."""
     __slots__ = ['matcher', 'edge_m', 'edge_o', 'logprob', 'logprobema', 'obs', 'obs_ne', 'dist_obs',
                  'prev', 'prev_other', 'stop', 'length']
 
@@ -76,11 +68,11 @@ class Matching(object):
         else:
             raise Exception(f"Should not happen")
 
-        logprob_trans = self.logprob_trans(edge_m.label, proj_m)
+        logprob_trans = self.matcher.logprob_trans(self, edge_m.label, proj_m)
         if obs_ne == 0:
-            logprob_obs = self.logprob_obs(dist, edge_m, edge_o)
+            logprob_obs = self.matcher.logprob_obs(dist, self, edge_m, edge_o)
         else:
-            logprob_obs = self.logprob_obs_ne(dist, edge_m, edge_o)
+            logprob_obs = self.matcher.logprob_obs_ne(dist, self, edge_m, edge_o)
         new_logprob_delta = logprob_trans + logprob_obs
         if edge_m.ti < self.edge_m.ti:
             # This node would imply going back on the edge between observations
@@ -210,19 +202,6 @@ class Matching(object):
     def __hash__(self):
         return self.cname.__hash__()
 
-    def logprob_trans(self, next_label=None, next_pos=None):
-        """Properties about the movement and the transition probability starting from this state.
-        """
-        return 0  # All probabilities are 1 (thus technically not a distribution)
-
-    def logprob_obs(self, dist, edge_m, edge_o):
-        """Emission probability for emitting states."""
-        return self.matcher.logprob_obs(dist)
-
-    def logprob_obs_ne(self, dist, edge_m,edge_o):
-        """Emission probability for non-emitting states."""
-        return self.matcher.logprob_obs_ne(dist)
-
 
 class MatchingSpeed(Matching):
     __slots__ = ['avg_dist', 'var_dist', 'dist_mov']  # Additional fields
@@ -292,6 +271,12 @@ class Matcher:
             If there are more possible next states, the states with the best likelihood so far are selected.
         :param only_edges: Do not include nodes as states, only edges.
         :param matching: Matching type
+
+        To define a custom transition and/or emission probabiility distribtion, overwrite the following functions:
+        - :meth:`logprob_trans`
+        - :meth:`logprob_obs_ne`
+        - :meth:`logprob_obs`
+
         """
         self.map = map_con
         if max_dist:
@@ -328,12 +313,17 @@ class Matcher:
         self.max_lattice_width = max_lattice_width
         self.only_edges = only_edges
 
-    def logprob_obs(self, dist):
+    def logprob_trans(self, prev_m, next_label=None, next_pos=None):
+        return 0  # All probabilities are 1 (thus technically not a distribution)
+
+    def logprob_obs(self, dist, prev_m, new_edge_m, new_edge_o):
+        """Emission probability for emitting states."""
         result = self.obs_noise_dist.logpdf(dist) + self.obs_noise_logint
         # print("logprob_obs: {} -> {:.5f} = {:.5f}".format(dist, result, math.exp(result)))
         return result
 
-    def logprob_obs_ne(self, dist):
+    def logprob_obs_ne(self, dist, prev_m, new_edge_m, new_edge_o):
+        """Emission probability for non-emitting states."""
         result = self.obs_noise_dist_ne.logpdf(dist) + self.obs_noise_logint_ne
         # print("logprob_obs: {} -> {:.5f} = {:.5f}".format(dist, result, math.exp(result)))
         return result
@@ -449,11 +439,11 @@ class Matcher:
                 # TODO: update dist_obs to be distance to line
                 nbrs = self.map.nodes_nbrto(label)
                 for nbr_label, nbr_loc in nbrs:
-                    logprob = logprob_init + self.logprob_obs(dist_obs)
+                    edge_m = Segment(label, loc, nbr_label, nbr_loc, loc, 0.0)
+                    edge_o = Segment(f"O{0}", self.path[0])
+                    logprob = logprob_init + self.logprob_obs(dist_obs, None, edge_m, edge_o)
                     new_stop = self.do_stop(logprob, dist_obs)
                     if not new_stop or logger.isEnabledFor(logging.DEBUG):
-                        edge_m = Segment(label, loc, nbr_label, nbr_loc, loc, 0.0)
-                        edge_o = Segment(f"O{0}", self.path[0])
                         m_next = self.matching(self, edge_m=edge_m, edge_o=edge_o, logprob=logprob, logprobema=logprob,
                                                dist_obs=dist_obs, obs=0, stop=new_stop)
                         if label in self.lattice[0]:
@@ -465,11 +455,11 @@ class Matcher:
         else:
             # Search for nearby nodes
             for dist_obs, label, loc in nodes:
-                logprob = logprob_init + self.logprob_obs(dist_obs)
+                edge_m = Segment(label, loc)
+                edge_o = Segment(f"O{0}", self.path[0])
+                logprob = logprob_init + self.logprob_obs(dist_obs, None, edge_m, edge_o)
                 new_stop = self.do_stop(logprob, dist_obs)
                 if not new_stop or logger.isEnabledFor(logging.DEBUG):
-                    edge_m = Segment(label, loc)
-                    edge_o = Segment(f"O{0}", self.path[0])
                     m_next = self.matching(self, edge_m=edge_m, edge_o=edge_o, logprob=logprob, logprobema=logprob,
                                            dist_obs=dist_obs, obs=0, stop=new_stop)
                     self.lattice[0][label] = m_next
