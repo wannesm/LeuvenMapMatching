@@ -23,12 +23,26 @@ More information and examples:
 
 ## Dependencies
 
-- [nvector](https://github.com/pbrod/Nvector)
-- [gpxpy](https://github.com/tkrajina/gpxpy)
-- [pykalman](https://pykalman.github.io)
+Required:
+
 - [numpy](http://www.numpy.org)
 - [scipy](https://www.scipy.org)
-- [matplotlib](http://matplotlib.org)
+
+
+Optional (only loaded when methods are called to rely on these packages):
+
+- [matplotlib](http://matplotlib.org):
+    For visualisation
+- [smopy](https://github.com/rossant/smopy):
+    For visualisation
+- [nvector](https://github.com/pbrod/Nvector):
+    For latitude-longitude computations
+- [gpxpy](https://github.com/tkrajina/gpxpy):
+    To import GPX files
+- [pykalman](https://pykalman.github.io):
+    So smooth paths using a Kalman filter
+- [pyproj](https://jswhit.github.io/pyproj/):
+    To project latitude-longitude coordinates to an XY-plane
 
 
 ## Contact
