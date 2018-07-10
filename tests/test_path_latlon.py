@@ -137,11 +137,33 @@ def test_path2():
                         show_lattice=True, filename=str(directory / "test_path_latlon_path2.png"))
 
 
+@pytest.mark.skip(reason="Ignore LatLon for now")
+def test_path2_onlyedges():
+    prepare_files()
+    track = gpx_to_path(track2_fn)
+    # track = track[:3]
+    # track = mm.util.interpolate_path(track, 5)
+    map_con = create_map2()
+    matcher = mm.matching.Matcher(map_con, max_dist=100, max_dist_init=20,
+                                  obs_noise=50, min_prob_norm=0.1,
+                                  max_lattice_width=5,
+                                  non_emitting_states=True, only_edges=True)
+    nodes, last_idx = matcher.match(track, unique=False)
+    if len(nodes) < len(track):
+        raise Exception(f"Could not find a match for the full path. Last index = {last_idx}")
+    if directory:
+        matcher.print_lattice_stats()
+        path = [(lat, lon) for lat, lon, _ in track]
+        mm_viz.plot_map(map_con, matcher=matcher, nodes=nodes, path=path, z=17, use_osm=True,
+                        show_lattice=True, filename=str(directory / "test_path_latlon_path2.png"))
+
+
 if __name__ == "__main__":
     mm.matching.logger.setLevel(logging.DEBUG)
     mm.matching.logger.addHandler(logging.StreamHandler(sys.stdout))
     directory = Path(os.environ.get('TESTDIR', Path(__file__).parent))
     print(f"Saving files to {directory}")
-    test_path1()
-    plot_path(max_nodes=None)
+    # test_path1()
+    # plot_path(max_nodes=None)
     # test_path2()
+    test_path2_onlyedges()

@@ -33,6 +33,11 @@ def distance(p1, p2):
     return d
 
 
+def distance_gp(p1, p2):
+    d, _, _ = p1.distance_and_azimuth(p2)
+    return d
+
+
 def distance_point_to_segment(p, s1, s2, delta=0.0):
     """
     TODO: A point exactly on the line gives an error.
@@ -62,25 +67,26 @@ def distance_segment_to_segment(f1, f2, t1, t2):
     :return: (distance, proj on f, proj on t, rel pos on t)
     """
     # TODO: Should be improved
-    f1 = frame.GeoPoint(f1[0], f1[1], degrees=True)
-    f2 = frame.GeoPoint(f2[0], f2[1], degrees=True)
-    path_f = nv.GeoPath(f1, f2)
-    t1 = frame.GeoPoint(t1[0], t1[1], degrees=True)
-    t2 = frame.GeoPoint(t2[0], t2[1], degrees=True)
-    path_t = nv.GeoPath(t1, t2)
+    f1_gp = frame.GeoPoint(f1[0], f1[1], degrees=True)
+    f2_gp = frame.GeoPoint(f2[0], f2[1], degrees=True)
+    path_f = nv.GeoPath(f1_gp, f2_gp)
+    t1_gp = frame.GeoPoint(t1[0], t1[1], degrees=True)
+    t2_gp = frame.GeoPoint(t2[0], t2[1], degrees=True)
+    path_t = nv.GeoPath(t1_gp, t2_gp)
     p_int = path_f.intersect(path_t)
+    p_int_gp = p_int.to_geo_point()
     if path_f.on_path(p_int)[0] and path_t.on_path(p_int)[0]:
         # Intersection point is on segments, between both begins and ends
-        loc = (p_int.latitude_deg[0], p_int.longitude_deg[0])
-        u_f = distance(f1, loc) / distance(f1, f2)
-        u_t = distance(t1, loc) / distance(t1, t2)
+        loc = (p_int_gp.latitude_deg[0], p_int_gp.longitude_deg[0])
+        u_f = distance_gp(f1_gp, p_int_gp) / distance_gp(f1_gp, f2_gp)
+        u_t = distance_gp(t1_gp, p_int_gp) / distance_gp(t1_gp, t2_gp)
         return 0, loc, loc, u_f, u_t
     # No intersection, use last point of map segment (the assumption is the observations are far apart)
     # TODO: decide which point to use (see distance_segment_to_segment)
-    p_int, u_t = _project_nvector(t1, t2, f2)
+    p_int, u_t = _project_nvector(t1_gp, t2_gp, f2_gp)
     u_f = 1
-    d, _, _ = f2.distance_and_azimuth(p_int)
-    return d, (f1, f2), (p_int.latitude_deg[0], p_int.longitude_deg[0]), u_f, u_t
+    d, _, _ = f2_gp.distance_and_azimuth(p_int)
+    return d, (f1, f2), (p_int_gp.latitude_deg[0], p_int_gp.longitude_deg[0]), u_f, u_t
 
 
 def project(s1, s2, p, delta=0.0):
