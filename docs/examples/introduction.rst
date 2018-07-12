@@ -139,3 +139,15 @@ The lattice will be built further every time a new subsequence of the path is gi
     print(nodes)
     print("")
     matcher.print_lattice_stats()
+
+
+If you do not want to store the entire lattice, you can create a new Matcher object using the
+:meth:`copy_lastinterface` before running the incremental matching. This new object will only
+contain the last part of the lattice.
+
+.. code-block:: python
+
+    matcher = mm.matching.Matcher(map_con, max_dist=2, obs_noise=1, min_prob_norm=0.5)
+    states, _ = matcher.match_incremental(path[:5])
+    matcher = matcher.copy_lastinterface()
+    states, _ = matcher.match_incremental(path[5:], backtrace_len=-1)

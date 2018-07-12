@@ -1086,12 +1086,38 @@ class Matcher:
                 counts[m.label] += 1
         return counts
 
+    def copy_lastinterface(self, nb_interfaces=1):
+        """Copy the current matcher and keep the last interface as the start point.
+
+        This method allows you to perform incremental matching without keeping the entire
+        lattice in memory.
+
+        You need to run :meth:`match_incremental` on this object to continue from the existing
+        (partial) lattice. Otherwise, if you use :meth:`match`, it will be overwritten.
+
+        :param nb_interfaces: Nb of interfaces (columns in lattice) to keep. Default is 1, the last one.
+        :return: new Matcher object
+        """
+        matcher = self.__class__(self.map, obs_noise=self.obs_noise, max_dist_init=self.max_dist_init,
+                                 max_dist=self.max_dist, min_prob_norm=self.min_logprob_norm,
+                                 non_emitting_states=self.non_emitting_states,
+                                 max_lattice_width=self.max_lattice_width, only_edges=self.only_edges,
+                                 obs_noise_ne=self.obs_noise_ne, matching=self.matching)
+        matcher.lattice = []
+        matcher.path = []
+        for int_i in range(len(self.lattice) - nb_interfaces, len(self.lattice)):
+            matcher.lattice.append(self.lattice[int_i])
+            matcher.path.append(self.path[int_i])
+        return matcher
+
     @property
     def path_pred(self):
+        """The matched path, both nodes and/or edges (depending on your settings)."""
         return self.node_path
 
     @property
     def path_pred_onlynodes(self):
+        """A list with all the nodes (no edges) the matched path passes through."""
         if self.node_path is None or len(self.node_path) == 0:
             return []
         nodes = []
