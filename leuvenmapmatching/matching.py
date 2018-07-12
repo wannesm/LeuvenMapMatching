@@ -342,10 +342,10 @@ class Matcher:
 
     def do_stop(self, logprob_norm, dist):
         if logprob_norm < self.min_logprob_norm:
-            logger.debug(f"Stopped trace because norm(log(Pr)) is too small: {logprob_norm} < {self.min_logprob_norm}")
+            logger.debug(f"     Stopped trace: norm(log(Pr)) too small: {logprob_norm} < {self.min_logprob_norm}")
             return True
         if dist > self.max_dist:
-            logger.debug(f"Stopped trace because distance is too large: {dist} > {self.max_dist}")
+            logger.debug(f"     Stopped trace: distance too large: {dist} > {self.max_dist}")
             return True
         return False
 
@@ -884,6 +884,7 @@ class Matcher:
                         continue
                     # Move to next edge
                     if m.edge_m.l1 != nbr_label:
+                        # edge_m = Segment(m.edge_m.l1, m.edge_m.p1, nbr_label, nbr_loc)
                         edge_m = Segment(nbr_label, nbr_loc)
                         edge_o = Segment(f"O{obs_idx+1}", obs_next)
                         m_next = m.next(edge_m, edge_o, obs=obs_idx)

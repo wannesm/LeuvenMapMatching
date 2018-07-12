@@ -156,6 +156,7 @@ class InMemMap(Map):
                 continue
             lat2, lon2 = loc2
             dist = self.distance(loc, loc2)
+            # print(f"{label}: {dist}")
             if max_dist is None or dist <= max_dist:
                 results.append((dist, label, (lat2, lon2)))
         results.sort(key=lambda t: t[0])
@@ -180,3 +181,9 @@ class InMemMap(Map):
     def print_stats(self):
         print("Graph\n-----")
         print("Nodes: {}".format(len(self.graph)))
+
+    def __str__(self):
+        s = ""
+        for label, (loc, nbrs, _) in self.graph.items():
+            s += f"{label:<10} - ({loc[0]:10.4f}, {loc[1]:10.4f})\n"
+        return s

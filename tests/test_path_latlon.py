@@ -14,10 +14,12 @@ import logging
 from pathlib import Path
 import osmread
 import pytest
+from functools import partial
 import leuvenmapmatching as mm
 import leuvenmapmatching.visualization as mm_viz
 from leuvenmapmatching.util.gpx import gpx_to_path
 from leuvenmapmatching.util.dist_latlon import interpolate_path
+from leuvenmapmatching.util.projections import latlon2grs80
 
 this_path = Path(os.path.realpath(__file__)).parent / "rsrc"
 osm_fn = this_path / "osm_downloaded.xml"
@@ -65,8 +67,9 @@ def create_map():
     return map_con
 
 
-def create_map2():
-    map_con = mm.map.InMemMap(use_latlon=True)
+def create_map2(convert_latlon=None):
+    use_latlon = True if convert_latlon is None else False
+    map_con = mm.map.InMemMap(use_latlon=use_latlon)
     cnt = 0
     for entity in osmread.parse_file(str(osm2_fn)):
         if isinstance(entity, osmread.Way) and 'highway' in entity.tags:
@@ -75,7 +78,12 @@ def create_map2():
                 # Some roads are one-way. We'll add both directions.
                 map_con.add_edge(node_b, None, node_a, None)
         if isinstance(entity, osmread.Node):
-            map_con.add_node(entity.id, (entity.lat, entity.lon))
+            if convert_latlon is None:
+                lat = entity.lat
+                lon = entity.lon
+            else:
+                lat, lon = list(convert_latlon([(entity.lat, entity.lon)]))[0]
+            map_con.add_node(entity.id, (lat, lon))
     map_con.purge()
     return map_con
 
@@ -117,6 +125,28 @@ def test_path1():
 
 
 @pytest.mark.skip(reason="Ignore LatLon for now")
+def test_path2_proj():
+    prepare_files()
+    track = [p[:2] for p in gpx_to_path(track2_fn)]
+    proj = partial(latlon2grs80, lon_0=track[0][1], lat_ts=track[0][0])
+    track = list(proj(track))
+    # track = track[:3]
+    # track = mm.util.interpolate_path(track, 5)
+    map_con = create_map2(convert_latlon=proj)
+    matcher = mm.matching.Matcher(map_con, max_dist=300, max_dist_init=25,
+                                  obs_noise=100, obs_noise_ne=100, min_prob_norm=0.1,
+                                  max_lattice_width=5,
+                                  non_emitting_states=True)
+    nodes, last_idx = matcher.match(track, unique=False)
+    if len(nodes) < len(track):
+        raise Exception(f"Could not find a match for the full path. Last index = {last_idx}")
+    if directory:
+        matcher.print_lattice_stats()
+        mm_viz.plot_map(map_con, matcher=matcher, nodes=nodes, path=track, use_osm=False,
+                        show_lattice=True, filename=str(directory / "test_path_latlon_path2_proj_ne.png"))
+
+
+@pytest.mark.skip(reason="Ignore LatLon for now")
 def test_path2():
     prepare_files()
     track = gpx_to_path(track2_fn)
@@ -134,7 +164,7 @@ def test_path2():
         matcher.print_lattice_stats()
         path = [(lat, lon) for lat, lon, _ in track]
         mm_viz.plot_map(map_con, matcher=matcher, nodes=nodes, path=path, z=17, use_osm=True,
-                        show_lattice=True, filename=str(directory / "test_path_latlon_path2.png"))
+                        show_lattice=True, filename=str(directory / "test_path_latlon_path2_ne.png"))
 
 
 @pytest.mark.skip(reason="Ignore LatLon for now")
@@ -155,7 +185,7 @@ def test_path2_onlyedges():
         matcher.print_lattice_stats()
         path = [(lat, lon) for lat, lon, _ in track]
         mm_viz.plot_map(map_con, matcher=matcher, nodes=nodes, path=path, z=17, use_osm=True,
-                        show_lattice=True, filename=str(directory / "test_path_latlon_path2.png"))
+                        show_lattice=True, filename=str(directory / "test_path_latlon_path2_e.png"))
 
 
 if __name__ == "__main__":
@@ -165,5 +195,6 @@ if __name__ == "__main__":
     print(f"Saving files to {directory}")
     # test_path1()
     # plot_path(max_nodes=None)
+    test_path2_proj()
     # test_path2()
-    test_path2_onlyedges()
+    # test_path2_onlyedges()

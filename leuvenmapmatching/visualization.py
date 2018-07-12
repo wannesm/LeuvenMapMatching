@@ -202,6 +202,7 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
         ax.set_xlabel('X')
         ax.set_ylabel('Y')
     ax.axis('equal')
+    ax.set_aspect('equal')
     if filename is not None:
         plt.savefig(filename)
         if fig is not None:

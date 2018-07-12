@@ -15,3 +15,4 @@ examples/Leuven\ Stadswandeling*
 .git-old
 .pytest_cache
 docs/_build
+build
