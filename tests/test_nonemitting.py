@@ -56,7 +56,9 @@ def visualize_map(pathnb=1):
 def test_path1():
     mapdb, path1, path2, path_sol = setup_map()
 
-    matcher = mm.matching.Matcher(mapdb, max_dist_init=1, min_prob_norm=0.8, obs_noise=0.5,
+    matcher = mm.matching.Matcher(mapdb, max_dist_init=1,
+                                  min_prob_norm=0.5,
+                                  obs_noise=0.5,
                                   non_emitting_states=True)
     matcher.match(path1, unique=True)
     path_pred = matcher.path_pred
@@ -74,7 +76,7 @@ def test_path1():
 def test_path2():
     mapdb, path1, path2, path_sol = setup_map()
 
-    matcher = mm.matching.Matcher(mapdb, max_dist_init=1, min_prob_norm=0.8, obs_noise=0.5,
+    matcher = mm.matching.Matcher(mapdb, max_dist_init=1, min_prob_norm=0.5, obs_noise=0.5,
                                   non_emitting_states=True)
     matcher.match(path2, unique=True)
     path_pred = matcher.path_pred
@@ -92,7 +94,7 @@ def test_path2():
 def test_path2_incremental():
     mapdb, path1, path2, path_sol = setup_map()
 
-    matcher = mm.matching.Matcher(mapdb, max_dist_init=1, min_prob_norm=0.8, obs_noise=0.5,
+    matcher = mm.matching.Matcher(mapdb, max_dist_init=1, min_prob_norm=0.5, obs_noise=0.5,
                                   non_emitting_states=True)
     matcher.match_incremental(path2[:2])
     path_pred_1 = matcher.path_pred
@@ -237,8 +239,8 @@ if __name__ == "__main__":
     print(f"Saving files to {directory}")
     # visualize_map(pathnb=1)
     # test_path1()
-    # test_path2()
-    test_path2_incremental()
+    test_path2()
+    # test_path2_incremental()
     # test_path_duplicate()
     # test_path3_many_obs()
     # test_path3_few_obs_en()

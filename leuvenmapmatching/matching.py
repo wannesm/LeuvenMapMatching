@@ -25,14 +25,35 @@ from .util import approx_equal
 
 logger = logging.getLogger("be.kuleuven.cs.dtai.mapmatching")
 approx_value = 0.0000000001
-ema_const = namedtuple('EMAConst', ['prev', 'cur'])(0.9, 0.1)
+ema_const = namedtuple('EMAConst', ['prev', 'cur'])(0.7, 0.3)
 default_label_width = 25
 
 
 class Matching(object):
     """Matching object that represents a node in the Viterbi lattice."""
-    __slots__ = ['matcher', 'edge_m', 'edge_o', 'logprob', 'logprobema', 'obs', 'obs_ne', 'dist_obs',
+    __slots__ = ['matcher', 'edge_m', 'edge_o',
+                 'logprob', 'logprobema', 'logprobe', 'logprobne',
+                 'obs', 'obs_ne', 'dist_obs',
                  'prev', 'prev_other', 'stop', 'length']
+
+    def __init__(self, matcher: 'Matcher', edge_m: Segment, edge_o: Segment,
+                 logprob=-np.inf, logprobema=-np.inf, logprobe=-np.inf, logprobne=-np.inf,
+                 dist_obs: float=0.0, obs: int=0, obs_ne: int=0,
+                 prev: Optional[Set['Matching']]=None, stop: bool=False, length: int=1):
+        self.edge_m: Segment = edge_m
+        self.edge_o: Segment = edge_o
+        self.logprob: float = logprob        # max probability
+        self.logprobe: float = logprobe      # Emitting
+        self.logprobne: float = logprobne    # Non-emitting
+        self.logprobema: float = logprobema  # exponential moving average log probability
+        self.obs: int = obs  # reference to path entry index (observation)
+        self.obs_ne: int = obs_ne  # number of non-emitting states for this observation
+        self.dist_obs: float = dist_obs  # Distance between map point and observation
+        self.prev: Set[Matching] = set() if prev is None else prev  # Previous best matching objects
+        self.prev_other: Set[Matching] = set()  # Previous matching objects with lower logprob
+        self.stop: bool = stop
+        self.length: int = length
+        self.matcher: Matcher = matcher
 
     def next(self, edge_m: Segment, edge_o: Segment, obs: int=0, obs_ne: int=0, only_edges=False):
         """Create a next Matching object with this Matching object as the previous one."""
@@ -77,34 +98,42 @@ class Matching(object):
         if edge_m.ti < self.edge_m.ti:
             # This node would imply going back on the edge between observations
             new_logprob_delta + math.log(0.9999)  # slight preference to avoid going back
-        new_logprob = self.logprob + new_logprob_delta
+        if obs_ne == 0:
+            new_logprobe = self.logprob + new_logprob_delta
+            new_logprobne = 0
+            new_logprob = new_logprobe
+            new_length = self.length + 1
+        else:
+            new_logprobe = self.logprobe
+            new_logprobne = self.logprobne + new_logprob_delta
+            # obs_ne + 2 to punish non-emitting states a bit less. Otherwise it would be
+            # similar to (Pr_tr*Pr_obs)**2, which punishes just one non-emitting state too much.
+            new_logprob = new_logprobe + new_logprobne / (obs_ne + 2)
+            new_length = self.length
         new_logprobema = ema_const.cur * new_logprob_delta + ema_const.prev * self.logprobema
-        new_stop |= self.matcher.do_stop(new_logprobema, dist)
+        new_stop |= self.matcher.do_stop(new_logprob / new_length, dist, logprob_trans, logprob_obs)
         if not new_stop or (__debug__ and logger.isEnabledFor(logging.DEBUG)):
             m_next = self.__class__(self.matcher, edge_m, edge_o,
-                                    logprob=new_logprob, logprobema=new_logprobema,
+                                    logprob=new_logprob, logprobne=new_logprobne,
+                                    logprobe=new_logprobe, logprobema=new_logprobema,
                                     obs=obs, obs_ne=obs_ne, prev={self}, dist_obs=dist,
-                                    stop=new_stop, length=self.length + 1)
+                                    stop=new_stop, length=new_length)
             return m_next
         else:
             return None
 
-    def __init__(self, matcher: 'Matcher', edge_m: Segment, edge_o: Segment,
-                 logprob=-np.inf, logprobema=-np.inf, dist_obs: float=0.0,
-                 obs: int=0, obs_ne: int=0,
-                 prev: Optional[Set['Matching']]=None, stop: bool=False, length: int=1):
-        self.edge_m: Segment = edge_m
-        self.edge_o: Segment = edge_o
-        self.logprob: float = logprob        # max probability
-        self.logprobema: float = logprobema  # exponential moving average log probability
-        self.obs: int = obs  # reference to path entry index (observation)
-        self.obs_ne: int = obs_ne  # number of non-emitting states for this observation
-        self.dist_obs: float = dist_obs  # Distance between map point and observation
-        self.prev: Set[Matching] = set() if prev is None else prev  # Previous best matching objects
-        self.prev_other: Set[Matching] = set()  # Previous matching objects with lower logprob
-        self.stop: bool = stop
-        self.length: int = length
-        self.matcher: Matcher = matcher
+    @classmethod
+    def first(cls, logprob_init, edge_m, edge_o, matcher, dist_obs):
+        logprob_obs = matcher.logprob_obs(dist_obs, None, edge_m, edge_o)
+        logprob = logprob_init + logprob_obs
+        new_stop = matcher.do_stop(logprob, dist_obs, logprob_init, logprob_obs)
+        if not new_stop or logger.isEnabledFor(logging.DEBUG):
+            m_next = cls(matcher, edge_m=edge_m, edge_o=edge_o,
+                         logprob=logprob, logprobema=logprob, logprobe=logprob, logprobne=0,
+                         dist_obs=dist_obs, obs=0, stop=new_stop)
+            return m_next
+        else:
+            return None
 
     def update(self, m_next):
         """Update the current entry if the new matching object is better.
@@ -112,19 +141,23 @@ class Matching(object):
         :param m_next: The new matching object representing the same node in the lattice.
         :return: True if the current object is replaced, False otherwise
         """
-        if self.length != m_next.length:
-            slogprob_norm = self.logprob / self.length
-            nlogprob_norm = m_next.logprob / m_next.length
-        else:
-            slogprob_norm = self.logprob
-            nlogprob_norm = m_next.logprob
-        if (self.stop == m_next.stop and slogprob_norm < nlogprob_norm) or (self.stop and not m_next.stop):
+        # if self.length != m_next.length:
+        #     slogprob_norm = self.logprob / self.length
+        #     nlogprob_norm = m_next.logprob / m_next.length
+        # else:
+        #     slogprob_norm = self.logprob
+        #     nlogprob_norm = m_next.logprob
+        # if (self.stop == m_next.stop and slogprob_norm < nlogprob_norm) or (self.stop and not m_next.stop):
+        #     self._update_inner(m_next)
+        #     return True
+        # elif abs(slogprob_norm - nlogprob_norm) < approx_value and self.stop == m_next.stop:
+        #     self.prev.update(m_next.prev)
+        #     self.stop = m_next.stop
+        #     return False
+        assert self.length == m_next.length
+        if (self.stop and not m_next.stop) or (self.stop == m_next.stop and self.logprob < m_next.logprob):
             self._update_inner(m_next)
             return True
-        elif abs(slogprob_norm - nlogprob_norm) < approx_value and self.stop == m_next.stop:
-            self.prev.update(m_next.prev)
-            self.stop = m_next.stop
-            return False
         else:
             self.prev_other.update(m_next.prev)
             return False
@@ -133,9 +166,13 @@ class Matching(object):
         self.edge_m = m_other.edge_m
         self.edge_o = m_other.edge_o
         self.logprob = m_other.logprob
+        self.logprobe = m_other.logprobe
+        self.logprobne = m_other.logprobne
         self.logprobema = m_other.logprobema
         self.dist_obs = m_other.dist_obs
-        self.prev_other.update(self.prev)
+        self.obs = m_other.obs
+        self.obs_ne = m_other.obs_ne
+        self.prev_other.update(self.prev)  # Do we use this?
         self.prev = m_other.prev
         self.stop = m_other.stop
         self.length = m_other.length
@@ -146,28 +183,38 @@ class Matching(object):
     def is_emitting(self):
         return self.obs_ne == 0
 
+    def last_emitting_logprob(self):
+        if self.is_emitting():
+            return self.logprob
+        elif self.prev is None or len(self.prev) == 0:
+            return 0
+        else:
+            return next(iter(self.prev)).last_emitting_logprob()
+
     def __str__(self, label_width=None):
         stop = "x" if self.stop else ""
         if label_width is None:
             label_width = default_label_width
-        repr_tmpl = "{:<2} | {:<"+str(label_width)+"} | {:10.5f} | {:10.5f} | {:10.5f} | {:<3} | {:10.5f} | {}"
-        return repr_tmpl.format(stop, self.label, self.logprob, self.logprob / self.length, self.logprobema, self.obs,
+        repr_tmpl = "{:<2} | {:<"+str(label_width)+"} | {:10.5f} | {:10.5f} | {:10.5f} | {:10.5f} | " +\
+                    "{:<3} | {:10.5f} | {}"
+        return repr_tmpl.format(stop, self.label, self.logprob, self.logprob / self.length,
+                                self.logprobema, self.logprobne, self.obs,
                                 self.dist_obs, ",".join([str(prev.label) for prev in self.prev]))
 
     @staticmethod
-    def repr_header(label_width=None):
+    def repr_header(label_width=None, stop=""):
         if label_width is None:
             label_width = default_label_width
-        repr_tmpl = "{:<2} | {:<"+str(label_width)+"} | {:<10} | {:<10} | {:<10} | " + \
+        repr_tmpl = "{:<2} | {:<"+str(label_width)+"} | {:<10} | {:<10} | {:<10} | {:<10} | " + \
                     "{:<3} | {:<10} | {:<"+str(label_width)+"} |"
-        return repr_tmpl.format("", "", "lg(Pr)", "nlg(Pr)", "slg(Pr)", "obs", "d(obs)", "prev")
+        return repr_tmpl.format(stop, "", "lg(Pr)", "nlg(Pr)", "slg(Pr)", "lg(Pr-ne)", "obs", "d(obs)", "prev")
 
     @staticmethod
     def repr_static(fields, label_width=None):
         if label_width is None:
             label_width = default_label_width
-        default_fields = ["", "", float('nan'), float('nan'), float('nan'), "", float('nan'), "", ""]
-        repr_tmpl = "{:<2} | {:<" + str(label_width) + "} | {:10.5f} | {:10.5f} | {:10.5f} | " + \
+        default_fields = ["", "", float('nan'), float('nan'), float('nan'), float('nan'), "", float('nan'), "", ""]
+        repr_tmpl = "{:<2} | {:<" + str(label_width) + "} | {:10.5f} | {:10.5f} | {:10.5f} | {:10.5f} | " + \
                     "{:<3} | {:10.5f} | {:<" + str(label_width) + "} |"
         if len(fields) < 8:
             fields = list(fields) + default_fields[len(fields):]
@@ -258,7 +305,7 @@ class Matcher:
 
     def __init__(self, map_con, obs_noise=1, max_dist_init=None, max_dist=None, min_prob_norm=None,
                  non_emitting_states=False, max_lattice_width=None,
-                 only_edges=False, obs_noise_ne=None, matching=Matching):
+                 only_edges=False, obs_noise_ne=None, matching=Matching, avoid_goingback=False):
         """Initialize a matcher for map matching.
 
         Distances are in meters when using latitude-longitude.
@@ -318,8 +365,17 @@ class Matcher:
         self.non_emitting_states_maxnb = 100
         self.max_lattice_width = max_lattice_width
         self.only_edges = only_edges
+        self.avoid_goingback = avoid_goingback
 
     def logprob_trans(self, prev_m, next_label=None, next_pos=None):
+        if self.avoid_goingback:
+            going_back = False
+            for m in prev_m.prev:
+                if next_label == m.edge_m.l1:
+                    going_back = True
+                    break
+            if going_back:
+                return -0.3  # Pr==0.5, prefer not going back
         return 0  # All probabilities are 1 (thus technically not a distribution)
 
     def logprob_obs(self, dist, prev_m, new_edge_m, new_edge_o):
@@ -340,9 +396,10 @@ class Matcher:
         path = gpx_to_path(gpx_file)
         return self.match(path, unique=unique)
 
-    def do_stop(self, logprob_norm, dist):
+    def do_stop(self, logprob_norm, dist, logprob_trans, logprob_obs):
         if logprob_norm < self.min_logprob_norm:
-            logger.debug(f"     Stopped trace: norm(log(Pr)) too small: {logprob_norm} < {self.min_logprob_norm}")
+            logger.debug(f"     Stopped trace: norm(log(Pr)) too small: {logprob_norm} < {self.min_logprob_norm}"
+                         f"  -- lPr_t = {logprob_trans:.3f}, lPr_o = {logprob_obs:.3f}")
             return True
         if dist > self.max_dist:
             logger.debug(f"     Stopped trace: distance too large: {dist} > {self.max_dist}")
@@ -529,11 +586,8 @@ class Matcher:
                 for nbr_label, nbr_loc in nbrs:
                     edge_m = Segment(label, loc, nbr_label, nbr_loc, loc, 0.0)
                     edge_o = Segment(f"O{0}", self.path[0])
-                    logprob = logprob_init + self.logprob_obs(dist_obs, None, edge_m, edge_o)
-                    new_stop = self.do_stop(logprob, dist_obs)
-                    if not new_stop or logger.isEnabledFor(logging.DEBUG):
-                        m_next = self.matching(self, edge_m=edge_m, edge_o=edge_o, logprob=logprob, logprobema=logprob,
-                                               dist_obs=dist_obs, obs=0, stop=new_stop)
+                    m_next = self.matching.first(logprob_init, edge_m, edge_o, self, dist_obs)
+                    if m_next is not None:
                         if label in self.lattice[0]:
                             self.lattice[0][label].update(m_next)
                         else:
@@ -545,11 +599,8 @@ class Matcher:
             for dist_obs, label, loc in nodes:
                 edge_m = Segment(label, loc)
                 edge_o = Segment(f"O{0}", self.path[0])
-                logprob = logprob_init + self.logprob_obs(dist_obs, None, edge_m, edge_o)
-                new_stop = self.do_stop(logprob, dist_obs)
-                if not new_stop or logger.isEnabledFor(logging.DEBUG):
-                    m_next = self.matching(self, edge_m=edge_m, edge_o=edge_o, logprob=logprob, logprobema=logprob,
-                                           dist_obs=dist_obs, obs=0, stop=new_stop)
+                m_next = self.matching.first(logprob_init, edge_m, edge_o, self, dist_obs)
+                if m_next is not None:
                     self.lattice[0][label] = m_next
                     if __debug__:
                         logger.debug(str(m_next))
@@ -942,11 +993,13 @@ class Matcher:
         node_max = None
         cur_depth = 0
         for m in self.lattice[start_idx].values():
-            if node_max is None or m.logprobema > node_max.logprobema:
+            if node_max is None or m.logprob > node_max.logprob:
                 node_max = m
         if node_max is None:
             raise Exception("Did not find a matching node for path point at index {}".format(start_idx))
-        logger.debug("Start: {}".format(node_max))
+        if __debug__ and logger.isEnabledFor(logging.DEBUG):
+            logger.debug(Matching.repr_header(stop="             "))
+        logger.debug("Start ({}): {}".format(node_max.obs, node_max))
         node_path_rev = [node_max.shortkey]
         self.lattice_best.append(node_max)
         if node_max.is_emitting():
@@ -958,11 +1011,11 @@ class Matcher:
             node_max_last = node_max
             node_max: Optional[Matching] = None
             for prev_m in node_max_last.prev:
-                if prev_m is not None and (node_max is None or prev_m.logprobema > node_max.logprobema):
+                if prev_m is not None and (node_max is None or prev_m.logprob > node_max.logprob):
                     node_max = prev_m
             if node_max is None:
                 raise Exception("Did not find a matching node for path point at index {}".format(node_max_last.obs))
-            logger.debug("Max ({}): {}".format(node_max_last.obs, node_max))
+            logger.debug("Max   ({}): {}".format(node_max.obs, node_max))
             node_path_rev.append(node_max.shortkey)
             self.lattice_best.append(node_max)
             if node_max.is_emitting():
@@ -1103,7 +1156,8 @@ class Matcher:
                                  max_dist=self.max_dist, min_prob_norm=self.min_logprob_norm,
                                  non_emitting_states=self.non_emitting_states,
                                  max_lattice_width=self.max_lattice_width, only_edges=self.only_edges,
-                                 obs_noise_ne=self.obs_noise_ne, matching=self.matching)
+                                 obs_noise_ne=self.obs_noise_ne, matching=self.matching,
+                                 avoid_goingback=self.avoid_goingback)
         matcher.lattice = []
         matcher.path = []
         for int_i in range(len(self.lattice) - nb_interfaces, len(self.lattice)):

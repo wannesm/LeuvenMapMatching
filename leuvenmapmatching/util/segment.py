@@ -27,10 +27,14 @@ class Segment(object):
 
     @property
     def label(self):
+        if self.l2 is None:
+            return self.l1
         return f"{self.l1}-{self.l2}"
 
     @property
     def key(self):
+        if self.l2 is None:
+            return self.l1
         return f"{self.l1}-{self.l2}"
 
     @property

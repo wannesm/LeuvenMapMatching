@@ -18,7 +18,8 @@ import smopy
 
 
 logger = logging.getLogger("be.kuleuven.cs.dtai.mapmatching")
-match_color = mcolors.CSS4_COLORS['olive']
+match_color = mcolors.CSS4_COLORS['green']
+match_ne_color = mcolors.CSS4_COLORS['olive']
 lattice_color = mcolors.CSS4_COLORS['magenta']
 # nodes_color = mcolors.CSS4_COLORS['orange']
 nodes_color = mcolors.CSS4_COLORS['black']
@@ -124,7 +125,10 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
         ax.scatter(gx, gy, s=node_sizes, alpha=0.4)
         if show_labels:
             for key, t in graph.items():
-                ax.annotate(str(key), xy=coord_trans(t[0]))
+                key = str(key)
+                if type(show_labels) is int:
+                    key = key[-show_labels:]
+                ax.annotate(key, xy=coord_trans(t[0]))
 
         logger.debug('Plot lines ...')
         for _, loc_a, _, loc_b in map_con.all_edges():
@@ -172,7 +176,10 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
         for idx, m in enumerate(lat_nodes):
             x, y = coord_trans(*m.edge_m.pi[:2])
             x2, y2 = coord_trans(*m.edge_o.pi[:2])
-            ax.plot((x, x2), (y, y2), '-', color=match_color, linewidth=linewidth, alpha=0.75)
+            if m.edge_o.is_point():
+                ax.plot((x, x2), (y, y2), '-', color=match_color, linewidth=linewidth, alpha=0.75)
+            else:
+                ax.plot((x, x2), (y, y2), '-', color=match_ne_color, linewidth=linewidth, alpha=0.75)
             # ax.plot((x, x2), (y, y2), '-', color=match_color, linewidth=10, alpha=0.1)
             # if show_labels:
             #     ax.annotate(str(m.obs), xy=(x, y))

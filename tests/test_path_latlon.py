@@ -124,8 +124,7 @@ def test_path1():
                         filename=str(directory / "test_path_latlon_path1.png"))
 
 
-@pytest.mark.skip(reason="Ignore LatLon for now")
-def test_path2_proj():
+def test_path2_proj_e():
     prepare_files()
     track = [p[:2] for p in gpx_to_path(track2_fn)]
     proj = partial(latlon2grs80, lon_0=track[0][1], lat_ts=track[0][0])
@@ -134,16 +133,51 @@ def test_path2_proj():
     # track = mm.util.interpolate_path(track, 5)
     map_con = create_map2(convert_latlon=proj)
     matcher = mm.matching.Matcher(map_con, max_dist=300, max_dist_init=25,
-                                  obs_noise=100, obs_noise_ne=100, min_prob_norm=0.1,
-                                  max_lattice_width=5,
+                                  obs_noise=75, obs_noise_ne=125, min_prob_norm=0.1,
+                                  max_lattice_width=5, only_edges=True,
                                   non_emitting_states=True)
-    nodes, last_idx = matcher.match(track, unique=False)
-    if len(nodes) < len(track):
+    path, last_idx = matcher.match(track, unique=False)
+    nodes = matcher.path_pred_onlynodes
+    if len(path) < len(track):
         raise Exception(f"Could not find a match for the full path. Last index = {last_idx}")
     if directory:
         matcher.print_lattice_stats()
-        mm_viz.plot_map(map_con, matcher=matcher, nodes=nodes, path=track, use_osm=False,
-                        show_lattice=True, filename=str(directory / "test_path_latlon_path2_proj_ne.png"))
+        mm_viz.plot_map(map_con, matcher=matcher, path=track, use_osm=False,
+                        show_lattice=True, show_matching=True, show_labels=3,
+                        filename=str(directory / "test_path_latlon_path2_proj_e.png"))
+    nodes_sol = [5435850758, 2634474831, 1096512242, 3051083902, 1096512239, 1096512241, 1096512240,
+                 1096508366, 1096508372, 16483861, 3051083900, 16483864, 16483865, 3060515058, 16526534,
+                 16526532, 1274158119, 16526540, 3060597377, 16526541, 16424220, 1233373340, 613125597,
+                 1076057753]
+    assert nodes == nodes_sol, f"Nodes do not match: {nodes}"
+
+
+def test_path2_proj_ne():
+    prepare_files()
+    track = [p[:2] for p in gpx_to_path(track2_fn)]
+    proj = partial(latlon2grs80, lon_0=track[0][1], lat_ts=track[0][0])
+    track = list(proj(track))
+    # track = track[:3]
+    # track = mm.util.interpolate_path(track, 5)
+    map_con = create_map2(convert_latlon=proj)
+    matcher = mm.matching.Matcher(map_con, max_dist=300, max_dist_init=25,
+                                  obs_noise=75, obs_noise_ne=125, min_prob_norm=0.1,
+                                  max_lattice_width=5, only_edges=False,
+                                  non_emitting_states=True)
+    path, last_idx = matcher.match(track, unique=False)
+    nodes = matcher.path_pred_onlynodes
+    if len(path) < len(track):
+        raise Exception(f"Could not find a match for the full path. Last index = {last_idx}")
+    if directory:
+        matcher.print_lattice_stats()
+        mm_viz.plot_map(map_con, matcher=matcher, path=track, use_osm=False,
+                        show_lattice=True, show_matching=True, show_labels=3,
+                        filename=str(directory / "test_path_latlon_path2_proj_ne.png"))
+    nodes_sol = [5435850758, 2634474829, 5435850755, 1096512241, 1096512240, 1096508366, 1096508372,
+                 16483861, 1096508360, 159656075, 1096508382, 16483862, 3051083898, 16526535, 3060597381,
+                 3060515059, 16526534, 16526532, 1274158119, 16526540, 3060597377, 16526541, 16424220,
+                 1233373340, 613125597, 1076057753]
+    assert nodes == nodes_sol, f"Nodes do not match: {nodes}"
 
 
 @pytest.mark.skip(reason="Ignore LatLon for now")
@@ -195,6 +229,7 @@ if __name__ == "__main__":
     print(f"Saving files to {directory}")
     # test_path1()
     # plot_path(max_nodes=None)
-    test_path2_proj()
+    # test_path2_proj_e()
+    test_path2_proj_ne()
     # test_path2()
     # test_path2_onlyedges()
