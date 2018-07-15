@@ -77,6 +77,7 @@ class Map(object):
         return None
 
 
+# TODO: Create an InMemMap version based on a geopandas datastructure
 class InMemMap(Map):
     def __init__(self, graph=None, use_latlon=True):
         """

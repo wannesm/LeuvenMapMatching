@@ -41,6 +41,7 @@ Reference:
 
 
    examples/introduction
+   examples/openstreetmap
 
 
 .. toctree::
