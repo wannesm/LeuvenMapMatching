@@ -104,9 +104,9 @@ class Matching(object):
             new_logprob = new_logprobe
             new_length = self.length + 1
         else:
-            # "* 0.99 / - 0.00435" for every step to a non-emitting state to prefer shorter paths
-            # TODO: Can we remove magic number?
-            new_logprobe = self.logprobe - 0.004345
+            # "* 0.999 / - 0.000435" for every step to a non-emitting state to prefer shorter paths
+            # TODO: Can we remove magic number? Make it dependent on distance between observations vs nodes?
+            new_logprobe = self.logprobe - 0.0004345
             new_logprobne = self.logprobne + new_logprob_delta
             # "+ 2" to punish non-emitting states a bit less. Otherwise it would be
             # similar to (Pr_tr*Pr_obs)**2, which punishes just one non-emitting state too much.
@@ -254,6 +254,13 @@ class Matching(object):
             return self.edge_m.l1
         else:
             return tuple([self.edge_m.l1, self.edge_m.l2])
+
+    @property
+    def nodes(self):
+        if self.edge_m.l2 is None:
+            return [self.edge_m.l1]
+        else:
+            return [self.edge_m.l1, self.edge_m.l2]
 
     def __hash__(self):
         return self.cname.__hash__()
@@ -748,13 +755,20 @@ class Matcher:
             self._insert(m)
 
     def _node_in_prev_ne(self, m_next, label):
+        """Is the given node already visited in the chain of non-emitting states.
+
+        :param m_next:
+        :param label: Node label
+        :return: True or False
+        """
         # for m in itertools.chain(m_next.prev, m_next.prev_other):
-        for m in m_next.prev:
+        for m in m_next.prev:  # type: Matching
             if m.obs != m_next.obs:
                 return False
             assert(m_next.obs_ne != m.obs_ne)
             # print('prev', m.shortkey, 'checking for ', label)
-            if label == m.shortkey:
+            # if label == m.shortkey:
+            if label in m.nodes:
                 return True
             if m.obs_ne == 0:
                 return False
@@ -834,6 +848,7 @@ class Matcher:
                         f"   Move to {len(nbrs)} neighbours from node {cur_node} ({m.label}, non-emitting)")
                     logger.debug(m.repr_header())
                 for nbr_label, nbr_loc in nbrs:
+                    # print(f"self._node_in_prev_ne({m.label}, {nbr_label}) = {self._node_in_prev_ne(m, nbr_label)}")
                     if self._node_in_prev_ne(m, nbr_label):
                         if __debug__:
                             logger.debug(self.matching.repr_static(('x', '{} <'.format(nbr_label))))
@@ -866,7 +881,7 @@ class Matcher:
                     else:
                         if __debug__:
                             logger.debug(
-                                self.matching.repr_static(('x', f'{m.edge_m.l2}-{nbr_label} <')))
+                                self.matching.repr_static(('x', f'{m.edge_m.l1}-{nbr_label} <')))
             else:
                 if __debug__:
                     logger.debug(f"   Ignoring, non-emitting is only node-node or edge-edge")
