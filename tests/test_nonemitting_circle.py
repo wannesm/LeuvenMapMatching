@@ -128,5 +128,5 @@ if __name__ == "__main__":
     directory = Path(os.environ.get('TESTDIR', Path(__file__).parent))
     print(f"Saving files to {directory}")
     visualize_map()
-    test_path1()
+    # test_path1()
     test_path2()

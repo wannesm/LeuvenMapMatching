@@ -45,7 +45,7 @@ class Matching(object):
         self.logprob: float = logprob        # max probability
         self.logprobe: float = logprobe      # Emitting
         self.logprobne: float = logprobne    # Non-emitting
-        self.logprobema: float = logprobema  # exponential moving average log probability
+        self.logprobema: float = logprobema  # exponential moving average log probability  # TODO: Not used anymore?
         self.obs: int = obs  # reference to path entry index (observation)
         self.obs_ne: int = obs_ne  # number of non-emitting states for this observation
         self.dist_obs: float = dist_obs  # Distance between map point and observation
@@ -56,7 +56,7 @@ class Matching(object):
         self.matcher: Matcher = matcher
 
     def next(self, edge_m: Segment, edge_o: Segment, obs: int=0, obs_ne: int=0, only_edges=False):
-        """Create a next Matching object with this Matching object as the previous one."""
+        """Create a next lattice Matching object with this Matching object as the previous one in the lattice."""
         new_stop = False
         if edge_m.is_point() and edge_o.is_point():
             # node to node
@@ -97,16 +97,18 @@ class Matching(object):
         new_logprob_delta = logprob_trans + logprob_obs
         if edge_m.ti < self.edge_m.ti:
             # This node would imply going back on the edge between observations
-            new_logprob_delta + math.log(0.9999)  # slight preference to avoid going back
+            new_logprob_delta - 0.0004345  # math.log(0.999), slight preference to avoid going back
         if obs_ne == 0:
             new_logprobe = self.logprob + new_logprob_delta
             new_logprobne = 0
             new_logprob = new_logprobe
             new_length = self.length + 1
         else:
-            new_logprobe = self.logprobe
+            # "* 0.99 / - 0.00435" for every step to a non-emitting state to prefer shorter paths
+            # TODO: Can we remove magic number?
+            new_logprobe = self.logprobe - 0.004345
             new_logprobne = self.logprobne + new_logprob_delta
-            # obs_ne + 2 to punish non-emitting states a bit less. Otherwise it would be
+            # "+ 2" to punish non-emitting states a bit less. Otherwise it would be
             # similar to (Pr_tr*Pr_obs)**2, which punishes just one non-emitting state too much.
             new_logprob = new_logprobe + new_logprobne / (obs_ne + 2)
             new_length = self.length
@@ -124,6 +126,7 @@ class Matching(object):
 
     @classmethod
     def first(cls, logprob_init, edge_m, edge_o, matcher, dist_obs):
+        """Create an initial lattice Matching object."""
         logprob_obs = matcher.logprob_obs(dist_obs, None, edge_m, edge_o)
         logprob = logprob_init + logprob_obs
         new_stop = matcher.do_stop(logprob, dist_obs, logprob_init, logprob_obs)
@@ -458,8 +461,7 @@ class Matcher:
             if self.non_emitting_states:
                 # Fill in non-emitting states between previous and current observation
                 self._match_non_emitting_states(obs_idx - 1)
-            if __debug__:
-                if logger.isEnabledFor(logging.DEBUG):
+            if __debug__ and logger.isEnabledFor(logging.DEBUG):
                     self.print_lattice(obs_idx=obs_idx, label_width=default_label_width)
 
         t_delta = time.time() - t_start
