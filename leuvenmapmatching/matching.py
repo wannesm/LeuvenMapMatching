@@ -104,9 +104,9 @@ class Matching(object):
             new_logprob = new_logprobe
             new_length = self.length + 1
         else:
-            # "* 0.999 / - 0.000435" for every step to a non-emitting state to prefer shorter paths
-            # TODO: Can we remove magic number? Make it dependent on distance between observations vs nodes?
-            new_logprobe = self.logprobe - 0.0004345
+            # "* e^(ne_length_factor_log)" or "- ne_length_factor_log" for every step to a non-emitting
+            # state to prefer shorter paths
+            new_logprobe = self.logprobe - self.matcher.ne_length_factor_log
             new_logprobne = self.logprobne + new_logprob_delta
             # "+ 2" to punish non-emitting states a bit less. Otherwise it would be
             # similar to (Pr_tr*Pr_obs)**2, which punishes just one non-emitting state too much.
@@ -315,7 +315,8 @@ class Matcher:
 
     def __init__(self, map_con, obs_noise=1, max_dist_init=None, max_dist=None, min_prob_norm=None,
                  non_emitting_states=False, max_lattice_width=None,
-                 only_edges=False, obs_noise_ne=None, matching=Matching, avoid_goingback=False):
+                 only_edges=False, obs_noise_ne=None, matching=Matching, avoid_goingback=False,
+                 non_emitting_length_factor=0.999):
         """Initialize a matcher for map matching.
 
         Distances are in meters when using latitude-longitude.
@@ -334,6 +335,10 @@ class Matcher:
             If there are more possible next states, the states with the best likelihood so far are selected.
         :param only_edges: Do not include nodes as states, only edges. This is the typical setting for HMM methods.
         :param matching: Matching type
+        :param avoid_goingback: Change the transition probability to be lower for the direction the path is coming
+            from.
+        :param non_emitting_length_factor: Reduce the probability of a sequence of non-emitting states the longer it
+            is. This can be used to prefer shorter paths.
 
         To define a custom transition and/or emission probabiility distribtion, overwrite the following functions:
         - :meth:`logprob_trans`
@@ -376,6 +381,7 @@ class Matcher:
         self.max_lattice_width = max_lattice_width
         self.only_edges = only_edges
         self.avoid_goingback = avoid_goingback
+        self.ne_length_factor_log = math.log(non_emitting_length_factor)
 
     def logprob_trans(self, prev_m, next_label=None, next_pos=None):
         if self.avoid_goingback:
@@ -1174,7 +1180,8 @@ class Matcher:
                                  non_emitting_states=self.non_emitting_states,
                                  max_lattice_width=self.max_lattice_width, only_edges=self.only_edges,
                                  obs_noise_ne=self.obs_noise_ne, matching=self.matching,
-                                 avoid_goingback=self.avoid_goingback)
+                                 avoid_goingback=self.avoid_goingback,
+                                 non_emitting_length_factor=math.exp(self.ne_length_factor_log))
         matcher.lattice = []
         matcher.path = []
         for int_i in range(len(self.lattice) - nb_interfaces, len(self.lattice)):
