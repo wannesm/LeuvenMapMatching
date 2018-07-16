@@ -338,9 +338,11 @@ class Matcher:
         :param avoid_goingback: Change the transition probability to be lower for the direction the path is coming
             from.
         :param non_emitting_length_factor: Reduce the probability of a sequence of non-emitting states the longer it
-            is. This can be used to prefer shorter paths.
+            is. This can be used to prefer shorter paths. This is separate from the transition probabilities because
+            transition probabilities are averaged for non-emitting states and thus the length is also averaged out.
 
-        To define a custom transition and/or emission probabiility distribtion, overwrite the following functions:
+        To define a custom transition and/or emission probability distribtion, overwrite the following functions:
+
         - :meth:`logprob_trans`
         - :meth:`logprob_obs_ne`
         - :meth:`logprob_obs`

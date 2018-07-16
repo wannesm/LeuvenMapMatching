@@ -22,17 +22,18 @@ You can use the overpass-api.de service:
                 ofile.write(chunk)
 
 
-Create graph using osmread
---------------------------
+Create graph using osmread and pyproj
+-------------------------------------
 
 Once we have a file containing the region we are interested in, we can select the roads we want to use
 to create a graph from. In this case we focus on 'ways' with a 'highway' tag. Those represent a variety
 of roads. For a more detailed filtering look at the
 `possible values of the highway tag <https://wiki.openstreetmap.org/wiki/Key:highway>`_.
 
-It is also recommended to project the latitude-longitude coordinates to an Euclidean space. In the
-example below this is achieved using the projection available in the utils. But any other projection
-can be used, for example using the ``pyproj`` Python package.
+It is also recommended to project the latitude-longitude coordinates to an Euclidean space.
+In the example below this is achieved using the projection available in the utils, which is based on the
+`pyproj <https://jswhit.github.io/pyproj/>`_ package.
+But any other projection can be used by using the pyproj package directly.
 
 .. code-block:: python
     import leuvenmapmatching as mm
@@ -51,11 +52,33 @@ can be used, for example using the ``pyproj`` Python package.
     map_con.purge()
 
 
-Create graph using osmnx
-------------------------
+Create graph using osmnx and geopandas
+--------------------------------------
 
 Another great library to interact with OpenStreetMap data is the `osmnx <https://github.com/gboeing/osmnx>`_ package.
 The osmnx package can retrieve relevant data automatically, for example when given a name of a region.
 This package is build on top of the `geopandas <http://geopandas.org>`_ package that also includes routines to
 perform projections.
 
+.. code-block:: python
+    import osmnx
+    graph = ox.graph_from_place('Leuven, Belgium', network_type='drive')
+    graph_proj = ox.project_graph(graph)
+    # Create GeoDataFrames
+    nodes_proj, edges_proj = ox.graph_to_gdfs(graph_proj, nodes=True, edges=True)
+    for nid, row in edges_proj[['u', 'v']].iterrows():
+        map_cont.add_edge(row['u'], None, row['v'], None)
+    for nid, row in nodes_proj[['x', 'y']].iterrows()
+        map_con.add_node(nid, (row['x'], row['y']))
+
+
+The projections can also be achieved directly on the GeoDataFrame:
+
+.. code-block:: python
+    nodes, edges = ox.graph_to_gdfs(graph, nodes=True, edges=True)
+    nodes.crs = {'init': 'epsg:4326'}  # WGS 84, System used in GPS
+    nodes_proj = nodes.to_crs({'init': 'epsg:3395'})  # Mercator projection
+    edges.crs = {'init': 'epsg:4326'}
+    edges_proj = nodes.to_crs({'init': 'epsg:3395'})
+
+When projecting both the map and the track you want to match, make sure to use the same projection.
