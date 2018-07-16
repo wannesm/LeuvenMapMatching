@@ -53,7 +53,8 @@ def prepare_files(verbose=False):
 
 
 def create_map():
-    map_con = mm.map.InMemMap(use_latlon=True)
+    from leuvenmapmatching.map.inmemmap import InMemMap
+    map_con = InMemMap(use_latlon=True)
     cnt = 0
     for entity in osmread.parse_file(str(osm_fn)):
         if isinstance(entity, osmread.Way) and 'highway' in entity.tags:
@@ -68,8 +69,9 @@ def create_map():
 
 
 def create_map2(convert_latlon=None):
+    from leuvenmapmatching.map.inmemmap import InMemMap
     use_latlon = True if convert_latlon is None else False
-    map_con = mm.map.InMemMap(use_latlon=use_latlon)
+    map_con = InMemMap(use_latlon=use_latlon)
     cnt = 0
     for entity in osmread.parse_file(str(osm2_fn)):
         if isinstance(entity, osmread.Way) and 'highway' in entity.tags:

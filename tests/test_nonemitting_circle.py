@@ -25,6 +25,7 @@ directory = None
 
 
 def setup_map(disconnect=True):
+    from leuvenmapmatching.map.inmemmap import InMemMap
     theta = np.linspace(0, 2 * math.pi, 4 * 5 + 1)[:-1]
 
     ox = 0.1 + np.cos(theta * 0.95)
@@ -55,7 +56,7 @@ def setup_map(disconnect=True):
     if not disconnect:
         path_sol += ["N0"]
 
-    mapdb = mm.map.InMemMap(graph=graph, use_latlon=False)
+    mapdb = InMemMap(graph=graph, use_latlon=False)
     return mapdb, path1, path2, path_sol
 
 

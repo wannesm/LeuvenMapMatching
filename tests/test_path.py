@@ -13,6 +13,7 @@ import os
 import logging
 from pathlib import Path
 import leuvenmapmatching as mm
+from leuvenmapmatching.map.inmemmap import InMemMap
 
 
 directory = None
@@ -25,7 +26,7 @@ def test_path1():
             (3.0, 4.0), (3.1, 4.3), (3.1, 4.6), (3.0, 4.9)]
     path_sol = ['A', ('A', 'B'), 'B', ('B', 'D'), 'D', ('D', 'E'), 'E', ('E', 'F')]
     path_sol_nodes = ['A', 'B', 'D', 'E', 'F']
-    mapdb = mm.map.InMemMap(graph=[
+    mapdb = InMemMap(graph=[
         ("A", (1, 1), ["B", "C"]),
         ("B", (1, 3), ["A", "C", "D"]),
         ("C", (2, 2), ["A", "B", "D", "E"]),
@@ -53,7 +54,7 @@ def test_path2():
             (2.1, 3.3), (2.4, 3.2), (2.6, 3.1), (2.9, 3.1), (3.0, 3.2), (3.1, 3.8),
             (3.0, 4.0), (3.1, 4.3), (3.1, 4.6), (3.0, 4.9)]
     path_sol = ['A', ('A', 'B'), 'B', ('B', 'D'), 'D', ('D', 'E'), 'E', ('E', 'F')]
-    mapdb = mm.map.InMemMap(graph=[
+    mapdb = InMemMap(graph=[
         ("A", (1, 1), ["B", "C", "X"]),
         ("B", (1, 3), ["A", "C", "D", "K"]),
         ("C", (2, 2), ["A", "B", "D", "E", "X", "Y"]),
@@ -85,7 +86,7 @@ def test_path_outlier():
             (3.0, 4.0), (3.1, 4.3), (3.1, 4.6), (3.0, 4.9)]
     path_sol = ['A', 'B', 'D', 'C', 'E', 'F']
     path.insert(13, (2.3, 1.8))
-    mapdb = mm.map.InMemMap(graph=[
+    mapdb = InMemMap(graph=[
         ("A", (1, 1), ["B", "C", "X"]),
         ("B", (1, 3), ["A", "C", "D", "K"]),
         ("C", (2, 2), ["A", "B", "D", "E", "X", "Y"]),
@@ -118,7 +119,7 @@ def test_path_outlier():
 def test_path3():
     path = [(3.0, 3.2), (3.1, 3.8), (3.0, 4.0), (3.1, 4.3), (3.1, 4.6), (3.0, 4.9)]
     path_sol = ['E', 'F']
-    mapdb = mm.map.InMemMap(graph=[
+    mapdb = InMemMap(graph=[
         ("E", (3, 3), ["F"]),
         ("F", (3, 5), ["E"]),
     ], use_latlon=False)

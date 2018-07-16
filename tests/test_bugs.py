@@ -13,6 +13,7 @@ import sys
 import logging
 from pathlib import Path
 import leuvenmapmatching as mm
+from leuvenmapmatching.map.inmemmap import InMemMap
 
 
 directory = None
@@ -22,7 +23,7 @@ def test_bug1():
     dist = 10
     nb_steps = 20
 
-    map_con = mm.map.InMemMap(graph=[
+    map_con = InMemMap(graph=[
         ("A", (1, dist), ["B"]),
         ("B", (2, dist), ["A", "C", "CC"]),
 

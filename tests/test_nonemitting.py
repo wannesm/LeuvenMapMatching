@@ -24,10 +24,11 @@ directory = None
 
 
 def setup_map():
+    from leuvenmapmatching.map.inmemmap import InMemMap
     path1 = [(1.8, 0.1), (1.8, 3.5), (3.0, 4.9)]  # More nodes than observations
     path2 = [(1.8, 0.1), (1.8, 2.0), (1.8, 3.5), (3.0, 4.9)]
     path_sol = ['X', 'C', 'D', ('D', 'F')]
-    mapdb = mm.map.InMemMap(graph=[
+    mapdb = InMemMap(graph=[
         ("A", (1, 1), ["B", "C", "X"]),
         ("B", (1, 3), ["A", "C", "D", "K"]),
         ("C", (2, 2), ["A", "B", "D", "E", "X", "Y"]),
@@ -114,13 +115,14 @@ def test_path2_incremental():
 
 def test_path_duplicate():
     from datetime import datetime
+    from leuvenmapmatching.map.inmemmap import InMemMap
     # A path with two identical points
     path = [(0.8, 0.7), (0.9, 0.7), (1.1, 1.0), (1.2, 1.5), (1.2, 1.5), (1.2, 1.6), (1.1, 2.0),
             (1.1, 2.3), (1.3, 2.9), (1.2, 3.1), (1.5, 3.2), (1.8, 3.5), (2.0, 3.7),
             (2.1, 3.3), (2.4, 3.2), (2.6, 3.1), (2.9, 3.1), (3.0, 3.2), (3.1, 3.8),
             (3.0, 4.0), (3.1, 4.3), (3.1, 4.6), (3.0, 4.9)]
 
-    mapdb = mm.map.InMemMap(graph=[
+    mapdb = InMemMap(graph=[
         ("A", (1, 1), ["B", "C"]),
         ("B", (1, 3), ["A", "C", "D"]),
         ("C", (2, 2), ["A", "B", "D", "E"]),
@@ -149,11 +151,13 @@ def test_path_duplicate():
 
 
 def test_path3_many_obs():
+    from leuvenmapmatching.map.inmemmap import InMemMap
+
     path = [(1, 0), (3, -0.1), (3.7, 0.6), (4.5, 0.7),
             (5.5, 1.2), (6.5, 0.88), (7.5, 0.65), (8.5, -0.1),
             (9.8, 0.1),(10.1, 1.9)]
     path_sol = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I']
-    mapdb = mm.map.InMemMap(graph=[
+    mapdb = InMemMap(graph=[
         ("A", (1, 0.00), ["B"]),
         ("B", (3, 0.00), ["A", "C"]),
         ("C", (4, 0.70), ["B", "D"]),
@@ -178,9 +182,10 @@ def test_path3_many_obs():
 
 
 def test_path3_few_obs_en():
+    from leuvenmapmatching.map.inmemmap import InMemMap
     path = [(1, 0), (7.5, 0.65), (10.1, 1.9)]
     path_sol = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I']
-    mapdb = mm.map.InMemMap(graph=[
+    mapdb = InMemMap(graph=[
         ("A", (1, 0.00), ["B"]),
         ("B", (3, 0.00), ["A", "C"]),
         ("C", (4, 0.70), ["B", "D"]),
@@ -205,9 +210,10 @@ def test_path3_few_obs_en():
 
 
 def test_path3_few_obs_e():
+    from leuvenmapmatching.map.inmemmap import InMemMap
     path = [(1, 0), (7.5, 0.65), (10.1, 1.9)]
     path_sol = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I']
-    mapdb = mm.map.InMemMap(graph=[
+    mapdb = InMemMap(graph=[
         ("A", (1, 0.00), ["B"]),
         ("B", (3, 0.00), ["A", "C"]),
         ("C", (4, 0.70), ["B", "D"]),
