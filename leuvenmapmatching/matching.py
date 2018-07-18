@@ -314,8 +314,8 @@ class MatchingSpeed(Matching):
 class Matcher:
 
     def __init__(self, map_con, obs_noise=1, max_dist_init=None, max_dist=None, min_prob_norm=None,
-                 non_emitting_states=False, max_lattice_width=None,
-                 only_edges=False, obs_noise_ne=None, matching=Matching, avoid_goingback=False,
+                 non_emitting_states=True, max_lattice_width=None,
+                 only_edges=True, obs_noise_ne=None, matching=Matching, avoid_goingback=False,
                  non_emitting_length_factor=0.999):
         """Initialize a matcher for map matching.
 

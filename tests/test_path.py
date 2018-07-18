@@ -35,7 +35,8 @@ def test_path1():
         ("F", (3, 5), ["D", "E"])
     ], use_latlon=False)
 
-    matcher = mm.matching.Matcher(mapdb, max_dist=None, min_prob_norm=None)
+    matcher = mm.matching.Matcher(mapdb, max_dist=None, min_prob_norm=None,
+                                  non_emitting_states=False, only_edges=False)
     path_pred, _ = matcher.match(path, unique=True)
     if directory:
         matcher.print_lattice_stats()
@@ -67,10 +68,11 @@ def test_path2():
         ("L", (2, 6), ["K", "D", "F"])
     ], use_latlon=False)
 
-    matcher = mm.matching.Matcher(mapdb, max_dist=None, min_prob_norm=0.001)
+    matcher = mm.matching.Matcher(mapdb, max_dist=None, min_prob_norm=0.001,
+                                  non_emitting_states=False, only_edges=False)
     path_pred, _ = matcher.match(path, unique=True)
     if directory:
-        matcher.print_lattice_stats()
+        matcher.print_lattice_stats()git
         matcher.print_lattice()
         from leuvenmapmatching import visualization as mmviz
         mmviz.plot_map(mapdb, matcher=matcher, show_labels=True, show_matching=True,
