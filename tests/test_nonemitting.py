@@ -60,7 +60,7 @@ def test_path1():
     matcher = mm.matching.Matcher(mapdb, max_dist_init=1,
                                   min_prob_norm=0.5,
                                   obs_noise=0.5,
-                                  non_emitting_states=True)
+                                  non_emitting_states=True, only_edges=False)
     matcher.match(path1, unique=True)
     path_pred = matcher.path_pred
     if directory:
@@ -78,7 +78,7 @@ def test_path2():
     mapdb, path1, path2, path_sol = setup_map()
 
     matcher = mm.matching.Matcher(mapdb, max_dist_init=1, min_prob_norm=0.5, obs_noise=0.5,
-                                  non_emitting_states=True)
+                                  non_emitting_states=True, only_edges=False)
     matcher.match(path2, unique=True)
     path_pred = matcher.path_pred
     if directory:
@@ -96,7 +96,7 @@ def test_path2_incremental():
     mapdb, path1, path2, path_sol = setup_map()
 
     matcher = mm.matching.Matcher(mapdb, max_dist_init=1, min_prob_norm=0.5, obs_noise=0.5,
-                                  non_emitting_states=True)
+                                  non_emitting_states=True, only_edges=False)
     matcher.match_incremental(path2[:2])
     path_pred_1 = matcher.path_pred
     matcher.match_incremental(path2[2:], backtrace_len=len(path2))
@@ -131,7 +131,8 @@ def test_path_duplicate():
         ("F", (3, 5), ["D", "E"])
     ], use_latlon=False)
 
-    matcher = mm.matching.Matcher(mapdb, max_dist=None, min_prob_norm=None, non_emitting_states = True)
+    matcher = mm.matching.Matcher(mapdb, max_dist=None, min_prob_norm=None,
+                                  non_emitting_states = True, only_edges=False)
 
     #Matching with and without timestamps signed to the points
     path_pred = matcher.match(path, unique=False)
