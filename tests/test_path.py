@@ -72,7 +72,7 @@ def test_path2():
                                   non_emitting_states=False, only_edges=False)
     path_pred, _ = matcher.match(path, unique=True)
     if directory:
-        matcher.print_lattice_stats()git
+        matcher.print_lattice_stats()
         matcher.print_lattice()
         from leuvenmapmatching import visualization as mmviz
         mmviz.plot_map(mapdb, matcher=matcher, show_labels=True, show_matching=True,
