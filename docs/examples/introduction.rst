@@ -27,7 +27,7 @@ But it is slightly less efficient because more possible states are tried.
         ("A", (1, 1), ["B", "C", "X"]),
         ("B", (1, 3), ["A", "C", "D", "K"]),
         ("C", (2, 2), ["A", "B", "D", "E", "X", "Y"]),
-        ("D", (2, 4), ["B", "C", "D", "E", "K", "L"]),
+        ("D", (2, 4), ["B", "C", "F", "E", "K", "L"]),
         ("E", (3, 3), ["C", "D", "F", "Y"]),
         ("F", (3, 5), ["D", "E", "L"]),
         ("X", (2, 0), ["A", "C", "Y"]),
