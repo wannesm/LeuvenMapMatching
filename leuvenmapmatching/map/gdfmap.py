@@ -46,6 +46,31 @@ class GDFMap(Map):
     def get_graph(self):
         return self.graph
 
+    def bb(self):
+        """Bounding box.
+
+        :return: (lat_min, lon_min, lat_max, lon_max)
+        """
+        self.prepare_index()
+        # glat, glon = zip(*[t[0] for t in self.graph.values()])
+        # lat_min, lat_max = min(glat), max(glat)
+        # lon_min, lon_max = min(glon), max(glon)
+        lat_min, lon_min, lat_max, lon_max = self.nodes.total_bounds
+        return (lat_min, lon_min, lat_max, lon_max)
+
+    def labels(self):
+        return self.graph.keys()
+
+    def size(self):
+        return len(self.graph)
+
+    def coordinates(self):
+        for t in self.graph.values():
+            yield t[0]
+
+    def node_coordinates(self, node_key):
+        return self.graph[node_key][0]
+
     def add_node(self, node, loc):
         """
         :param node: label
@@ -187,7 +212,8 @@ class GDFMap(Map):
         print("Nodes: {}".format(len(self.graph)))
 
     def __str__(self):
-        s = ""
-        for label, (loc, nbrs, _) in self.graph.items():
-            s += f"{label:<10} - ({loc[0]:10.4f}, {loc[1]:10.4f})\n"
-        return s
+        # s = ""
+        # for label, (loc, nbrs, _) in self.graph.items():
+        #     s += f"{label:<10} - ({loc[0]:10.4f}, {loc[1]:10.4f})\n"
+        # return s
+        return f"GDFMap(size={self.size()})"

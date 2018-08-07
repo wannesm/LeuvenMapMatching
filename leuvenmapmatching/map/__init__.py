@@ -52,6 +52,29 @@ class Map(object):
         """
 
     @abstractmethod
+    def bb(self):
+        """Bounding box.
+
+        :return: (lat_min, lon_min, lat_max, lon_max)
+        """
+
+    @abstractmethod
+    def labels(self):
+        """Labels of all nodes."""
+
+    @abstractmethod
+    def size(self):
+        """Number of nodes."""
+
+    @abstractmethod
+    def coordinates(self):
+        """Coordinates of all nodes."""
+
+    @abstractmethod
+    def node_coordinates(self, node_key):
+        """Coordinates for given node key."""
+
+    @abstractmethod
     def preload_nodes(self, path, dist):
         """Preload all nodes that are within a certain range from a given path.
 
@@ -78,3 +101,17 @@ class Map(object):
         :return: list[tuple[label, loc]]
         """
         return None
+
+    @abstractmethod
+    def all_nodes(self):
+        """All node keys and coordinates.
+
+        :return: [(key, (lat, lon))]
+        """
+
+    @abstractmethod
+    def all_edges(self):
+        """All edges.
+
+        :return: [(key_a, loc_a, key_b, loc_b)]
+        """

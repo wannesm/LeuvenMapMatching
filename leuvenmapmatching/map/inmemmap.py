@@ -33,6 +33,29 @@ class InMemMap(Map):
     def get_graph(self):
         return self.graph
 
+    def bb(self):
+        """Bounding box.
+
+        :return: (lat_min, lon_min, lat_max, lon_max)
+        """
+        glat, glon = zip(*[t[0] for t in self.graph.values()])
+        lat_min, lat_max = min(glat), max(glat)
+        lon_min, lon_max = min(glon), max(glon)
+        return (lat_min, lon_min, lat_max, lon_max)
+
+    def labels(self):
+        return self.graph.keys()
+
+    def size(self):
+        return len(self.graph)
+
+    def coordinates(self):
+        for t in self.graph.values():
+            yield t[0]
+
+    def node_coordinates(self, node_key):
+        return self.graph[node_key][0]
+
     def add_node(self, node, loc):
         if node in self.graph:
             if self.graph[node][0] is None:

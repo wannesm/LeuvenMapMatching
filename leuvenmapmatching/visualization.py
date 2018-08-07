@@ -28,7 +28,7 @@ path_color = mcolors.CSS4_COLORS['blue']
 
 
 def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False, z=None, bb=None,
-             show_labels=False, matcher=None, hide_graph=False, zoom_path=False, show_lattice=False,
+             show_labels=False, matcher=None, show_graph=True, zoom_path=False, show_lattice=False,
              show_matching=False, filename=None, linewidth=2):
     """Plot the db/graph and optionally include the observed path and inferred nodes.
 
@@ -40,6 +40,7 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
     :param use_osm: Use OpenStreetMap layer, the points should be latitude-longitude pairs.
     :param matcher: Matcher object (overrules given path, nodes and counts)
     :param filename: File to write image to
+    :param show_graph: Plot the vertices and edges in the graph
     :return: None
     """
     if matcher is not None:
@@ -49,10 +50,7 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
         lat_nodes = matcher.lattice_best
     else:
         lat_nodes = None
-    graph = map_con.get_graph()
-    glat, glon = zip(*[t[0] for t in graph.values()])
-    lat_min, lat_max = min(glat), max(glat)
-    lon_min, lon_max = min(glon), max(glon)
+    lat_min, lon_min, lat_max, lon_max = map_con.bb()
     if path:
         plat, plon = islice(zip(*path), 2)
         if zoom_path:
@@ -115,20 +113,20 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
         ax.set_ylim([y_min, y_max])
 
     if counts is None:
-        node_sizes = [10]*len(graph)
+        node_sizes = [10] * map_con.size()
     else:
-        node_sizes = [counts[label]*100+5 for label in graph.keys()]
+        node_sizes = [counts[label]*100+5 for label in map_con.labels()]
 
-    if not hide_graph:
+    if show_graph:
         logger.debug('Plot vertices ...')
-        gx, gy = zip(*[coord_trans(t[0]) for t in graph.values()])
+        gx, gy = zip(*[coord_trans(t) for t in map_con.coordinates()])
         ax.scatter(gx, gy, s=node_sizes, alpha=0.4)
         if show_labels:
-            for key, t in graph.items():
+            for key, coord in map_con.all_nodes():
                 key = str(key)
                 if type(show_labels) is int:
                     key = key[-show_labels:]
-                ax.annotate(key, xy=coord_trans(t[0]))
+                ax.annotate(key, xy=coord_trans(coord))
 
         logger.debug('Plot lines ...')
         for _, loc_a, _, loc_b in map_con.all_edges():
@@ -144,7 +142,7 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
 
     if show_lattice:
         if matcher is None:
-            raise Exception("matcher needs to be passed to show lattice")
+            logger.warning("Matcher needs to be passed to show lattice. Not showing lattice.")
         plot_lattice(ax, coord_trans, matcher)
 
     if path:
@@ -162,11 +160,11 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
         xs, ys = [], []
         for node in nodes:
             if type(node) == tuple and len(node) == 3:
-                x, y = coord_trans(*graph[node[0]][0])
+                x, y = coord_trans(*map_con.node_coordinates(node[0]))
                 xs.append(x)
                 ys.append(y)
             elif type(node) == str or type(node) == int:
-                x, y = coord_trans(*graph[node][0])
+                x, y = coord_trans(*map_con.node_coordinates(node[0]))
                 xs.append(x)
                 ys.append(y)
         ax.plot(xs, ys, linewidth=linewidth, alpha=0.75, color=nodes_color)
@@ -188,15 +186,15 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
         for idx, (loc, node) in enumerate(zip(path, nodes)):
             x, y = coord_trans(*loc)
             if type(node) == tuple and (len(node) == 4 or len(node) == 2):
-                latlon2, latlon3 = graph[node[0]][0], graph[node[1]][0]
+                latlon2, latlon3 = map_con.node_coordinates(node[0]), map_con.node_coordinates(node[1])
                 latlon4, _ = project(latlon2, latlon3, loc)
                 x4, y4 = coord_trans(*latlon4)
                 ax.plot((x, x4), (y, y4), '-', color=match_color, linewidth=linewidth, alpha=0.75)
             elif type(node) == tuple and len(node) == 3:
-                x2, y2 = coord_trans(*graph[node[0]][0])
+                x2, y2 = coord_trans(*map_con.node_coordinates(node[0]))
                 ax.plot((x, x2), (y, y2), '-', color=match_color, linewidth=linewidth, alpha=0.75)
             elif type(node) == str or type(node) == int:
-                x2, y2 = coord_trans(*graph[node][0])
+                x2, y2 = coord_trans(*map_con.node_coordinates(node[0]))
                 ax.plot((x, x2), (y, y2), '-', color=match_color, linewidth=linewidth, alpha=0.75)
             else:
                 raise Exception('Unknown node type: {} ({})'.format(node, type(node)))
