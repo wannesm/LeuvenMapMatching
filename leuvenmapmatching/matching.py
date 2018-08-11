@@ -62,6 +62,7 @@ class Matching(object):
             # node to node
             dist = self.matcher.map.distance(edge_m.p1, edge_o.p1)
             proj_m = edge_m.p1
+            proj_o = edge_o.pi
         elif edge_m.is_point() and not edge_o.is_point():
             # node to edge
             dist, proj_o, t_o = self.matcher.map.distance_point_to_segment(edge_m.p1, edge_o.p1, edge_o.p2)
@@ -78,6 +79,7 @@ class Matching(object):
                     return None
             edge_m.pi = proj_m
             edge_m.ti = t_m
+            proj_o = edge_o.pi
         elif not edge_m.is_point() and not edge_o.is_point():
             # edge to edge
             dist, proj_m, proj_o, t_m, t_o = self.matcher.map.distance_segment_to_segment(edge_m.p1, edge_m.p2,
@@ -89,7 +91,7 @@ class Matching(object):
         else:
             raise Exception(f"Should not happen")
 
-        logprob_trans = self.matcher.logprob_trans(self, edge_m.label, proj_m)
+        logprob_trans = self.matcher.logprob_trans(self, edge_m.label, proj_m, proj_o)
         if obs_ne == 0:
             logprob_obs = self.matcher.logprob_obs(dist, self, edge_m, edge_o)
         else:
@@ -266,51 +268,6 @@ class Matching(object):
         return self.cname.__hash__()
 
 
-class MatchingSpeed(Matching):
-    __slots__ = ['avg_dist', 'var_dist', 'dist_mov']  # Additional fields
-
-    def __init__(self, *args, **kwargs):
-        """Properties about the movement and the transition probability.
-
-        The transition probability takes into account the average distance travelled to
-        compute the probability for the next projected observation.
-
-        TODO: It would be better to combine projection and expected next location.
-        TODO: This could also include expected movement vector instead of only distance
-        """
-        super().__init__(*args, **kwargs)
-        self.avg_dist: float = 0.0
-        self.var_dist: float = 1.0
-        self.dist_mov: float = 0
-        if len(self.prev) != 0:
-            m_prev = list(self.prev)[0]  # type: MatchingSpeed
-            dist = 1  # TODO
-            # dist = matcher.map.distance(m.proj_obs, next_latlon)
-            self.avg_dist = 0.8 * m_prev.avg_dist + 0.2 * dist
-            self.var_dist = 0.8 * m_prev.var_dist + 0.2 * (dist - m_prev.avg_dist) ** 2
-
-    def logprob_trans(self, next_label=None, next_pos=None):
-        dist = self.matcher.map.distance(self.edge_o.pi, next_pos)
-        stddev = 1 if self.var_dist == 0 else math.sqrt(self.var_dist)
-        logprob_trans = norm.logpdf(dist, loc=self.avg_dist, scale=stddev) + math.log(stddev) + math.log(2)
-        # logger.debug("logprob_trans = {} = f({}, {}, {})".format(self.logprob_trans, dist, self.avg_dist, stddev))
-        return logprob_trans
-
-    # def __format__(self, format_spec):
-    #     return self.avg_dist.__format__(format_spec)
-
-    @staticmethod
-    def repr_header(label_width=None):
-        res = Matching.repr_header(label_width)
-        res += f"{'d(mov)':<5} |"
-        return res
-
-    def __str__(self, label_width=None):
-        res = super().__str__(label_width)
-        res += f"{self.dist_mov:<5.2f}"
-        return res
-
-
 class Matcher:
 
     def __init__(self, map_con, obs_noise=1, max_dist_init=None, max_dist=None, min_prob_norm=None,
@@ -385,7 +342,7 @@ class Matcher:
         self.avoid_goingback = avoid_goingback
         self.ne_length_factor_log = math.log(non_emitting_length_factor)
 
-    def logprob_trans(self, prev_m, next_label=None, next_pos=None):
+    def logprob_trans(self, prev_m, next_label=None, next_pos=None, next_obs=None):
         if self.avoid_goingback:
             going_back = False
             for m in prev_m.prev:
@@ -449,6 +406,7 @@ class Matcher:
         self.path = path
         nb_start_nodes = self._create_start_nodes()
         if nb_start_nodes == 0:
+            self.lattice_best = []
             return [], 0
 
         # Start iterating over observations 1..end
@@ -480,11 +438,13 @@ class Matcher:
                     self.print_lattice(obs_idx=obs_idx, label_width=default_label_width)
 
         t_delta = time.time() - t_start
+        logger.info("--- end ---")
         logger.info("Build lattice in {} seconds".format(t_delta))
 
         # Backtrack to find best path
         if early_stop_idx:
             if early_stop_idx <= 1:
+                self.lattice_best = []
                 return [], 0
             start_idx = early_stop_idx - 2
         else:
@@ -605,10 +565,10 @@ class Matcher:
                     edge_o = Segment(f"O{0}", self.path[0])
                     m_next = self.matching.first(logprob_init, edge_m, edge_o, self, dist_obs)
                     if m_next is not None:
-                        if label in self.lattice[0]:
-                            self.lattice[0][label].update(m_next)
+                        if m_next.key in self.lattice[0]:
+                            self.lattice[0][m_next.key].update(m_next)
                         else:
-                            self.lattice[0][label] = m_next
+                            self.lattice[0][m_next.key] = m_next
                         if __debug__:
                             logger.debug(str(m_next))
         else:
@@ -618,7 +578,7 @@ class Matcher:
                 edge_o = Segment(f"O{0}", self.path[0])
                 m_next = self.matching.first(logprob_init, edge_m, edge_o, self, dist_obs)
                 if m_next is not None:
-                    self.lattice[0][label] = m_next
+                    self.lattice[0][m_next.key] = m_next
                     if __debug__:
                         logger.debug(str(m_next))
         if self.max_lattice_width:
