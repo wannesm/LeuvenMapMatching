@@ -53,12 +53,9 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
     else:
         lat_nodes = None
     lat_min, lon_min, lat_max, lon_max = map_con.bb()
-    print("XXX")
-    print(lat_min, lon_min, lat_max, lon_max)
     if coord_trans:
         lat_min, lon_min = coord_trans(lat_min, lon_min)
         lat_max, lon_max = coord_trans(lat_max, lon_max)
-    print(lat_min, lon_min, lat_max, lon_max)
     if path:
         if type(zoom_path) is slice:
             plat, plon = islice(zip(*path[zoom_path]), 2)
