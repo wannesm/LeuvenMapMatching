@@ -18,8 +18,9 @@ logger = logging.getLogger("be.kuleuven.cs.dtai.mapmatching")
 class Map(object):
     """Abstract class for a Map."""
 
-    def __init__(self, use_latlon=True):
+    def __init__(self, name, use_latlon=True):
         """Simple database wrapper/stub."""
+        self.name = name
         self._use_latlon = None
         self.distance = None
         self.distance_point_to_segment = None

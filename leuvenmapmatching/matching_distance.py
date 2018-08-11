@@ -69,9 +69,9 @@ class MatcherDistance(Matcher):
         :param next_obs:
         :return:
         """
-        d_z = self.map.distance(prev_m.edge_o.pi, next_pos)
-        d_x = self.map.distance(prev_m.edge_m.pi, next_obs)
-        d_t = d_z - d_x
+        d_z = self.map.distance(prev_m.edge_o.pi, next_obs)
+        d_x = self.map.distance(prev_m.edge_m.pi, next_pos)
+        d_t = abs(d_z - d_x)
         beta = 1 / 6
         p_dt = 1 / beta * math.exp(-d_t / beta)
         return p_dt

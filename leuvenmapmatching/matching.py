@@ -406,6 +406,7 @@ class Matcher:
         self.path = path
         nb_start_nodes = self._create_start_nodes()
         if nb_start_nodes == 0:
+            self.lattice_best = []
             return [], 0
 
         # Start iterating over observations 1..end
@@ -437,11 +438,13 @@ class Matcher:
                     self.print_lattice(obs_idx=obs_idx, label_width=default_label_width)
 
         t_delta = time.time() - t_start
+        logger.info("--- end ---")
         logger.info("Build lattice in {} seconds".format(t_delta))
 
         # Backtrack to find best path
         if early_stop_idx:
             if early_stop_idx <= 1:
+                self.lattice_best = []
                 return [], 0
             start_idx = early_stop_idx - 2
         else:
@@ -562,10 +565,10 @@ class Matcher:
                     edge_o = Segment(f"O{0}", self.path[0])
                     m_next = self.matching.first(logprob_init, edge_m, edge_o, self, dist_obs)
                     if m_next is not None:
-                        if label in self.lattice[0]:
-                            self.lattice[0][label].update(m_next)
+                        if m_next.key in self.lattice[0]:
+                            self.lattice[0][m_next.key].update(m_next)
                         else:
-                            self.lattice[0][label] = m_next
+                            self.lattice[0][m_next.key] = m_next
                         if __debug__:
                             logger.debug(str(m_next))
         else:
@@ -575,7 +578,7 @@ class Matcher:
                 edge_o = Segment(f"O{0}", self.path[0])
                 m_next = self.matching.first(logprob_init, edge_m, edge_o, self, dist_obs)
                 if m_next is not None:
-                    self.lattice[0][label] = m_next
+                    self.lattice[0][m_next.key] = m_next
                     if __debug__:
                         logger.debug(str(m_next))
         if self.max_lattice_width:

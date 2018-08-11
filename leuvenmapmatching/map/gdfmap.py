@@ -10,6 +10,9 @@ Map based on the GeoPandas GeoDataFrame.
 :license: Apache License, Version 2.0, see LICENSE for details.
 """
 import logging
+import time
+from pathlib import Path
+import pickle
 from . import Map
 import pandas as pd
 import geopandas as gp
@@ -22,26 +25,56 @@ logger = logging.getLogger("be.kuleuven.cs.dtai.mapmatching")
 
 
 class GDFMap(Map):
-    def __init__(self, use_latlon):
+    def __init__(self, use_latlon=True, crs_lonlat=None, crs_xy=None, graph=None):
         """
         In-memory representation of a map based on a GeoDataFrame.
         """
         super(GDFMap, self).__init__(use_latlon=use_latlon)
-        self.graph = dict()
+        self.graph = dict() if graph is None else graph
         self.nodes = None
-        if use_latlon:
-            self.crs_in = {'init': 'epsg:4326'}   # GPS
-            self.crs_out = {'init': 'epsg:3395'}  # Mercator projection
-            proj_in = pyproj.Proj(self.crs_in, preserve_units=True)
-            proj_out = pyproj.Proj(self.crs_out, preserve_units=True)
-            self._latlon2yx = partial(pyproj.transform, proj_in, proj_out)
-            self._yx2latlon = partial(pyproj.transform, proj_out, proj_in)
-        else:
-            self.crs_in = None
-            self.crs_out = None
-            self._latlon2yx = lambda lat, lon: (lat, lon)
-            self._yx2latlon = lambda x, y: (x, y)
-        print("DO NOT USE THIS CLASS. IT IS UNDER CONSTRUCTION")
+
+        self.crs_lonlat = {'init': 'epsg:4326'} if crs_lonlat is None else crs_lonlat  # GPS
+        self.crs_xy = {'init': 'epsg:3395'} if crs_xy is None else crs_xy  # Mercator projection
+        proj_lonlat = pyproj.Proj(self.crs_lonlat, preserve_units=True)
+        proj_xy = pyproj.Proj(self.crs_xy, preserve_units=True)
+
+        self.lonlat2xy = partial(pyproj.transform, proj_lonlat, proj_xy)
+        self.xy2lonlat = partial(pyproj.transform, proj_xy, proj_lonlat)
+
+    def serialize(self):
+        data = {
+            "graph": self.graph,
+            "use_latlon": self.use_latlon,
+            "crs_lonlat": self.crs_lonlat,
+            "crs_xy": self.crs_xy
+        }
+        return data
+
+    @classmethod
+    def deserialize(cls, data):
+        return cls(use_latlon=data["use_latlon"],
+                   crs_lonlat=data["crs_lonlat"], crs_xy=data["crs_xy"],
+                   graph=data["graph"])
+
+    def to_pickle(self, filename):
+        filename = Path(filename)
+        with filename.open("wb") as ofile:
+            pickle.dump(self.serialize(), ofile)
+        if self.nodes:
+            with filename.with_suffix(".rtree").open("wb") as ofile:
+                pickle.dump(self.nodes, ofile)
+
+    @classmethod
+    def from_pickle(cls, filename):
+        filename = Path(filename)
+        with filename.open("rb") as ifile:
+            data = pickle.load(ifile)
+        nmap = cls.deserialize(data)
+        rtree = filename.with_suffix(".rtree")
+        if rtree.exists():
+            with rtree.open("rb") as ifile:
+                nmap.nodes = pickle.load(ifile)
+        return nmap
 
     def get_graph(self):
         return self.graph
@@ -56,7 +89,7 @@ class GDFMap(Map):
         # lat_min, lat_max = min(glat), max(glat)
         # lon_min, lon_max = min(glon), max(glon)
         lat_min, lon_min, lat_max, lon_max = self.nodes.total_bounds
-        return (lat_min, lon_min, lat_max, lon_max)
+        return lat_min, lon_min, lat_max, lon_max
 
     def labels(self):
         return self.graph.keys()
@@ -136,10 +169,10 @@ class GDFMap(Map):
                 labels.append(label)
                 lats.append(data[0][0])
                 lons.append(data[0][1])
-            df = pd.DataFrame({'label': labels, 'lat': lats, 'lon': lons})
-            df['Coordinates'] = list(zip(df.lon, df.lat))
-            df['Coordinates'] = df['Coordinates'].apply(Point)
-            self.nodes = gp.GeoDataFrame(df, geometry='Coordinates', crs=self.crs_in)
+            df = pd.DataFrame(index=labels, data={'lat': lats, 'lon': lons})
+            df['coordinates'] = list(zip(df.lon, df.lat))
+            df['coordinates'] = df['coordinates'].apply(Point)
+            self.nodes = gp.GeoDataFrame(df, geometry='coordinates', crs=self.crs_lonlat)
 
         else:
             ys, xs, labels = [], [], []
@@ -147,31 +180,38 @@ class GDFMap(Map):
                 labels.append(label)
                 ys.append(data[0][0])
                 xs.append(data[0][1])
-            df = pd.DataFrame({'label': labels, 'y': ys, 'x': xs})
-            df['Coordinates'] = list(zip(df.x, df.y))
-            df['Coordinates'] = df['Coordinates'].apply(Point)
-            self.nodes = gp.GeoDataFrame(df, geometry='Coordinates', crs=self.crs_in)
+            df = pd.DataFrame(index=labels, data={'y': ys, 'x': xs})
+            df['coordinates'] = list(zip(df.x, df.y))
+            df['coordinates'] = df['coordinates'].apply(Point)
+            self.nodes = gp.GeoDataFrame(df, geometry='coordinates', crs=self.crs_lonlat)
 
     def to_xy(self):
+        """Create a map that uses a projected XY representation on which Euclidean distances
+        can be used.
+        """
         if not self.use_latlon:
             return self
+
         self.prepare_index()
-        map = GDFMap(use_latlon=False)
-        map.graph = self.graph
-        map.nodes = self.nodes.to_crs(self.crs_out, inplace=True)
-        map.nodes['lat'] = map.nodes.apply(lambda row: row['geometry'].x, axis=1)
-        map.nodes['lon'] = map.nodes.apply(lambda row: row['geometry'].y, axis=1)
-        for label, row in map.graph.items():
-            point = map.nodes[label]['geometry']
-            row[0] = (point.y, point.x)
-        return map
+        nmap = GDFMap(use_latlon=False)
+        print(self.nodes.head())
+        nmap.nodes = self.nodes.to_crs(self.crs_xy)
+        logger.debug("Projected all coordinates")
+        print(nmap.nodes.head())
+        # nmap.nodes['x'] = nmap.nodes.apply(lambda r: r['coordinates'].x, axis=1)
+        # nmap.nodes['y'] = nmap.nodes.apply(lambda r: r['coordinates'].y, axis=1)
+        for label, row in self.graph.items():
+            point = nmap.nodes.loc[label]['coordinates']
+            nmap.graph[label] = ((point.y, point.x), row[1], row[2])
+
+        return nmap
 
     def latlon2xy(self, lat, lon):
-        x, y = self._latlon2yx(lon, lat)  # x, y
+        x, y = self.lonlat2xy(lon, lat)
         return y, x
 
     def xy2latlon(self, x, y):
-        lon, lat = self._yx2latlon(y, x)
+        lon, lat = self.xy2lonlat(y, x)
         return lat, lon
 
     def preload_nodes(self, path, dist):
@@ -179,18 +219,24 @@ class GDFMap(Map):
 
     def nodes_closeto(self, loc, max_dist=None, max_elmt=None):
         self.prepare_index()
-        lat, lon = loc
-        if max_dist is not None:
-            nodes = self.nodes.cx[lat - max_dist: lat + max_dist, lon - max_dist: lon + max_dist]
+        lat, lon = loc[:2]
+        if False and max_dist is not None:
+            nodes = self.nodes.cx[lon - max_dist: lon + max_dist,  # Longitude
+                                  lat - max_dist: lat + max_dist]  # Latitude
         else:
-            nodes = self.nodes
-        dists = nodes.distance(Point(lon, lat)).sort_values(inplace=True)
+            nodes = self.graph.keys()
+
+        dists = nodes.distance(Point(lon, lat))
+        dists.sort_values(inplace=True)
         if max_elmt is not None:
             dists = dists.iloc[:max_elmt]
         results = []
         for label, dist in dists.items():
-            point = nodes[label]['geometry']
+            if dist > max_dist:
+                break
+            point = nodes.loc[label]['coordinates']
             results.append((dist, label, (point.y, point.x)))
+
         return results
 
     def nodes_nbrto(self, node):
