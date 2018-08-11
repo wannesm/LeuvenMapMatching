@@ -561,6 +561,8 @@ class Matcher:
                 # TODO: update dist_obs to be distance to line
                 nbrs = self.map.nodes_nbrto(label)
                 for nbr_label, nbr_loc in nbrs:
+                    if nbr_label == label:
+                        continue
                     edge_m = Segment(label, loc, nbr_label, nbr_loc, loc, 0.0)
                     edge_o = Segment(f"O{0}", self.path[0])
                     m_next = self.matching.first(logprob_init, edge_m, edge_o, self, dist_obs)

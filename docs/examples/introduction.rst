@@ -23,18 +23,18 @@ But it is slightly less efficient because more possible states are tried.
 
     import leuvenmapmatching as mm
 
-    map_con = mm.map.InMemMap(graph=[
-        ("A", (1, 1), ["B", "C", "X"]),
-        ("B", (1, 3), ["A", "C", "D", "K"]),
-        ("C", (2, 2), ["A", "B", "D", "E", "X", "Y"]),
-        ("D", (2, 4), ["B", "C", "F", "E", "K", "L"]),
-        ("E", (3, 3), ["C", "D", "F", "Y"]),
-        ("F", (3, 5), ["D", "E", "L"]),
-        ("X", (2, 0), ["A", "C", "Y"]),
-        ("Y", (3, 1), ["X", "C", "E"]),
-        ("K", (1, 5), ["B", "D", "L"]),
-        ("L", (2, 6), ["K", "D", "F"])
-    ], use_latlon=False)
+    map_con = mm.map.InMemMap(graph={
+        "A": ((1, 1), ["B", "C", "X"]),
+        "B": ((1, 3), ["A", "C", "D", "K"]),
+        "C": ((2, 2), ["A", "B", "D", "E", "X", "Y"]),
+        "D": ((2, 4), ["B", "C", "F", "E", "K", "L"]),
+        "E": ((3, 3), ["C", "D", "F", "Y"]),
+        "F": ((3, 5), ["D", "E", "L"]),
+        "X": ((2, 0), ["A", "C", "Y"]),
+        "Y": ((3, 1), ["X", "C", "E"]),
+        "K": ((1, 5), ["B", "D", "L"]),
+        "L": ((2, 6), ["K", "D", "F"])
+    }, use_latlon=False)
 
     path = [(0.8, 0.7), (0.9, 0.7), (1.1, 1.0), (1.2, 1.5), (1.2, 1.6), (1.1, 2.0),
             (1.1, 2.3), (1.3, 2.9), (1.2, 3.1), (1.5, 3.2), (1.8, 3.5), (2.0, 3.7),
@@ -72,17 +72,17 @@ non-emitting states that ignore observations completely.
     from leuvenmapmatching import visualization as mmviz
 
     path = [(1, 0), (7.5, 0.65), (10.1, 1.9)]
-    mapdb = mm.map.InMemMap(graph=[
-        ("A", (1, 0.00), ["B"]),
-        ("B", (3, 0.00), ["A", "C"]),
-        ("C", (4, 0.70), ["B", "D"]),
-        ("D", (5, 1.00), ["C", "E"]),
-        ("E", (6, 1.00), ["D", "F"]),
-        ("F", (7, 0.70), ["E", "G"]),
-        ("G", (8, 0.00), ["F", "H"]),
-        ("H", (10, 0.0), ["G", "I"]),
-        ("I", (10, 2.0), ["H"])
-    ], use_latlon=False)
+    mapdb = mm.map.InMemMap(graph={
+        "A": ((1, 0.00), ["B"]),
+        "B": ((3, 0.00), ["A", "C"]),
+        "C": ((4, 0.70), ["B", "D"]),
+        "D": ((5, 1.00), ["C", "E"]),
+        "E": ((6, 1.00), ["D", "F"]),
+        "F": ((7, 0.70), ["E", "G"]),
+        "G": ((8, 0.00), ["F", "H"]),
+        "H": ((10, 0.0), ["G", "I"]),
+        "I": ((10, 2.0), ["H"])
+    }, use_latlon=False)
     matcher = mm.matching.Matcher(mapdb, max_dist_init=0.2, obs_noise=1, obs_noise_ne=10,
                                   non_emitting_states=True, only_edges=True)
     states, _ = matcher.match(path)
@@ -110,18 +110,18 @@ The lattice will be built further every time a new subsequence of the path is gi
 
     import leuvenmapmatching as mm
 
-    map_con = mm.map.InMemMap(graph=[
-        ("A", (1, 1), ["B", "C", "X"]),
-        ("B", (1, 3), ["A", "C", "D", "K"]),
-        ("C", (2, 2), ["A", "B", "D", "E", "X", "Y"]),
-        ("D", (2, 4), ["B", "C", "D", "E", "K", "L"]),
-        ("E", (3, 3), ["C", "D", "F", "Y"]),
-        ("F", (3, 5), ["D", "E", "L"]),
-        ("X", (2, 0), ["A", "C", "Y"]),
-        ("Y", (3, 1), ["X", "C", "E"]),
-        ("K", (1, 5), ["B", "D", "L"]),
-        ("L", (2, 6), ["K", "D", "F"])
-    ], use_latlon=False)
+    map_con = mm.map.InMemMap(graph={
+        "A": ((1, 1), ["B", "C", "X"]),
+        "B": ((1, 3), ["A", "C", "D", "K"]),
+        "C": ((2, 2), ["A", "B", "D", "E", "X", "Y"]),
+        "D": ((2, 4), ["B", "C", "D", "E", "K", "L"]),
+        "E": ((3, 3), ["C", "D", "F", "Y"]),
+        "F": ((3, 5), ["D", "E", "L"]),
+        "X": ((2, 0), ["A", "C", "Y"]),
+        "Y": ((3, 1), ["X", "C", "E"]),
+        "K": ((1, 5), ["B", "D", "L"]),
+        "L": ((2, 6), ["K", "D", "F"])
+    }, use_latlon=False)
 
     path = [(0.8, 0.7), (0.9, 0.7), (1.1, 1.0), (1.2, 1.5), (1.2, 1.6), (1.1, 2.0),
             (1.1, 2.3), (1.3, 2.9), (1.2, 3.1), (1.5, 3.2), (1.8, 3.5), (2.0, 3.7),

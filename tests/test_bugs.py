@@ -23,20 +23,17 @@ def test_bug1():
     dist = 10
     nb_steps = 20
 
-    map_con = InMemMap(graph=[
-        ("A", (1, dist), ["B"]),
-        ("B", (2, dist), ["A", "C", "CC"]),
+    map_con = InMemMap("map", graph={
+        "A":  ((1, dist), ["B"]),
+        "B":  ((2, dist), ["A", "C", "CC"]),
+        "C":  ((3, 0), ["B", "D"]),
+        "D":  ((4 + dist, 0), ["C", "E"]),
+        "CC": ((3, 2 * dist), ["B", "DD"]),
+        "DD": ((4 + dist, 2 * dist), ["CC", "E"]),
+        "E":  ((5 + dist, dist), ["F", "D", "DD"]),
+        "F":  ((6 + dist, dist), ["E", ]),
 
-        ("C", (3, 0), ["B", "D"]),
-        ("D", (4 + dist, 0), ["C", "E"]),
-
-        ("CC", (3, 2 * dist), ["B", "DD"]),
-        ("DD", (4 + dist, 2 * dist), ["CC", "E"]),
-
-        ("E", (5 + dist, dist), ["F", "D", "DD"]),
-        ("F", (6 + dist, dist), ["E", ]),
-
-    ], use_latlon=False)
+    }, use_latlon=False)
 
     i = 10
     path = [(1.1,      2*dist*i/nb_steps),

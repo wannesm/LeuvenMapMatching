@@ -68,9 +68,10 @@ setup(
     url='https://dtai.cs.kuleuven.be',
     description='Match a trace of locations to a map',
     long_description=long_description,
-    install_requires=['numpy', 'scipy', 'nvector==0.5.2', 'gpxpy', 'pykalman'],
+    install_requires=['numpy', 'scipy'],
     extras_require={
-        'vis': ['smopy', 'matplotlib>=2.0.0']
+        'vis': ['smopy', 'matplotlib>=2.0.0'],
+        'all': ['rtree', 'pyproj', 'nvector==0.5.2', 'gpxpy', 'pykalman']
     },
     setup_requires=['pytest-runner'],
     tests_require=['pytest'],

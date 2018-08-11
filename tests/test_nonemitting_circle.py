@@ -36,7 +36,7 @@ def setup_map(disconnect=True):
     nx = np.cos(theta)
     ny = np.sin(theta)
     nl = [f"N{i}" for i in range(len(nx))]
-    graph = []
+    graph = {}
     for i, (x, y, l) in enumerate(zip(nx, ny, nl)):
         if disconnect:
             edges = []
@@ -46,17 +46,17 @@ def setup_map(disconnect=True):
                 edges.append(nl[(i - 1) % len(nl)])
         else:
             edges = [nl[(i - 1) % len(nl)], nl[(i + 1) % len(nl)]]
-        graph.append([l, (x, y), edges])
-    graph.append(["M", (0, 0), ["N5", "N15"]])
-    graph[5][2].append("M")
-    graph[15][2].append("M")
+        graph[l] = ((x, y), edges)
+    graph["M"] = ((0, 0), ["N5", "N15"])
+    graph["N5"][1].append("M")
+    graph["N15"][1].append("M")
     print(graph)
 
     path_sol = nl
     if not disconnect:
         path_sol += ["N0"]
 
-    mapdb = InMemMap(graph=graph, use_latlon=False)
+    mapdb = InMemMap("map", graph=graph, use_latlon=False)
     return mapdb, path1, path2, path_sol
 
 
