@@ -157,7 +157,11 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
 
     if path:
         logger.debug('Plot path ...')
-        px, py = zip(*[to_pixels(p[:2]) for p in path])
+        if zoom_path:
+            path_slice = path[zoom_path]
+        else:
+            path_slice = path
+        px, py = zip(*[to_pixels(p[:2]) for p in path_slice])
         ax.plot(px, py, 'o-', linewidth=linewidth, markersize=linewidth * 2, alpha=0.75,
                 linestyle="--", color=path_color)
         if show_labels:

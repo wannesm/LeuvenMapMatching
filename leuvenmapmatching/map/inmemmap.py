@@ -14,8 +14,14 @@ import time
 from pathlib import Path
 import pickle
 from . import Map
-import rtree
-import pyproj
+try:
+    import rtree
+except ImportError:
+    rtree = None
+try:
+    import pyproj
+except ImportError:
+    pyproj = None
 from functools import partial
 
 
@@ -23,7 +29,7 @@ logger = logging.getLogger("be.kuleuven.cs.dtai.mapmatching")
 
 
 class InMemMap(Map):
-    def __init__(self, name, use_latlon=True, use_rtree=True,
+    def __init__(self, name, use_latlon=True, use_rtree=False,
                  crs_lonlat=None, crs_xy=None, graph=None, dir=None):
         """
         In-memory representation of a map based on a GeoDataFrame.
@@ -38,11 +44,16 @@ class InMemMap(Map):
 
         self.crs_lonlat = {'init': 'epsg:4326'} if crs_lonlat is None else crs_lonlat  # GPS
         self.crs_xy = {'init': 'epsg:3395'} if crs_xy is None else crs_xy  # Mercator projection
-        proj_lonlat = pyproj.Proj(self.crs_lonlat, preserve_units=True)
-        proj_xy = pyproj.Proj(self.crs_xy, preserve_units=True)
-
-        self.lonlat2xy = partial(pyproj.transform, proj_lonlat, proj_xy)
-        self.xy2lonlat = partial(pyproj.transform, proj_xy, proj_lonlat)
+        if pyproj:
+            proj_lonlat = pyproj.Proj(self.crs_lonlat, preserve_units=True)
+            proj_xy = pyproj.Proj(self.crs_xy, preserve_units=True)
+            self.lonlat2xy = partial(pyproj.transform, proj_lonlat, proj_xy)
+            self.xy2lonlat = partial(pyproj.transform, proj_xy, proj_lonlat)
+        else:
+            def pyproj_notfound(*_args, **_kwargs):
+                raise Exception("pyproj package not found")
+            self.lonlat2xy = pyproj_notfound
+            self.xy2lonlat = pyproj_notfound
 
     def serialize(self):
         data = {
@@ -130,9 +141,9 @@ class InMemMap(Map):
         """
         if node in self.graph:
             if self.graph[node][0] is None:
-                self.graph[node] = (loc, self.graph[node][1], self.graph[node][2])
+                self.graph[node] = (loc, self.graph[node][1])
         else:
-            self.graph[node] = (loc, [], [])
+            self.graph[node] = (loc, [])
         if self.use_rtree and self.rtree:
             self.rtree.insert(node, (loc[1], loc[0], loc[1], loc[0]))
 
@@ -152,15 +163,13 @@ class InMemMap(Map):
             raise ValueError(f"Add {node_b} first as node")
         if node_b not in self.graph[node_a][1]:
             self.graph[node_a][1].append(node_b)
-        if node_a not in self.graph[node_b][2]:
-            self.graph[node_b][2].append(node_a)
 
     def all_edges(self):
-        for key_a, (loc_a, nbrs, _) in self.graph.items():
+        for key_a, (loc_a, nbrs) in self.graph.items():
             if loc_a is not None:
                 for nbr in nbrs:
                     try:
-                        loc_b, _, _ = self.graph[nbr]
+                        loc_b, _ = self.graph[nbr]
                         if loc_b is not None:
                             yield (key_a, loc_a, nbr, loc_b)
                     except KeyError:
@@ -168,7 +177,7 @@ class InMemMap(Map):
                         pass
 
     def all_nodes(self):
-        for key_a, (loc_a, nbrs, _) in self.graph.items():
+        for key_a, (loc_a, nbrs) in self.graph.items():
             if loc_a is not None:
                 yield key_a, loc_a
 
@@ -181,7 +190,7 @@ class InMemMap(Map):
                 cnt_noloc += 1
                 remove.append(node)
                 # print("No location for node {}".format(node))
-            elif len(self.graph[node][1]) == 0 and len(self.graph[node][1]) == 0:
+            elif len(self.graph[node][1]) == 0:
                 cnt_noedges += 1
                 remove.append(node)
         for node in remove:
@@ -202,6 +211,8 @@ class InMemMap(Map):
             return
         if self.rtree is not None and not force:
             return
+        if rtree is None:
+            raise Exception("rtree package not found")
 
         if self.dir is not None:
             rtree_fn = self.dir / self.name
@@ -244,7 +255,7 @@ class InMemMap(Map):
         for label, row in self.graph.items():
             lat, lon = row[0]
             x, y = self.lonlat2xy(lon, lat)
-            nmap.graph[label] = ((y, x), row[1], row[2])
+            nmap.graph[label] = ((y, x), row[1])
         nmap.fill_index()
 
         return nmap
@@ -300,7 +311,7 @@ class InMemMap(Map):
         results = []
         if node not in self.graph:
             return results
-        loc_node, nbrs, _ = self.graph[node]
+        loc_node, nbrs = self.graph[node]
         for nbr_label in nbrs + [node]:
             try:
                 loc_nbr = self.graph[nbr_label][0]
@@ -319,4 +330,4 @@ class InMemMap(Map):
         # for label, (loc, nbrs, _) in self.graph.items():
         #     s += f"{label:<10} - ({loc[0]:10.4f}, {loc[1]:10.4f})\n"
         # return s
-        return f"InMemMap(size={self.size()})"
+        return f"InMemMap({self.name}, size={self.size()})"

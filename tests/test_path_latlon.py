@@ -54,7 +54,7 @@ def prepare_files(verbose=False):
 
 def create_map():
     from leuvenmapmatching.map.inmemmap import InMemMap
-    map_con = InMemMap(use_latlon=True)
+    map_con = InMemMap("map", use_latlon=True)
     cnt = 0
     for entity in osmread.parse_file(str(osm_fn)):
         if isinstance(entity, osmread.Way) and 'highway' in entity.tags:
@@ -71,14 +71,14 @@ def create_map():
 def create_map2(convert_latlon=None):
     from leuvenmapmatching.map.inmemmap import InMemMap
     use_latlon = True if convert_latlon is None else False
-    map_con = InMemMap(use_latlon=use_latlon)
+    map_con = InMemMap("map2", use_latlon=use_latlon)
     cnt = 0
     for entity in osmread.parse_file(str(osm2_fn)):
         if isinstance(entity, osmread.Way) and 'highway' in entity.tags:
             for node_a, node_b in zip(entity.nodes, entity.nodes[1:]):
-                map_con.add_edge(node_a, None, node_b, None)
+                map_con.add_edge(node_a, node_b)
                 # Some roads are one-way. We'll add both directions.
-                map_con.add_edge(node_b, None, node_a, None)
+                map_con.add_edge(node_b, node_a)
         if isinstance(entity, osmread.Node):
             if convert_latlon is None:
                 lat = entity.lat
@@ -147,10 +147,9 @@ def test_path2_proj_e():
         mm_viz.plot_map(map_con, matcher=matcher, path=track, use_osm=False,
                         show_lattice=True, show_matching=True, show_labels=3,
                         filename=str(directory / "test_path_latlon_path2_proj_e.png"))
-    nodes_sol = [5435850758, 2634474831, 1096512242, 3051083902, 1096512239, 1096512241, 1096512240,
-                 1096508366, 1096508372, 16483861, 3051083900, 16483864, 16483865, 3060515058, 16526534,
-                 16526532, 1274158119, 16526540, 3060597377, 16526541, 16424220, 1233373340, 613125597,
-                 1076057753]
+    nodes_sol = [5435850758, 2634474829, 5435850755, 1096512241, 1096512240, 1096508366, 1096508372, 16483861,
+                 3051083900, 16483864, 16483865, 3060515058, 16526534, 16526532, 1274158119, 16526540, 3060597377,
+                 16526541, 16424220, 1233373340, 613125597, 1076057753]
     assert nodes == nodes_sol, f"Nodes do not match: {nodes}"
 
 

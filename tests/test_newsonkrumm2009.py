@@ -18,6 +18,7 @@ import pickle
 from pathlib import Path
 import csv
 from datetime import datetime
+import pytest
 import leuvenmapmatching as mm
 from leuvenmapmatching.matching_distance import MatcherDistance
 from leuvenmapmatching.map.inmemmap import InMemMap
@@ -113,7 +114,7 @@ def read_map(map_fn):
 
 
 def load_data():
-    max_route_length = 200
+    max_route_length = None  #200
 
     # Nodes
     nodes = read_nodes(ground_truth_route)
@@ -150,17 +151,20 @@ def load_data():
     return nodes, map_con, map_con_latlon, route, route_latlon
 
 
+@pytest.mark.skip(reason="Not yet fully implemented")
 def test_route():
     nodes, map_con, map_con_latlon, route, route_latlon = load_data()
+    # zoom_path = True
+    zoom_path = slice(750, 850)
 
     if directory is not None:
         mm.matching.logger.debug("Plotting pre map ...")
         mm_viz.plot_map(map_con_latlon, path=route_latlon, use_osm=True,
-                        show_lattice=False, show_labels=False, show_graph=False, zoom_path=True,
+                        show_lattice=False, show_labels=False, show_graph=False, zoom_path=zoom_path,
                         filename=str(directory / "test_newson_route.png"))
         mm.matching.logger.debug("... done")
 
-    matcher = MatcherDistance(map_con, min_prob_norm=0.0001,
+    matcher = MatcherDistance(map_con, min_prob_norm=0.00001,
                               max_dist=200, obs_noise=4.07, only_edges=True,  # Newson Krumm defaults
                               non_emitting_states=False)
     matcher.match(route)
@@ -170,7 +174,7 @@ def test_route():
         matcher.print_lattice_stats()
         mm.matching.logger.debug("Plotting post map ...")
         mm_viz.plot_map(map_con, matcher=matcher, use_osm=True,
-                        show_lattice=False, show_labels=False, show_graph=False, zoom_path=True,
+                        show_lattice=False, show_labels=False, show_graph=False, zoom_path=zoom_path,
                         coord_trans=map_con.yx2latlon,
                         filename=str(directory / "test_newson_route_matched.png"))
         mm.matching.logger.debug("... done")

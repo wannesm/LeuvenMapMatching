@@ -26,14 +26,14 @@ def test_path1():
             (3.0, 4.0), (3.1, 4.3), (3.1, 4.6), (3.0, 4.9)]
     path_sol = ['A', ('A', 'B'), 'B', ('B', 'D'), 'D', ('D', 'E'), 'E', ('E', 'F')]
     path_sol_nodes = ['A', 'B', 'D', 'E', 'F']
-    mapdb = InMemMap(graph=[
-        ("A", (1, 1), ["B", "C"]),
-        ("B", (1, 3), ["A", "C", "D"]),
-        ("C", (2, 2), ["A", "B", "D", "E"]),
-        ("D", (2, 4), ["B", "C", "D", "E"]),
-        ("E", (3, 3), ["C", "D", "F"]),
-        ("F", (3, 5), ["D", "E"])
-    ], use_latlon=False)
+    mapdb = InMemMap("map", graph={
+        "A": ((1, 1), ["B", "C"]),
+        "B": ((1, 3), ["A", "C", "D"]),
+        "C": ((2, 2), ["A", "B", "D", "E"]),
+        "D": ((2, 4), ["B", "C", "D", "E"]),
+        "E": ((3, 3), ["C", "D", "F"]),
+        "F": ((3, 5), ["D", "E"])
+    }, use_latlon=False)
 
     matcher = mm.matching.Matcher(mapdb, max_dist=None, min_prob_norm=None,
                                   non_emitting_states=False, only_edges=False)
@@ -55,18 +55,18 @@ def test_path2():
             (2.1, 3.3), (2.4, 3.2), (2.6, 3.1), (2.9, 3.1), (3.0, 3.2), (3.1, 3.8),
             (3.0, 4.0), (3.1, 4.3), (3.1, 4.6), (3.0, 4.9)]
     path_sol = ['A', ('A', 'B'), 'B', ('B', 'D'), 'D', ('D', 'E'), 'E', ('E', 'F')]
-    mapdb = InMemMap(graph=[
-        ("A", (1, 1), ["B", "C", "X"]),
-        ("B", (1, 3), ["A", "C", "D", "K"]),
-        ("C", (2, 2), ["A", "B", "D", "E", "X", "Y"]),
-        ("D", (2, 4), ["B", "C", "F", "E", "K", "L"]),
-        ("E", (3, 3), ["C", "D", "F", "Y"]),
-        ("F", (3, 5), ["D", "E", "L"]),
-        ("X", (2, 0), ["A", "C", "Y"]),
-        ("Y", (3, 1), ["X", "C", "E"]),
-        ("K", (1, 5), ["B", "D", "L"]),
-        ("L", (2, 6), ["K", "D", "F"])
-    ], use_latlon=False)
+    mapdb = InMemMap("map", graph={
+        "A": ((1, 1), ["B", "C", "X"]),
+        "B": ((1, 3), ["A", "C", "D", "K"]),
+        "C": ((2, 2), ["A", "B", "D", "E", "X", "Y"]),
+        "D": ((2, 4), ["B", "C", "F", "E", "K", "L"]),
+        "E": ((3, 3), ["C", "D", "F", "Y"]),
+        "F": ((3, 5), ["D", "E", "L"]),
+        "X": ((2, 0), ["A", "C", "Y"]),
+        "Y": ((3, 1), ["X", "C", "E"]),
+        "K": ((1, 5), ["B", "D", "L"]),
+        "L": ((2, 6), ["K", "D", "F"])
+    }, use_latlon=False)
 
     matcher = mm.matching.Matcher(mapdb, max_dist=None, min_prob_norm=0.001,
                                   non_emitting_states=False, only_edges=False)
@@ -88,18 +88,18 @@ def test_path_outlier():
             (3.0, 4.0), (3.1, 4.3), (3.1, 4.6), (3.0, 4.9)]
     path_sol = ['A', 'B', 'D', 'C', 'E', 'F']
     path.insert(13, (2.3, 1.8))
-    mapdb = InMemMap(graph=[
-        ("A", (1, 1), ["B", "C", "X"]),
-        ("B", (1, 3), ["A", "C", "D", "K"]),
-        ("C", (2, 2), ["A", "B", "D", "E", "X", "Y"]),
-        ("D", (2, 4), ["B", "C", "F", "E", "K", "L"]),
-        ("E", (3, 3), ["C", "D", "F", "Y"]),
-        ("F", (3, 5), ["D", "E", "L"]),
-        ("X", (2, 0), ["A", "C", "Y"]),
-        ("Y", (3, 1), ["X", "C", "E"]),
-        ("K", (1, 5), ["B", "D", "L"]),
-        ("L", (2, 6), ["K", "D", "F"])
-    ], use_latlon=False)
+    mapdb = InMemMap("map", graph={
+        "A": ((1, 1), ["B", "C", "X"]),
+        "B": ((1, 3), ["A", "C", "D", "K"]),
+        "C": ((2, 2), ["A", "B", "D", "E", "X", "Y"]),
+        "D": ((2, 4), ["B", "C", "F", "E", "K", "L"]),
+        "E": ((3, 3), ["C", "D", "F", "Y"]),
+        "F": ((3, 5), ["D", "E", "L"]),
+        "X": ((2, 0), ["A", "C", "Y"]),
+        "Y": ((3, 1), ["X", "C", "E"]),
+        "K": ((1, 5), ["B", "D", "L"]),
+        "L": ((2, 6), ["K", "D", "F"])
+    }, use_latlon=False)
 
     matcher = mm.matching.Matcher(mapdb, max_dist=None, min_prob_norm=0.0001,
                                   max_dist_init=1, obs_noise=0.5, obs_noise_ne=10,
@@ -121,10 +121,10 @@ def test_path_outlier():
 def test_path3():
     path = [(3.0, 3.2), (3.1, 3.8), (3.0, 4.0), (3.1, 4.3), (3.1, 4.6), (3.0, 4.9)]
     path_sol = ['E', 'F']
-    mapdb = InMemMap(graph=[
-        ("E", (3, 3), ["F"]),
-        ("F", (3, 5), ["E"]),
-    ], use_latlon=False)
+    mapdb = InMemMap("map", graph={
+        "E": ((3, 3), ["F"]),
+        "F": ((3, 5), ["E"]),
+    }, use_latlon=False)
 
     matcher = mm.matching.Matcher(mapdb, max_dist=None, min_prob_norm=0.0001,
                                   max_dist_init=1, obs_noise=0.25, obs_noise_ne=10,
