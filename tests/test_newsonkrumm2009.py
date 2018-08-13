@@ -7,6 +7,16 @@ tests.test_path_newsonkrumm2009
 Based on the data available at:
 https://www.microsoft.com/en-us/research/publication/hidden-markov-map-matching-noise-sparseness/
 
+Notes:
+
+* There is a bug in the map available from the website.
+  Multiple segments (streets) in the map are not connected but have overlappen, but
+  disconnected, nodes.
+  For example, nodes 884147801204 and 884148400033 are on the same location and
+  should be connected because the given path runs over this road.
+* At index 2662, the path is missing a number of observations. First part where
+  non-emitting nodes are required.
+
 :author: Wannes Meert
 :copyright: Copyright 2018 DTAI, KU Leuven and Sirris.
 :license: Apache License, Version 2.0, see LICENSE for details.
@@ -81,7 +91,8 @@ def parse_linestring(line):
 
 
 def read_map(map_fn):
-    mmap = InMemMap("road_network", use_latlon=True, use_rtree=False, dir=this_path)
+    mmap = InMemMap("road_network", use_latlon=True, use_rtree=False,
+                    index_edges=True, dir=this_path)
     node_cnt = 0
     edge_cnt = 0
     with map_fn.open("r") as map_f:
@@ -113,11 +124,20 @@ def read_map(map_fn):
     return mmap
 
 
+def correct_map(mmap):
+    """Add edges between nodes with degree > 2 that are on the exact same location."""
+    def correct_edge(label, others):
+        for other in others:
+            mmap.add_edge(label, other)
+    mmap.find_duplicates(func=correct_edge)
+
+
 def load_data():
     max_route_length = None  #200
 
     # Nodes
     nodes = read_nodes(ground_truth_route)
+
     # Map
     if road_network_pkl.exists() and road_network_xy_pkl.exists():
         map_con_latlon = InMemMap.from_pickle(road_network_pkl)
@@ -129,6 +149,7 @@ def load_data():
         map_con_latlon.dump()
         mm.matching.logger.debug(f"Saved latlon road network to file ({map_con_latlon.size()} nodes)")
         map_con = map_con_latlon.to_xy(name="road_network_xy", use_rtree=True)
+        # correct_map(map_con)
         map_con.dump()
         mm.matching.logger.debug(f"Saved xy road network to file ({map_con.size()} nodes)")
 
@@ -154,8 +175,8 @@ def load_data():
 @pytest.mark.skip(reason="Not yet fully implemented")
 def test_route():
     nodes, map_con, map_con_latlon, route, route_latlon = load_data()
-    # zoom_path = True
-    zoom_path = slice(750, 850)
+    zoom_path = True
+    # zoom_path = slice(2645, 2665)
 
     if directory is not None:
         mm.matching.logger.debug("Plotting pre map ...")
@@ -164,17 +185,17 @@ def test_route():
                         filename=str(directory / "test_newson_route.png"))
         mm.matching.logger.debug("... done")
 
-    matcher = MatcherDistance(map_con, min_prob_norm=0.00001,
+    matcher = MatcherDistance(map_con, min_prob_norm=0.000001,
                               max_dist=200, obs_noise=4.07, only_edges=True,  # Newson Krumm defaults
                               non_emitting_states=False)
-    matcher.match(route)
+    matcher.match(route[2650:2662])
     path_pred = matcher.path_pred_onlynodes
 
     if directory:
         matcher.print_lattice_stats()
         mm.matching.logger.debug("Plotting post map ...")
         mm_viz.plot_map(map_con, matcher=matcher, use_osm=True,
-                        show_lattice=False, show_labels=False, show_graph=False, zoom_path=zoom_path,
+                        show_lattice=False, show_labels=True, show_graph=True, zoom_path=zoom_path,
                         coord_trans=map_con.yx2latlon,
                         filename=str(directory / "test_newson_route_matched.png"))
         mm.matching.logger.debug("... done")

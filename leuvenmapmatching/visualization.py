@@ -8,6 +8,7 @@ leuvenmapmatching.visualization
 :license: Apache License, Version 2.0, see LICENSE for details.
 """
 import math
+import random
 import logging
 from itertools import islice
 
@@ -25,6 +26,7 @@ lattice_color = mcolors.CSS4_COLORS['magenta']
 nodes_color = mcolors.CSS4_COLORS['black']
 # path_color = mcolors.CSS4_COLORS['blue']
 path_color = mcolors.CSS4_COLORS['blue']
+fontsize = 7
 
 
 def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False, z=None, bb=None,
@@ -48,15 +50,15 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
         counts = matcher.node_counts()
         nodes = matcher.path_pred_onlynodes
         lat_nodes = matcher.lattice_best
-        if coord_trans:
-            path = [coord_trans(lat, lon) for lat, lon in path]
     else:
         lat_nodes = None
-    lat_min, lon_min, lat_max, lon_max = map_con.bb()
-    if coord_trans:
-        lat_min, lon_min = coord_trans(lat_min, lon_min)
-        lat_max, lon_max = coord_trans(lat_max, lon_max)
-    if path:
+
+    if not bb:
+        bb = map_con.bb()
+    lat_min, lon_min, lat_max, lon_max = bb
+    logger.debug("bb = [{}, {}, {}, {}]".format(*bb))
+
+    if zoom_path and path:
         if type(zoom_path) is slice:
             plat, plon = islice(zip(*path[zoom_path]), 2)
             lat_min, lat_max = min(plat), max(plat)
@@ -70,17 +72,26 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
             lat_min, lat_max = min(lat_min, min(plat)), max(lat_max, max(plat))
             lon_min, lon_max = min(lon_min, min(plon)), max(lon_max, max(plon))
         logger.debug("Setting bounding box to path")
+        bb = [lat_min, lon_min, lat_max, lon_max]
+        logger.debug("bb = [{}, {}, {}, {}]".format(*bb))
     else:
         plat, plon = None, None
 
-    width = 10
+    bb_o = bb
+    if coord_trans:
+        logger.debug("Converting bounding box coordinates")
+        if path:
+            path = [coord_trans(lat, lon) for lat, lon in path]
+        lat_min, lon_min = coord_trans(lat_min, lon_min)
+        lat_max, lon_max = coord_trans(lat_max, lon_max)
+        bb = [lat_min, lon_min, lat_max, lon_max]
+        logger.debug("bb = [{}, {}, {}, {}]".format(*bb))
+
+    width = 20
 
     if use_osm:
         from .util import dist_latlon
         project = dist_latlon.project
-        if bb is None:
-            bb = [lat_min, lon_min, lat_max, lon_max]
-            logger.debug("bb = [{}, {}, {}, {}]".format(*bb))
         if z is None:
             z = 18
         m = smopy.Map(bb, z=z, ax=ax)
@@ -107,13 +118,8 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
             if lon is None:
                 lat, lon = lat[0], lat[1]
             return lon, lat
-        # to_pixels = lambda lat_, lon_: (lon_, lat_)
-        if bb is None:
-            x_max, y_max = to_pixels(lat_max, lon_max)
-            x_min, y_min = to_pixels(lat_min, lon_min)
-        else:
-            x_max, y_max = to_pixels(bb[2], bb[3])
-            x_min, y_min = to_pixels(bb[0], bb[1])
+        x_max, y_max = to_pixels(lat_max, lon_max)
+        x_min, y_min = to_pixels(lat_min, lon_min)
         height = width / abs(lon_max - lon_min) * abs(lat_max - lat_min)
         if ax is None:
             fig, ax = plt.subplots(ncols=1, nrows=1, figsize=(width, height))
@@ -122,33 +128,38 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
         ax.set_xlim([x_min, x_max])
         ax.set_ylim([y_min, y_max])
 
-    if counts is None:
-        node_sizes = [10] * map_con.size()
-    else:
-        node_sizes = [counts[label]*100+5 for label in map_con.labels()]
+    # if counts is None:
+    #     node_sizes = [10] * map_con.size()
+    # else:
+    #     node_sizes = [counts[label]*100+5 for label in map_con.labels()]
 
     if show_graph:
         logger.debug('Plot vertices ...')
-        gx, gy = zip(*[to_pixels(t) for t in map_con.coordinates()])
-        ax.scatter(gx, gy, s=node_sizes, alpha=0.4)
-        if show_labels:
-            for key, coord in map_con.all_nodes():
+        cnt = 0
+        for key, coord in map_con.all_nodes(bb=bb_o):
+            if coord_trans:
+                coord = coord_trans(*coord)
+                coord = to_pixels(coord)
+            plt.plot(coord[0], coord[1], marker='o', markersize=1, color="k", alpha=0.4)
+            if show_labels:
                 key = str(key)
                 if type(show_labels) is int:
                     key = key[-show_labels:]
-                ax.annotate(key, xy=to_pixels(coord))
+                ax.annotate(key, xy=coord, xytext=(coord[0]+10, coord[1]+random.randint(0,10)),
+                            color="k", fontsize=fontsize)
+            cnt += 1
+        logger.debug(f'... done, {cnt} nodes')
 
         logger.debug('Plot lines ...')
-        for _, loc_a, _, loc_b in map_con.all_edges():
+        cnt = 0
+        for _, loc_a, _, loc_b in map_con.all_edges(bb=bb_o):
+            loc_a = coord_trans(*loc_a)
+            loc_b = coord_trans(*loc_b)
             x_a, y_a = to_pixels(*loc_a)
             x_b, y_b = to_pixels(*loc_b)
             ax.plot([x_a, x_b], [y_a, y_b], 'k', linewidth=0.3)
-
-    # for label, ((lat, lon), nbrs, _) in graph.items():
-    #     ax.annotate(label, xy=(lon, lat))
-    #     for nbr in nbrs:
-    #         lat2, lon2 = graph[nbr][0]
-    #         plt.plot((lon, lon2), (lat, lat2), 'k', linewidth=0.3)
+            cnt += 1
+        logger.debug(f'... done, {cnt} edges')
 
     if show_lattice:
         if matcher is None:
@@ -157,9 +168,11 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
 
     if path:
         logger.debug('Plot path ...')
-        if zoom_path:
+        if type(zoom_path) is slice:
+            path_startidx = zoom_path.start
             path_slice = path[zoom_path]
         else:
+            path_startidx = 0
             path_slice = path
         px, py = zip(*[to_pixels(p[:2]) for p in path_slice])
         ax.plot(px, py, 'o-', linewidth=linewidth, markersize=linewidth * 2, alpha=0.75,
@@ -167,28 +180,27 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
         if show_labels:
             for li, (lx, ly) in enumerate(zip(px, py)):
                 # ax.text(lx, ly, f"O{li}", color=path_color)
-                ax.annotate(f"O{li}", xy=(lx, ly), color=path_color)
+                ax.annotate(f"O{path_startidx + li}", xy=(lx, ly), color=path_color, fontsize=fontsize)
 
     if nodes:
         logger.debug('Plot nodes ...')
-        xs, ys = [], []
+        xs, ys, ls = [], [], []
         for node in nodes:
-            if type(node) == tuple and len(node) == 3:
-                lat, lon = map_con.node_coordinates(node[0])
-                if coord_trans:
-                    lat, lon = coord_trans(lat, lon)
+            if type(node) == tuple:
+                node = node[0]
+            lat, lon = map_con.node_coordinates(node)
+            if coord_trans:
+                lat, lon = coord_trans(lat, lon)
+            if bb[0] <= lat <= bb[2] and bb[1] <= lon <= bb[3]:
                 x, y = to_pixels(lat, lon)
                 xs.append(x)
                 ys.append(y)
-            elif type(node) == str or type(node) == int:
-                lat, lon = map_con.node_coordinates(node)
-                if coord_trans:
-                    lat, lon = coord_trans(lat, lon)
-                x, y = to_pixels(lat, lon)
-                xs.append(x)
-                ys.append(y)
+                ls.append(node)
         ax.plot(xs, ys, 'o-', linewidth=linewidth, markersize=linewidth * 2, alpha=0.75,
-                linestyle="--", color=nodes_color)
+                color=nodes_color)
+        # if show_labels:
+        #     for label, lx, ly in zip(ls, xs, ys):
+        #         ax.annotate(label, xy=(lx, ly), xytext=(lx - 30, ly), color=nodes_color)
 
     if matcher and show_matching:
         logger.debug('Plot matching path-nodes (using matcher) ...')

@@ -29,18 +29,19 @@ logger = logging.getLogger("be.kuleuven.cs.dtai.mapmatching")
 
 
 class InMemMap(Map):
-    def __init__(self, name, use_latlon=True, use_rtree=False,
-                 crs_lonlat=None, crs_xy=None, graph=None, dir=None):
+    def __init__(self, name, use_latlon=True, use_rtree=False, index_edges=False,
+                 crs_lonlat=None, crs_xy=None, graph=None, dir=None, deserializing=False):
         """
         In-memory representation of a map based on a GeoDataFrame.
         """
         super(InMemMap, self).__init__(name, use_latlon=use_latlon)
         self.dir = Path(".") if dir is None else Path(dir)
+        self.index_edges = index_edges
+        self.graph = dict() if graph is None else graph
         self.rtree = None
         self.use_rtree = use_rtree
         if self.use_rtree:
-            self.setup_index()
-        self.graph = dict() if graph is None else graph
+            self.setup_index(deserializing=deserializing)
 
         self.crs_lonlat = {'init': 'epsg:4326'} if crs_lonlat is None else crs_lonlat  # GPS
         self.crs_xy = {'init': 'epsg:3395'} if crs_xy is None else crs_xy  # Mercator projection
@@ -61,6 +62,7 @@ class InMemMap(Map):
             "graph": self.graph,
             "use_latlon": self.use_latlon,
             "use_rtree": self.use_rtree,
+            "index_edges": self.index_edges,
             "crs_lonlat": self.crs_lonlat,
             "crs_xy": self.crs_xy
         }
@@ -72,8 +74,9 @@ class InMemMap(Map):
     def deserialize(cls, data):
         nmap = cls(data["name"], dir=data.get("dir", None),
                    use_latlon=data["use_latlon"], use_rtree=data["use_rtree"],
+                   index_edges=data["index_edges"],
                    crs_lonlat=data["crs_lonlat"], crs_xy=data["crs_xy"],
-                   graph=data["graph"])
+                   graph=data["graph"], deserializing=True)
         return nmap
 
     def dump(self):
@@ -89,7 +92,10 @@ class InMemMap(Map):
             pickle.dump(self.serialize(), ofile)
         logger.debug(f"Saved map to {filename}")
         if self.rtree:
-            self.rtree.close()
+            rtree_fn = self.rtree_fn()
+            if rtree_fn is not None:
+                self.rtree.close()
+                self.rtree = rtree.index.Index(str(rtree_fn))
 
     @classmethod
     def from_pickle(cls, filename):
@@ -109,7 +115,7 @@ class InMemMap(Map):
         :return: (lat_min, lon_min, lat_max, lon_max)
         """
         if self.use_rtree:
-            lon_min, lat_min, lon_max, lat_max = self.rtree.bounds
+            lat_min, lon_min, lat_max, lon_max = self.rtree.bounds
         else:
             glat, glon = zip(*[t[0] for t in self.graph.values()])
             lat_min, lat_max = min(glat), max(glat)
@@ -122,8 +128,13 @@ class InMemMap(Map):
     def size(self):
         return len(self.graph)
 
-    def coordinates(self):
-        for t in self.graph.values():
+    def coordinates(self, bb=None):
+        if bb is None:
+            nodes = self.graph.values()
+        else:
+            node_idxs = self.rtree.intersection(bb)
+            nodes = [self.graph[idx] for idx in node_idxs]
+        for t in nodes:
             yield t[0]
 
     def node_coordinates(self, node_key):
@@ -145,7 +156,7 @@ class InMemMap(Map):
         else:
             self.graph[node] = (loc, [])
         if self.use_rtree and self.rtree:
-            self.rtree.insert(node, (loc[1], loc[0], loc[1], loc[0]))
+            self.rtree.insert(node, (loc[0], loc[1], loc[0], loc[1]))
 
     def del_node(self, node):
         if node not in self.graph:
@@ -153,7 +164,7 @@ class InMemMap(Map):
         if self.rtree:
             data = self.graph[node]
             loc = data[0]
-            self.rtree.delete(node, (loc[1], loc[0], loc[1], loc[0]))
+            self.rtree.delete(node, (loc[0], loc[1], loc[0], loc[1]))
         del self.graph[node]
 
     def add_edge(self, node_a, node_b):
@@ -164,8 +175,13 @@ class InMemMap(Map):
         if node_b not in self.graph[node_a][1]:
             self.graph[node_a][1].append(node_b)
 
-    def all_edges(self):
-        for key_a, (loc_a, nbrs) in self.graph.items():
+    def all_edges(self, bb=None):
+        if bb is None:
+            keyvals = self.graph.items()
+        else:
+            node_idxs = self.rtree.intersection(bb)
+            keyvals = ((idx, self.graph[idx]) for idx in node_idxs)
+        for key_a, (loc_a, nbrs) in keyvals:
             if loc_a is not None:
                 for nbr in nbrs:
                     try:
@@ -176,8 +192,13 @@ class InMemMap(Map):
                         # print("Node not found: {}".format(nbr))
                         pass
 
-    def all_nodes(self):
-        for key_a, (loc_a, nbrs) in self.graph.items():
+    def all_nodes(self, bb=None):
+        if bb is None:
+            keyvals = self.graph.items()
+        else:
+            node_idxs = self.rtree.intersection(bb)
+            keyvals = ((idx, self.graph[idx]) for idx in node_idxs)
+        for key_a, (loc_a, nbrs) in keyvals:
             if loc_a is not None:
                 yield key_a, loc_a
 
@@ -206,7 +227,13 @@ class InMemMap(Map):
             rtree_size = 0
         return rtree_size
 
-    def setup_index(self, force=False):
+    def rtree_fn(self):
+        rtree_fn = None
+        if self.dir is not None:
+            rtree_fn = self.dir / self.name
+        return rtree_fn
+
+    def setup_index(self, force=False, deserializing=False):
         if not self.use_rtree:
             return
         if self.rtree is not None and not force:
@@ -214,20 +241,44 @@ class InMemMap(Map):
         if rtree is None:
             raise Exception("rtree package not found")
 
+        rtree_fn = self.rtree_fn()
+        args = []
+
+        if self.graph and (not deserializing or rtree_fn is None or not rtree_fn.exists()):
+            if self.index_edges:
+                logger.debug("Index edges")
+                def generator_function():
+                    for label, data in self.graph.items():
+                        lat_min, lon_min = data[0]
+                        lat_max, lon_max = lat_min, lon_min
+                        for idx in data[1]:
+                            olat, olon = self.graph[idx][0]
+                            lat_min = min(lat_min, olat)
+                            lat_max = max(lat_max, olat)
+                            lon_min = min(lon_min, olon)
+                            lon_max = max(lon_max, olon)
+                        yield (label, (lat_min, lon_min, lat_max, lon_max), None)
+            else:
+                def generator_function():
+                    for label, data in self.graph.items():
+                        lat, lon = data[0]
+                        yield (label, (lat, lon, lat, lon), None)
+            args.append(generator_function())
+
+        t_start = time.time()
         if self.dir is not None:
-            rtree_fn = self.dir / self.name
             props = rtree.index.Property()
             # if force:
             #     props.overwrite = True
-            logger.debug(f"Creating new file-based rtree index ({rtree_fn})")
-            self.rtree = rtree.index.Index(str(rtree_fn))
-            logger.debug(f"Rtree size = {self.rtree_size()}")
+            logger.debug(f"Creating new file-based rtree index ({rtree_fn}) ...")
+            args.insert(0, str(rtree_fn))
+        elif deserializing:
+            raise Exception("Cannot deserialize, no directory given")
         else:
-            logger.debug("Creating new in-memory rtree index")
-            self.rtree = rtree.index.Index()
-        # for label, data in self.graph.items():
-        #     lat, lon = data[0]
-        #     self.rtree.insert(0, (lon, lat, lon, lat))  # left, bottom, right, top
+            logger.debug("Creating new in-memory rtree index ...")
+        self.rtree = rtree.index.Index(*args)
+        t_delta = time.time() - t_start
+        logger.debug(f"... done: rtree size = {self.rtree_size()}, time = {t_delta} sec")
 
     def fill_index(self):
         if not self.use_rtree or self.rtree is None:
@@ -249,14 +300,14 @@ class InMemMap(Map):
         if use_rtree is None:
             use_rtree = self.use_rtree
 
-        nmap = self.__class__(name, dir=self.dir,
-                              use_latlon=False, use_rtree=use_rtree,
-                              crs_xy=self.crs_xy, crs_lonlat=self.crs_lonlat)
+        ngraph = dict()
         for label, row in self.graph.items():
             lat, lon = row[0]
             x, y = self.lonlat2xy(lon, lat)
-            nmap.graph[label] = ((y, x), row[1])
-        nmap.fill_index()
+            ngraph[label] = ((y, x), row[1])
+        nmap = self.__class__(name, dir=self.dir, graph=ngraph,
+                              use_latlon=False, use_rtree=use_rtree, index_edges=self.index_edges,
+                              crs_xy=self.crs_xy, crs_lonlat=self.crs_lonlat)
 
         return nmap
 
@@ -283,9 +334,9 @@ class InMemMap(Map):
         t_start = time.time()
         lat, lon = loc[:2]
         if self.rtree is not None and max_dist is not None:
-            bb = (lon - max_dist, lat - max_dist,  # left, bottom
-                  lon + max_dist, lat + max_dist)  # right, top
-            logger.debug(f"Search closeby nodes with index {bb}")
+            bb = (lat - max_dist, lon - max_dist,  # y_min, x_min
+                  lat + max_dist, lon + max_dist)  # y_max, x_max
+            logger.debug(f"Search closeby nodes to {loc}, bb={bb}")
             nodes = self.rtree.intersection(bb)
         else:
             logger.debug("Search closeby nodes with linear search")
@@ -296,8 +347,8 @@ class InMemMap(Map):
         for label in nodes:
             oloc = self.graph[label][0]
             dist = self.distance(loc, oloc)
-            if dist > max_dist:
-                continue
+            # if dist > max_dist:
+            #     continue
             results.append((dist, label, oloc))
         results.sort()
         t_delta_dist = time.time() - t_start
@@ -320,6 +371,19 @@ class InMemMap(Map):
             except KeyError:
                 pass
         return results
+
+    def find_duplicates(self, func=None):
+        """Find entries with identical locations."""
+        cnt = 0
+        for label, data in self.graph.items():
+            lat, lon = data[0]
+            idxs = list(self.rtree.nearest((lat, lon, lat, lon), num_results=1))
+            idxs.remove(label)
+            if len(idxs) > 0:
+                logger.info(f"Found doubles for {label}: {idxs}")
+                if func:
+                    func(label, idxs)
+        logger.info(f"Found {cnt} doubles")
 
     def print_stats(self):
         print("Graph\n-----")
