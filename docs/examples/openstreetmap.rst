@@ -39,7 +39,7 @@ But any other projection can be used by using the pyproj package directly.
     import leuvenmapmatching as mm
     from leuvenmapmatching.util.projections import latlon2grs80
     import osmread
-    map_con = mm.map.InMemMap(use_latlon=use_latlon)
+    map_con = mm.map.InMemMap("myosm", use_latlon=use_latlon)
     for entity in osmread.parse_file(str(xml_file)):
         if isinstance(entity, osmread.Way) and 'highway' in entity.tags:
             for node_a, node_b in zip(entity.nodes, entity.nodes[1:]):

@@ -61,7 +61,7 @@ For example to read in an OpenStreetMap file directly to a :class:`InMemMap` obj
 
 .. code-block:: python
 
-    map_con = mm.map.InMemMap(use_latlon=True)
+    map_con = mm.map.InMemMap("myosm", use_latlon=True)
     for entity in osmread.parse_file(osm_fn):
         if isinstance(entity, osmread.Way) and 'highway' in entity.tags:
             for node_a, node_b in zip(entity.nodes, entity.nodes[1:]):
