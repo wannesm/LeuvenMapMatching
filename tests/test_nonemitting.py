@@ -249,6 +249,6 @@ if __name__ == "__main__":
     # test_path2()
     # test_path2_incremental()
     # test_path_duplicate()
-    test_path3_many_obs()
-    # test_path3_few_obs_en()
+    # test_path3_many_obs()
+    test_path3_few_obs_en()
     # test_path3_few_obs_e()

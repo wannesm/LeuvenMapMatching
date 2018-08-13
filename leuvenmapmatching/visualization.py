@@ -153,8 +153,9 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
         logger.debug('Plot lines ...')
         cnt = 0
         for _, loc_a, _, loc_b in map_con.all_edges(bb=bb_o):
-            loc_a = coord_trans(*loc_a)
-            loc_b = coord_trans(*loc_b)
+            if coord_trans:
+                loc_a = coord_trans(*loc_a)
+                loc_b = coord_trans(*loc_b)
             x_a, y_a = to_pixels(*loc_a)
             x_b, y_b = to_pixels(*loc_b)
             ax.plot([x_a, x_b], [y_a, y_b], 'k', linewidth=0.3)

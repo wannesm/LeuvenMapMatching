@@ -129,7 +129,7 @@ class InMemMap(Map):
         return len(self.graph)
 
     def coordinates(self, bb=None):
-        if bb is None:
+        if bb is None or self.rtree is None:
             nodes = self.graph.values()
         else:
             node_idxs = self.rtree.intersection(bb)
@@ -176,7 +176,7 @@ class InMemMap(Map):
             self.graph[node_a][1].append(node_b)
 
     def all_edges(self, bb=None):
-        if bb is None:
+        if bb is None or self.rtree is None:
             keyvals = self.graph.items()
         else:
             node_idxs = self.rtree.intersection(bb)
@@ -193,7 +193,7 @@ class InMemMap(Map):
                         pass
 
     def all_nodes(self, bb=None):
-        if bb is None:
+        if bb is None or self.rtree is None:
             keyvals = self.graph.items()
         else:
             node_idxs = self.rtree.intersection(bb)
@@ -347,8 +347,8 @@ class InMemMap(Map):
         for label in nodes:
             oloc = self.graph[label][0]
             dist = self.distance(loc, oloc)
-            # if dist > max_dist:
-            #     continue
+            if dist > max_dist:
+                continue
             results.append((dist, label, oloc))
         results.sort()
         t_delta_dist = time.time() - t_start

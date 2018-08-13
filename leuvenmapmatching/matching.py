@@ -565,8 +565,8 @@ class Matcher:
                         continue
                     edge_m = Segment(label, loc, nbr_label, nbr_loc, loc, 0.0)
                     edge_o = Segment(f"O{0}", self.path[0])
-                    dist_obs, pi, _ = self.map.distance_point_to_segment(edge_o.pi, edge_m.p1, edge_m.p2)
-                    edge_m.pi = pi
+                    # dist_obs, pi, _ = self.map.distance_point_to_segment(edge_o.pi, edge_m.p1, edge_m.p2)
+                    # edge_m.pi = pi
                     m_next = self.matching.first(logprob_init, edge_m, edge_o, self, dist_obs)
                     if m_next is not None:
                         if m_next.key in self.lattice[0]:

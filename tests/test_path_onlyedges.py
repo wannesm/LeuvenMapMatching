@@ -77,5 +77,5 @@ if __name__ == "__main__":
     mm.matching.logger.addHandler(logging.StreamHandler(sys.stdout))
     directory = Path(os.environ.get('TESTDIR', Path(__file__).parent))
     print(f"Saving files to {directory}")
-    # test_path1()
-    test_path3()
+    test_path1()
+    # test_path3()
