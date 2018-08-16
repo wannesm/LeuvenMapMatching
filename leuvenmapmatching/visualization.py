@@ -139,13 +139,18 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
         for key, coord in map_con.all_nodes(bb=bb_o):
             if coord_trans:
                 coord = coord_trans(*coord)
-                coord = to_pixels(coord)
-            plt.plot(coord[0], coord[1], marker='o', markersize=1, color="k", alpha=0.4)
+            coord = to_pixels(coord)
+            plt.plot(coord[0], coord[1], marker='o', markersize=2, color="k", alpha=0.4)
             if show_labels:
                 key = str(key)
                 if type(show_labels) is int:
                     key = key[-show_labels:]
-                ax.annotate(key, xy=coord, xytext=(coord[0]+10, coord[1]+random.randint(0,10)),
+                xytext = ax.transLimits.transform(coord)
+                xytext = (xytext[0]+0.01, xytext[1]+0.01)
+                xytext = ax.transLimits.inverted().transform(xytext)
+                ax.annotate(key, xy=coord, xytext=xytext,
+                            # textcoords=('axes fraction', 'axes fraction'),
+                            # arrowprops=dict(arrowstyle='->'),
                             color="k", fontsize=fontsize)
             cnt += 1
         logger.debug(f'... done, {cnt} nodes')

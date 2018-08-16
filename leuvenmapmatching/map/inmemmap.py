@@ -339,20 +339,50 @@ class InMemMap(Map):
             logger.debug(f"Search closeby nodes to {loc}, bb={bb}")
             nodes = self.rtree.intersection(bb)
         else:
-            logger.debug("Search closeby nodes with linear search")
+            logger.warning("Searching closeby nodes with linear search, use an index and set max_dist")
             nodes = self.graph.keys()
         t_delta_search = time.time() - t_start
         t_start = time.time()
         results = []
         for label in nodes:
-            oloc = self.graph[label][0]
+            oloc, nbrs = self.graph[label]
             dist = self.distance(loc, oloc)
-            if dist > max_dist:
-                continue
-            results.append((dist, label, oloc))
+            if dist < max_dist:
+                results.append((dist, label, oloc))
         results.sort()
         t_delta_dist = time.time() - t_start
         logger.debug(f"Found {len(results)} closeby nodes "
+                     f"in {t_delta_search} sec and computed distances in {t_delta_dist} sec")
+        if max_elmt is not None:
+            results = results[:max_elmt]
+        return results
+
+    def edges_closeto(self, loc, max_dist=None, max_elmt=None):
+        t_start = time.time()
+        lat, lon = loc[:2]
+        if self.rtree is not None and max_dist is not None and self.index_edges:
+            bb = (lat - max_dist, lon - max_dist,  # y_min, x_min
+                  lat + max_dist, lon + max_dist)  # y_max, x_max
+            logger.debug(f"Search closeby edges to {loc}, bb={bb}")
+            nodes = self.rtree.intersection(bb)
+        else:
+            if self.rtree is not None and max_dist is not None and not self.index_edges:
+                logger.warning("Index is built for nodes, not for edges, set the index_edges argument to true")
+            logger.warning("Searching closeby nodes with linear search, use an index and set max_dist")
+            nodes = self.graph.keys()
+        t_delta_search = time.time() - t_start
+        t_start = time.time()
+        results = []
+        for label in nodes:
+            oloc, nbrs = self.graph[label]
+            for nbr in nbrs:
+                nbr_data = self.graph[nbr]
+                dist, pi, ti = self.distance_point_to_segment(loc, oloc, nbr_data[0])
+                if dist < max_dist:
+                    results.append((dist, label, oloc, nbr, nbr_data[0], pi, ti))
+        results.sort()
+        t_delta_dist = time.time() - t_start
+        logger.debug(f"Found {len(results)} closeby edges "
                      f"in {t_delta_search} sec and computed distances in {t_delta_dist} sec")
         if max_elmt is not None:
             results = results[:max_elmt]

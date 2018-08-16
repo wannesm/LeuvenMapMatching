@@ -20,7 +20,7 @@ import numpy as np
 from scipy.stats import halfnorm, norm
 
 from .util.segment import Segment
-from .util import approx_equal
+from .util import approx_equal, approx_leq
 
 
 logger = logging.getLogger("be.kuleuven.cs.dtai.mapmatching")
@@ -74,6 +74,7 @@ class Matching(object):
             dist, proj_m, t_m = self.matcher.map.distance_point_to_segment(edge_o.p1, edge_m.p1, edge_m.p2)
             if only_edges and (approx_equal(t_m, 0.0) or approx_equal(t_m, 1.0)):
                 if __debug__ and logger.isEnabledFor(logging.DEBUG):
+                    logger.debug(f"     Stopped trace: Too close to end, {t_m}")  # TODO: why is this useful
                     new_stop = True
                 else:
                     return None
@@ -201,7 +202,7 @@ class Matching(object):
         if label_width is None:
             label_width = default_label_width
         repr_tmpl = "{:<2} | {:<"+str(label_width)+"} | {:10.5f} | {:10.5f} | {:10.5f} | {:10.5f} | " +\
-                    "{:<3} | {:10.5f} | {}"
+                    "{:<3} | {:10.5f} | {:<" + str(label_width) + "} |"
         return repr_tmpl.format(stop, self.label, self.logprob, self.logprob / self.length,
                                 self.logprobema, self.logprobne, self.obs,
                                 self.dist_obs, ",".join([str(prev.label) for prev in self.prev]))
@@ -404,7 +405,7 @@ class Matcher:
 
         # Initialisation
         self.path = path
-        nb_start_nodes = self._create_start_nodes()
+        nb_start_nodes = self._create_start_nodes(use_edges=self.only_edges)
         if nb_start_nodes == 0:
             self.lattice_best = []
             return [], 0
@@ -530,7 +531,7 @@ class Matcher:
         node_path = self._build_node_path(start_idx, unique, max_depth=max_depth)
         return node_path, start_idx
 
-    def _create_start_nodes(self):
+    def _create_start_nodes(self, use_edges=True):
         """
 
         :return: Number of created start points.
@@ -541,40 +542,37 @@ class Matcher:
         for idx in range(len(self.path)):
             self.lattice[idx] = dict()
 
-        nodes = self.map.nodes_closeto(self.path[0], max_dist=self.max_dist_init)
+        if use_edges:
+            nodes = self.map.edges_closeto(self.path[0], max_dist=self.max_dist_init)
+        else:
+            nodes = self.map.nodes_closeto(self.path[0], max_dist=self.max_dist_init)
         if __debug__:
             logger.debug("--- obs {} --- {} ---".format(0, self.path[0]))
         t_delta = time.time() - t_start
         logger.info("Initialized map with {} starting points in {} seconds".format(len(nodes), t_delta))
         if len(nodes) == 0:
             logger.info(f'Stopped early at observation 0'
-                        f', no starting points x found for which '
+                        f', no starting points/edges x found for which '
                         f'|x - ({self.path[0][0]:.2f},{self.path[0][1]:.2f})| < {self.max_dist_init}')
             return 0
         if __debug__:
             logger.debug(self.matching.repr_header())
         logprob_init = 0  # math.log(1.0/len(nodes))
-        if self.only_edges:
+        if use_edges:
             # Search for nearby edges
-            # TODO: Search for nearby edges, not first nodes
-            for dist_obs, label, loc in nodes:
-                # TODO: update dist_obs to be distance to line
-                nbrs = self.map.nodes_nbrto(label)
-                for nbr_label, nbr_loc in nbrs:
-                    if nbr_label == label:
-                        continue
-                    edge_m = Segment(label, loc, nbr_label, nbr_loc, loc, 0.0)
-                    edge_o = Segment(f"O{0}", self.path[0])
-                    # dist_obs, pi, _ = self.map.distance_point_to_segment(edge_o.pi, edge_m.p1, edge_m.p2)
-                    # edge_m.pi = pi
-                    m_next = self.matching.first(logprob_init, edge_m, edge_o, self, dist_obs)
-                    if m_next is not None:
-                        if m_next.key in self.lattice[0]:
-                            self.lattice[0][m_next.key].update(m_next)
-                        else:
-                            self.lattice[0][m_next.key] = m_next
-                        if __debug__:
-                            logger.debug(str(m_next))
+            for dist_obs, label1, loc1, label2, loc2, pi, ti in nodes:
+                if label2 == label1:
+                    continue
+                edge_m = Segment(label1, loc1, label2, loc2, pi, ti)
+                edge_o = Segment(f"O{0}", self.path[0])
+                m_next = self.matching.first(logprob_init, edge_m, edge_o, self, dist_obs)
+                if m_next is not None:
+                    if m_next.key in self.lattice[0]:
+                        self.lattice[0][m_next.key].update(m_next)
+                    else:
+                        self.lattice[0][m_next.key] = m_next
+                    if __debug__:
+                        logger.debug(str(m_next))
         else:
             # Search for nearby nodes
             for dist_obs, label, loc in nodes:
@@ -771,7 +769,7 @@ class Matcher:
                         logger.debug(f"No neighbours found for node {m.edge_m.l2} ({m.label}, non-emitting)")
                     continue
                 if __debug__:
-                    logger.debug(f"   Move to {len(nbrs)} neighbours from node {m.edge_m.l2} ({m.label}, non-emitting)")
+                    logger.debug(f"   Move to {len(nbrs)} neighbours from edge {m.edge_m.l2} ({m.label}, non-emitting)")
                     logger.debug(m.repr_header())
                 for nbr_label, nbr_loc in nbrs:
                     if self._node_in_prev_ne(m, nbr_label):
@@ -789,11 +787,13 @@ class Matcher:
                             else:
                                 if m_next.shortkey in lattice_best:
                                     # if m_next.logprob > lattice_best[m_next.shortkey].logprob:
-                                    if m_next.dist_obs < lattice_best[m_next.shortkey].dist_obs:
+                                    if approx_leq(m_next.dist_obs, lattice_best[m_next.shortkey].dist_obs):
                                         cur_lattice_new[m_next.key] = m_next
                                         lattice_best[m_next.shortkey] = m_next
                                         lattice_toinsert.append(m_next)
                                     elif __debug__ and logger.isEnabledFor(logging.DEBUG):
+                                        logger.debug(f"     Stopped trace: distance smaller than best for key: "
+                                                     f"{m_next.dist_obs} > {lattice_best[m_next.shortkey].dist_obs}")
                                         m_next.stop = True
                                         self._insert(m_next)
                                 else:

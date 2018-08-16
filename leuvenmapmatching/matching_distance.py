@@ -13,6 +13,10 @@ method presented in Newson and Krumm (2009).
 from .matching import Matching, Matcher
 from scipy.stats import norm
 import math
+import logging
+
+
+logger = logging.getLogger("be.kuleuven.cs.dtai.mapmatching")
 
 
 class MatchingDistance(Matching):
@@ -20,22 +24,29 @@ class MatchingDistance(Matching):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.dist_betw_obs: float = 0.0
-        self.dist_betw_states: float = 1.0
-        if len(self.prev) != 0:
-            m_prev = list(self.prev)[0]  # type: MatchingDistance
-            self.dist_betw_states = self.matcher.map.distance(m_prev.edge_m.pi, self.edge_m.pi)
-            self.dist_betw_obs = self.matcher.map.distance(m_prev.edge_o.pi, self.edge_o.pi)
+        if logger.isEnabledFor(logging.DEBUG):
+            self.dist_betw_obs: float = 0.0
+            self.dist_betw_states: float = 1.0
+            if len(self.prev) != 0:
+                m_prev = list(self.prev)[0]  # type: MatchingDistance
+                if m_prev.edge_m.label == self.label:
+                    self.dist_betw_states = self.matcher.map.distance(m_prev.edge_m.pi, self.edge_m.pi)
+                else:
+                    self.dist_betw_states = self.matcher.map.distance(m_prev.edge_m.pi, m_prev.edge_m.p2) +\
+                                            self.matcher.map.distance(m_prev.edge_m.p2, self.edge_m.pi)
+                self.dist_betw_obs = self.matcher.map.distance(m_prev.edge_o.pi, self.edge_o.pi)
 
     @staticmethod
     def repr_header(label_width=None, stop=""):
         res = Matching.repr_header(label_width)
-        res += f"{'d(o)':<5} | {'d(s)':<5} |"
+        if logger.isEnabledFor(logging.DEBUG):
+            res += f" {'d(o)':<5} | {'d(s)':<5} |"
         return res
 
     def __str__(self, label_width=None):
         res = super().__str__(label_width)
-        res += f"{self.dist_betw_obs:<5.2f} | {self.dist_betw_states:<5.2f} |"
+        if logger.isEnabledFor(logging.DEBUG):
+            res += f" {self.dist_betw_obs:<5.2f} | {self.dist_betw_states:<5.2f} |"
         return res
 
 
@@ -51,6 +62,11 @@ class MatcherDistance(Matcher):
         - non_emitting_states = False
 
         """
+        if not kwargs.get("only_edges", True):
+            logger.warning("The MatcherDistance method only works on edges as states. Nodes have been disabled.")
+        kwargs["only_edges"] = True
+        if "matching" not in kwargs:
+            kwargs["matching"] = MatchingDistance
         super().__init__(*args, **kwargs)
         self.obs_noise_dist = norm(scale=self.obs_noise)
         self.obs_noise_dist_ne = norm(scale=self.obs_noise_ne)
@@ -70,7 +86,10 @@ class MatcherDistance(Matcher):
         :return:
         """
         d_z = self.map.distance(prev_m.edge_o.pi, next_obs)
-        d_x = self.map.distance(prev_m.edge_m.pi, next_pos)
+        if prev_m.edge_m.label == next_label:
+            d_x = self.map.distance(prev_m.edge_m.pi, next_pos)
+        else:
+            d_x = self.map.distance(prev_m.edge_m.pi, prev_m.edge_m.p2) + self.map.distance(prev_m.edge_m.p2, next_pos)
         d_t = abs(d_z - d_x)
         beta = 1 / 6
         p_dt = 1 / beta * math.exp(-d_t / beta)
