@@ -344,6 +344,11 @@ class Matcher:
         self.ne_length_factor_log = math.log(non_emitting_length_factor)
 
     def logprob_trans(self, prev_m, next_label=None, next_pos=None, next_obs=None):
+        """Transition probability.
+
+        Note: In contrast with a regular HMM, this cannot be a probability density function, it needs
+              to be a proper probability (thus values between 0.0 and 1.0).
+        """
         if self.avoid_goingback:
             going_back = False
             for m in prev_m.prev:
@@ -355,13 +360,20 @@ class Matcher:
         return 0  # All probabilities are 1 (thus technically not a distribution)
 
     def logprob_obs(self, dist, prev_m, new_edge_m, new_edge_o):
-        """Emission probability for emitting states."""
+        """Emission probability for emitting states.
+
+        Note: In contrast with a regular HMM, this cannot be a probability density function, it needs
+              to be a proper probability (thus values between 0.0 and 1.0).
+        """
         result = self.obs_noise_dist.logpdf(dist) + self.obs_noise_logint
         # print("logprob_obs: {} -> {:.5f} = {:.5f}".format(dist, result, math.exp(result)))
         return result
 
     def logprob_obs_ne(self, dist, prev_m, new_edge_m, new_edge_o):
-        """Emission probability for non-emitting states."""
+        """Emission probability for non-emitting states.
+
+        Note: This needs to be a proper probability (thus values between 0.0 and 1.0).
+        """
         result = self.obs_noise_dist_ne.logpdf(dist) + self.obs_noise_logint_ne
         # print("logprob_obs: {} -> {:.5f} = {:.5f}".format(dist, result, math.exp(result)))
         return result
