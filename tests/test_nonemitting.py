@@ -89,6 +89,9 @@ def test_path1_newson():
         from leuvenmapmatching import visualization as mmviz
         matcher.print_lattice_stats()
         matcher.print_lattice()
+        print("LATTICE BEST")
+        for m in matcher.lattice_best:
+            print(m)
         with (directory / 'lattice_path1.gv').open('w') as ofile:
             matcher.lattice_dot(file=ofile)
         mmviz.plot_map(mapdb, matcher=matcher, show_labels=True, show_matching=True,

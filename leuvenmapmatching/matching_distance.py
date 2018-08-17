@@ -25,7 +25,7 @@ class MatchingDistance(Matching):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if logger.isEnabledFor(logging.DEBUG):
-            self.dist_betw_obs: float = 0.0
+            self.dist_betw_obs: float = 1.0
             self.dist_betw_states: float = 1.0
             if len(self.prev) != 0:
                 m_prev = list(self.prev)[0]  # type: MatchingDistance
@@ -61,6 +61,9 @@ class MatcherDistance(Matcher):
         - only_edges = True
         - non_emitting_states = False
 
+        Transition and emission probability are transformed from densities to probababilities by
+        taking the 1 - CDF instead of the PDF.
+
         """
         if not kwargs.get("only_edges", True):
             logger.warning("The MatcherDistance method only works on edges as states. Nodes have been disabled.")
@@ -74,7 +77,11 @@ class MatcherDistance(Matcher):
     def logprob_trans(self, prev_m: MatchingDistance, next_label=None, next_pos=None, next_obs=None):
         """Transition probability.
 
-        P(dt) = 1 / beta * e^(-dt / beta)
+        Original PDF:
+        p(dt) = 1 / beta * e^(-dt / beta)
+
+        Transformed to probability:
+        P(dt) = p(d > dt) = e^(-dt / beta)
 
         Main difference with Newson and Krumm: we know all points are connected thus do not compute the
         shortest path but the distance between two points.
@@ -92,15 +99,22 @@ class MatcherDistance(Matcher):
             d_x = self.map.distance(prev_m.edge_m.pi, prev_m.edge_m.p2) + self.map.distance(prev_m.edge_m.p2, next_pos)
         d_t = abs(d_z - d_x)
         beta = 1 / 6
-        p_dt = 1 / beta * math.exp(-d_t / beta)
-        return p_dt
+        # p_dt = 1 / beta * math.exp(-d_t / beta)
+        icp_dt = math.exp(-d_t / beta)
+        licp_dt = math.log(icp_dt)
+        return licp_dt
 
     def logprob_obs(self, dist, prev_m, new_edge_m, new_edge_o):
         """Emission probability for emitting states."""
-        result = self.obs_noise_dist.logpdf(dist)
-        return result
+        print(dist)
+        result = 2 * (1 - self.obs_noise_dist.cdf(dist))
+        if result == 0:
+            return -float("inf")
+        return math.log(result)
 
     def logprob_obs_ne(self, dist, prev_m, new_edge_m, new_edge_o):
         """Emission probability for non-emitting states."""
-        result = self.obs_noise_dist_ne.logpdf(dist)
-        return result
+        result = 2 * (1 - self.obs_noise_dist_ne.cdf(dist))
+        if result == 0:
+            return -float("inf")
+        return math.log(result)
