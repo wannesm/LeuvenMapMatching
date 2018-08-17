@@ -55,7 +55,7 @@ class Matching(object):
         self.length: int = length
         self.matcher: Matcher = matcher
 
-    def next(self, edge_m: Segment, edge_o: Segment, obs: int=0, obs_ne: int=0, only_edges=False):
+    def next(self, edge_m: Segment, edge_o: Segment, obs: int=0, obs_ne: int=0):
         """Create a next lattice Matching object with this Matching object as the previous one in the lattice."""
         new_stop = False
         if edge_m.is_point() and edge_o.is_point():
@@ -72,9 +72,9 @@ class Matching(object):
         elif not edge_m.is_point() and edge_o.is_point():
             # edge to node
             dist, proj_m, t_m = self.matcher.map.distance_point_to_segment(edge_o.p1, edge_m.p1, edge_m.p2)
-            if only_edges and (approx_equal(t_m, 0.0) or approx_equal(t_m, 1.0)):
+            if not self.matcher.only_edges and (approx_equal(t_m, 0.0) or approx_equal(t_m, 1.0)):
                 if __debug__ and logger.isEnabledFor(logging.DEBUG):
-                    logger.debug(f"   | Stopped trace: Too close to end, {t_m}")  # TODO: why is this useful
+                    logger.debug(f"   | Stopped trace: Too close to end, {t_m}")
                     new_stop = True
                 else:
                     return None
@@ -98,9 +98,10 @@ class Matching(object):
         else:
             logprob_obs = self.matcher.logprob_obs_ne(dist, self, edge_m, edge_o)
         new_logprob_delta = logprob_trans + logprob_obs
-        if edge_m.ti < self.edge_m.ti:
+        print(f"ti = {edge_m.ti} < {self.edge_m.ti}")
+        if self.matcher.avoid_goingback and edge_m.ti < self.edge_m.ti:
             # This node would imply going back on the edge between observations
-            new_logprob_delta - 0.0004345  # math.log(0.999), slight preference to avoid going back
+            new_logprob_delta -= self.matcher.goback_factor_log  # slight preference to avoid going back
         if obs_ne == 0:
             new_logprobe = self.logprob + new_logprob_delta
             new_logprobne = 0
@@ -273,7 +274,7 @@ class Matcher:
 
     def __init__(self, map_con, obs_noise=1, max_dist_init=None, max_dist=None, min_prob_norm=None,
                  non_emitting_states=True, max_lattice_width=None,
-                 only_edges=True, obs_noise_ne=None, matching=Matching, avoid_goingback=False,
+                 only_edges=True, obs_noise_ne=None, matching=Matching, avoid_goingback=True,
                  non_emitting_length_factor=0.999):
         """Initialize a matcher for map matching.
 
@@ -340,8 +341,11 @@ class Matcher:
         self.non_emitting_states_maxnb = 100
         self.max_lattice_width = max_lattice_width
         self.only_edges = only_edges
-        self.avoid_goingback = avoid_goingback
+
+        # Penalties
         self.ne_length_factor_log = math.log(non_emitting_length_factor)
+        self.avoid_goingback = avoid_goingback
+        self.goback_factor_log = 0.004345  # math.log(0.99)
 
     def logprob_trans(self, prev_m, next_label=None, next_pos=None, next_obs=None):
         """Transition probability.

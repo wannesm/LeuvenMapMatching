@@ -34,10 +34,14 @@ def test_path1():
         "F": ((3, 5), ["D", "E"])
     }, use_latlon=False)
 
-    matcher = mm.matching.Matcher(mapdb, max_dist=None, min_prob_norm=None, only_edges=True)
+    matcher = mm.matching.Matcher(mapdb, max_dist=None, min_prob_norm=None,
+                                  only_edges=True, non_emitting_states=False)
     matcher.match(path, unique=True)
     path_pred = matcher.path_pred_onlynodes
     if directory:
+        print("Lattice best:")
+        for m in matcher.lattice_best:
+            print(m)
         matcher.print_lattice_stats()
         matcher.print_lattice()
         from leuvenmapmatching import visualization as mmviz
