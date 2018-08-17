@@ -107,8 +107,9 @@ def test_path1():
 def test_path2():
     mapdb, path1, path2, _ = setup_map()
     path_sol = [f"N{i}" for i in range(20)]
-    matcher = mm.matching.Matcher(mapdb, max_dist_init=0.2, obs_noise=1, obs_noise_ne=10,
-                                  non_emitting_states=True)
+    matcher = mm.matching.Matcher(mapdb, max_dist_init=0.2, min_prob_norm=0.1,
+                                  obs_noise=0.1, obs_noise_ne=1,
+                                  non_emitting_states=True, only_edges=True)
     path_pred = matcher.match(path2, unique=True)
     print(path_pred)
     path_pred = matcher.path_pred_onlynodes

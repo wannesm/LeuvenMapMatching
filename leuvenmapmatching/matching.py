@@ -98,8 +98,8 @@ class Matching(object):
         else:
             logprob_obs = self.matcher.logprob_obs_ne(dist, self, edge_m, edge_o)
         new_logprob_delta = logprob_trans + logprob_obs
-        print(f"ti = {edge_m.ti} < {self.edge_m.ti}")
-        if self.matcher.avoid_goingback and edge_m.ti < self.edge_m.ti:
+        if self.matcher.avoid_goingback and edge_m.key == self.edge_m and edge_m.ti < self.edge_m.ti:
+            print(f"ti = {edge_m.ti} < {self.edge_m.ti}")
             # This node would imply going back on the edge between observations
             new_logprob_delta -= self.matcher.goback_factor_log  # slight preference to avoid going back
         if obs_ne == 0:
@@ -786,8 +786,6 @@ class Matcher:
                     if __debug__:
                         logger.debug(f"No neighbours found for node {m.edge_m.l2} ({m.label}, non-emitting)")
                     continue
-                if str(m.label) == "Y-X-0-0":
-                    print("XXX")
                 if __debug__:
                     logger.debug(f"   Move to {len(nbrs)} neighbours from edge {m.edge_m.l2} ({m.label}, non-emitting)")
                     logger.debug(m.repr_header())
