@@ -74,7 +74,7 @@ class MatcherDistance(Matcher):
         self.obs_noise_dist = norm(scale=self.obs_noise)
         self.obs_noise_dist_ne = norm(scale=self.obs_noise_ne)
 
-    def logprob_trans(self, prev_m: MatchingDistance, next_label=None, next_pos=None, next_obs=None):
+    def logprob_trans(self, prev_m: MatchingDistance, edge_m, edge_o):
         """Transition probability.
 
         Original PDF:
@@ -87,16 +87,15 @@ class MatcherDistance(Matcher):
         shortest path but the distance between two points.
 
         :param prev_m:
-        :param next_label:
-        :param next_pos:
-        :param next_obs:
+        :param edge_m:
+        :param edge_o:
         :return:
         """
-        d_z = self.map.distance(prev_m.edge_o.pi, next_obs)
-        if prev_m.edge_m.label == next_label:
-            d_x = self.map.distance(prev_m.edge_m.pi, next_pos)
+        d_z = self.map.distance(prev_m.edge_o.pi, edge_o.pi)
+        if prev_m.edge_m.label == edge_m.label:
+            d_x = self.map.distance(prev_m.edge_m.pi, edge_m.pi)
         else:
-            d_x = self.map.distance(prev_m.edge_m.pi, prev_m.edge_m.p2) + self.map.distance(prev_m.edge_m.p2, next_pos)
+            d_x = self.map.distance(prev_m.edge_m.pi, prev_m.edge_m.p2) + self.map.distance(prev_m.edge_m.p2, edge_m.pi)
         d_t = abs(d_z - d_x)
         beta = 1 / 6
         # p_dt = 1 / beta * math.exp(-d_t / beta)

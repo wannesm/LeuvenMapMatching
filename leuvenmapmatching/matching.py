@@ -92,16 +92,12 @@ class Matching(object):
         else:
             raise Exception(f"Should not happen")
 
-        logprob_trans = self.matcher.logprob_trans(self, edge_m.label, proj_m, proj_o)
+        logprob_trans = self.matcher.logprob_trans(self, edge_m, edge_o)
         if obs_ne == 0:
             logprob_obs = self.matcher.logprob_obs(dist, self, edge_m, edge_o)
         else:
             logprob_obs = self.matcher.logprob_obs_ne(dist, self, edge_m, edge_o)
         new_logprob_delta = logprob_trans + logprob_obs
-        if self.matcher.avoid_goingback and edge_m.key == self.edge_m and edge_m.ti < self.edge_m.ti:
-            print(f"ti = {edge_m.ti} < {self.edge_m.ti}")
-            # This node would imply going back on the edge between observations
-            new_logprob_delta -= self.matcher.goback_factor_log  # slight preference to avoid going back
         if obs_ne == 0:
             new_logprobe = self.logprob + new_logprob_delta
             new_logprobne = 0
@@ -275,7 +271,7 @@ class Matcher:
     def __init__(self, map_con, obs_noise=1, max_dist_init=None, max_dist=None, min_prob_norm=None,
                  non_emitting_states=True, max_lattice_width=None,
                  only_edges=True, obs_noise_ne=None, matching=Matching, avoid_goingback=True,
-                 non_emitting_length_factor=0.999):
+                 non_emitting_length_factor=1.0):
         """Initialize a matcher for map matching.
 
         Distances are in meters when using latitude-longitude.
@@ -344,24 +340,41 @@ class Matcher:
 
         # Penalties
         self.ne_length_factor_log = math.log(non_emitting_length_factor)
+        # Transition probability is divided (in next) by this factor if we move back on the
+        # current edge.
         self.avoid_goingback = avoid_goingback
-        self.goback_factor_log = 0.004345  # math.log(0.99)
+        self.gobackonedge_factor_log = 0.004345  # -math.log(0.99)
+        # Transition probability is divided (in logprob_trans) by this factor if the next state is
+        # also the previous state, thus if we go back
+        self.gobacktoedge_factor_log = 0.3  # -math.log(0.5)
+        # Transition probability is divided (in logprob_trans) by this factor if a transition is made
+        self.transition_factor = 0.3# -math.log(0.9)
 
-    def logprob_trans(self, prev_m, next_label=None, next_pos=None, next_obs=None):
+    def logprob_trans(self, prev_m:Matching, edge_m:Segment, edge_o:Segment):
         """Transition probability.
 
         Note: In contrast with a regular HMM, this cannot be a probability density function, it needs
               to be a proper probability (thus values between 0.0 and 1.0).
         """
-        if self.avoid_goingback:
-            going_back = False
-            for m in prev_m.prev:
-                if next_label == m.edge_m.l1:
-                    going_back = True
-                    break
-            if going_back:
-                return -0.3  # Pr==0.5, prefer not going back
-        return 0  # All probabilities are 1 (thus technically not a distribution)
+        logprob = 0
+        if prev_m.edge_m.label == edge_m.label:
+            # Staying in same state
+            if self.avoid_goingback and edge_m.key == prev_m.edge_m.key and edge_m.ti < prev_m.edge_m.ti:
+                # Going back on edge
+                logprob -= self.gobackonedge_factor_log  # slight preference to avoid going back
+        else:
+            # Moving states
+            logprob -= self.transition_factor
+            if self.avoid_goingback:
+                # Goin back on state
+                going_back = False
+                for m in prev_m.prev:
+                    if edge_m.label == m.edge_m.label:
+                        going_back = True
+                        break
+                if going_back:
+                    logprob -= self.gobacktoedge_factor_log  # Pr==0.5, prefer not going back
+        return logprob  # All probabilities are 1 (thus technically not a distribution)
 
     def logprob_obs(self, dist, prev_m, new_edge_m, new_edge_o):
         """Emission probability for emitting states.
@@ -739,8 +752,6 @@ class Matcher:
         # logger.info('Used {} levels of non-emitting states'.format(nb_ne))
         for m in lattice_toinsert:
             self._insert(m)
-        for m in lattice_best.values():
-            self._insert(m)
 
     def _node_in_prev_ne(self, m_next, label):
         """Is the given node already visited in the chain of non-emitting states.
@@ -914,12 +925,13 @@ class Matcher:
                                 # if m_next.dist_obs < lattice_best[m_next.shortkey].dist_obs:
                                 if m_next.logprob > lattice_best[m_next.shortkey].logprob:
                                     lattice_best[m_next.shortkey] = m_next
-                                    # lattice_toinsert.append(m_next)
+                                    lattice_toinsert.append(m_next)
                                 elif __debug__ and logger.isEnabledFor(logging.DEBUG):
                                     m_next.stop = True
+                                    lattice_toinsert.append(m_next)
                             else:
                                 lattice_best[m_next.shortkey] = m_next
-                                # lattice_toinsert.append(m_next)
+                                lattice_toinsert.append(m_next)
                             if __debug__:
                                 logger.debug(str(m_next))
                     else:
@@ -951,15 +963,16 @@ class Matcher:
                         m_next = m.next(edge_m, edge_o, obs=obs_idx)
                         if m_next is not None:
                             if m_next.shortkey in lattice_best:
-                                # if m_next.logprob > lattice_best[m_next.shortkey].logprob:
-                                if m_next.dist_obs < lattice_best[m_next.shortkey].dist_obs:
+                                # if m_next.dist_obs < lattice_best[m_next.shortkey].dist_obs:
+                                if m_next.logprob > lattice_best[m_next.shortkey].logprob:
                                     lattice_best[m_next.shortkey] = m_next
-                                    # lattice_toinsert.append(m_next)
+                                    lattice_toinsert.append(m_next)
                                 elif __debug__ and logger.isEnabledFor(logging.DEBUG):
                                     m_next.stop = True
+                                    lattice_toinsert.append(m_next)
                             else:
                                 lattice_best[m_next.shortkey] = m_next
-                                # lattice_toinsert.append(m_next)
+                                lattice_toinsert.append(m_next)
                             if __debug__:
                                 logger.debug(str(m_next))
                     else:
