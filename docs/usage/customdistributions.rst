@@ -4,6 +4,9 @@ Custom probability distributions
 You can use your own custom probability distributions for the transition and emission probabilities.
 This is achieved by inheriting from the :class:`Matcher` class.
 
+An elaborate example is available in the :class:`MatchingDistance` class that implements a variation
+based on Newson and Krumm (2009).
+
 Transition probability distribution
 -----------------------------------
 

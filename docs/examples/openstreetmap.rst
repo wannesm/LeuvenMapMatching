@@ -11,6 +11,7 @@ Download a map as XML
 You can use the overpass-api.de service:
 
 .. code-block:: python
+
     from pathlib import Path
     import requests
     xml_file = Path(".") / "osm.xml"
@@ -36,6 +37,7 @@ In the example below this is achieved using the projection available in the util
 But any other projection can be used by using the pyproj package directly.
 
 .. code-block:: python
+
     import leuvenmapmatching as mm
     from leuvenmapmatching.util.projections import latlon2grs80
     import osmread
@@ -61,6 +63,7 @@ This package is build on top of the `geopandas <http://geopandas.org>`_ package 
 perform projections.
 
 .. code-block:: python
+
     import osmnx
     graph = ox.graph_from_place('Leuven, Belgium', network_type='drive')
     graph_proj = ox.project_graph(graph)
@@ -75,6 +78,7 @@ perform projections.
 The projections can also be achieved directly on the GeoDataFrame:
 
 .. code-block:: python
+
     nodes, edges = ox.graph_to_gdfs(graph, nodes=True, edges=True)
     nodes.crs = {'init': 'epsg:4326'}  # WGS 84, System used in GPS
     nodes_proj = nodes.to_crs({'init': 'epsg:3395'})  # Mercator projection
