@@ -3,9 +3,6 @@
 leuvenmapmatching.matching_distance
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Take distance between observations vs states into account. Based on the
-method presented in Newson and Krumm (2009).
-
 :author: Wannes Meert
 :copyright: Copyright 2018 DTAI, KU Leuven and Sirris.
 :license: Apache License, Version 2.0, see LICENSE for details.
@@ -51,20 +48,34 @@ class MatchingDistance(Matching):
 
 
 class MatcherDistance(Matcher):
+    """
+    Take distance between observations vs states into account. Based on the
+    method presented in:
+
+        P. Newson and J. Krumm. Hidden markov map matching through noise and sparseness.
+        In Proceedings of the 17th ACM SIGSPATIAL international conference on advances
+        in geographic information systems, pages 336–343. ACM, 2009.
+
+    Two important differences:
+
+    * Newson and Krumm use shortest path to handle situations where the distances between
+      observations are larger than distances between nodes in the graph. The LeuvenMapMatching
+      toolbox uses non-emitting states to handle this. We thus do not implement the shortest
+      path algorithm in this class.
+    * Transition and emission probability are transformed from densities to probababilities by
+      taking the 1 - CDF instead of the PDF.
+
+
+    Newson and Krumm defaults:
+
+    - max_dist = 200 m
+    - obs_noise = 4.07 m
+    - beta = 1/6
+    - only_edges = True
+    """
 
     def __init__(self, *args, **kwargs):
-        """
-        Newson and Krumm defaults:
 
-        - max_dist = 200 m
-        - obs_noise = 4.07 m
-        - only_edges = True
-        - non_emitting_states = False
-
-        Transition and emission probability are transformed from densities to probababilities by
-        taking the 1 - CDF instead of the PDF.
-
-        """
         if not kwargs.get("only_edges", True):
             logger.warning("The MatcherDistance method only works on edges as states. Nodes have been disabled.")
         kwargs["only_edges"] = True
@@ -79,6 +90,7 @@ class MatcherDistance(Matcher):
 
         Original PDF:
         p(dt) = 1 / beta * e^(-dt / beta)
+        with beta = 1/6
 
         Transformed to probability:
         P(dt) = p(d > dt) = e^(-dt / beta)
@@ -104,7 +116,16 @@ class MatcherDistance(Matcher):
         return licp_dt
 
     def logprob_obs(self, dist, prev_m, new_edge_m, new_edge_o):
-        """Emission probability for emitting states."""
+        """Emission probability for emitting states.
+
+        Original pdf:
+        p(d) = N(0, sigma)
+        with sigma = 4.07m
+
+        Transformed to probability:
+        P(d) = 2 * (1 - p(d > D)) = 2 * (1 - cdf)
+
+        """
         print(dist)
         result = 2 * (1 - self.obs_noise_dist.cdf(dist))
         if result == 0:

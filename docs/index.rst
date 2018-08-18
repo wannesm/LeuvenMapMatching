@@ -49,6 +49,7 @@ Reference:
 
    classes/Matching
    classes/Matcher
+   classes/MatcherDistance
 
 
 Indices and tables
