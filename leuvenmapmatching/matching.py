@@ -20,7 +20,7 @@ import numpy as np
 from scipy.stats import halfnorm, norm
 
 from .util.segment import Segment
-from .util import approx_equal
+from .util import approx_equal, approx_leq
 
 
 logger = logging.getLogger("be.kuleuven.cs.dtai.mapmatching")
@@ -55,7 +55,7 @@ class Matching(object):
         self.length: int = length
         self.matcher: Matcher = matcher
 
-    def next(self, edge_m: Segment, edge_o: Segment, obs: int=0, obs_ne: int=0, only_edges=False):
+    def next(self, edge_m: Segment, edge_o: Segment, obs: int=0, obs_ne: int=0):
         """Create a next lattice Matching object with this Matching object as the previous one in the lattice."""
         new_stop = False
         if edge_m.is_point() and edge_o.is_point():
@@ -72,8 +72,9 @@ class Matching(object):
         elif not edge_m.is_point() and edge_o.is_point():
             # edge to node
             dist, proj_m, t_m = self.matcher.map.distance_point_to_segment(edge_o.p1, edge_m.p1, edge_m.p2)
-            if only_edges and (approx_equal(t_m, 0.0) or approx_equal(t_m, 1.0)):
+            if not self.matcher.only_edges and (approx_equal(t_m, 0.0) or approx_equal(t_m, 1.0)):
                 if __debug__ and logger.isEnabledFor(logging.DEBUG):
+                    logger.debug(f"   | Stopped trace: Too close to end, {t_m}")
                     new_stop = True
                 else:
                     return None
@@ -91,15 +92,12 @@ class Matching(object):
         else:
             raise Exception(f"Should not happen")
 
-        logprob_trans = self.matcher.logprob_trans(self, edge_m.label, proj_m, proj_o)
+        logprob_trans = self.matcher.logprob_trans(self, edge_m, edge_o)
         if obs_ne == 0:
             logprob_obs = self.matcher.logprob_obs(dist, self, edge_m, edge_o)
         else:
             logprob_obs = self.matcher.logprob_obs_ne(dist, self, edge_m, edge_o)
         new_logprob_delta = logprob_trans + logprob_obs
-        if edge_m.ti < self.edge_m.ti:
-            # This node would imply going back on the edge between observations
-            new_logprob_delta - 0.0004345  # math.log(0.999), slight preference to avoid going back
         if obs_ne == 0:
             new_logprobe = self.logprob + new_logprob_delta
             new_logprobne = 0
@@ -201,7 +199,7 @@ class Matching(object):
         if label_width is None:
             label_width = default_label_width
         repr_tmpl = "{:<2} | {:<"+str(label_width)+"} | {:10.5f} | {:10.5f} | {:10.5f} | {:10.5f} | " +\
-                    "{:<3} | {:10.5f} | {}"
+                    "{:<3} | {:10.5f} | {:<" + str(label_width) + "} |"
         return repr_tmpl.format(stop, self.label, self.logprob, self.logprob / self.length,
                                 self.logprobema, self.logprobne, self.obs,
                                 self.dist_obs, ",".join([str(prev.label) for prev in self.prev]))
@@ -272,8 +270,8 @@ class Matcher:
 
     def __init__(self, map_con, obs_noise=1, max_dist_init=None, max_dist=None, min_prob_norm=None,
                  non_emitting_states=True, max_lattice_width=None,
-                 only_edges=True, obs_noise_ne=None, matching=Matching, avoid_goingback=False,
-                 non_emitting_length_factor=0.999):
+                 only_edges=True, obs_noise_ne=None, matching=Matching, avoid_goingback=True,
+                 non_emitting_length_factor=1.0):
         """Initialize a matcher for map matching.
 
         Distances are in meters when using latitude-longitude.
@@ -339,28 +337,60 @@ class Matcher:
         self.non_emitting_states_maxnb = 100
         self.max_lattice_width = max_lattice_width
         self.only_edges = only_edges
-        self.avoid_goingback = avoid_goingback
-        self.ne_length_factor_log = math.log(non_emitting_length_factor)
 
-    def logprob_trans(self, prev_m, next_label=None, next_pos=None, next_obs=None):
-        if self.avoid_goingback:
-            going_back = False
-            for m in prev_m.prev:
-                if next_label == m.edge_m.l1:
-                    going_back = True
-                    break
-            if going_back:
-                return -0.3  # Pr==0.5, prefer not going back
-        return 0  # All probabilities are 1 (thus technically not a distribution)
+        # Penalties
+        self.ne_length_factor_log = math.log(non_emitting_length_factor)
+        # Transition probability is divided (in next) by this factor if we move back on the
+        # current edge.
+        self.avoid_goingback = avoid_goingback
+        self.gobackonedge_factor_log = 0.004345  # -math.log(0.99)
+        # Transition probability is divided (in logprob_trans) by this factor if the next state is
+        # also the previous state, thus if we go back
+        self.gobacktoedge_factor_log = 0.3  # -math.log(0.5)
+        # Transition probability is divided (in logprob_trans) by this factor if a transition is made
+        self.transition_factor = 0.3# -math.log(0.9)
+
+    def logprob_trans(self, prev_m:Matching, edge_m:Segment, edge_o:Segment):
+        """Transition probability.
+
+        Note: In contrast with a regular HMM, this cannot be a probability density function, it needs
+              to be a proper probability (thus values between 0.0 and 1.0).
+        """
+        logprob = 0
+        if prev_m.edge_m.label == edge_m.label:
+            # Staying in same state
+            if self.avoid_goingback and edge_m.key == prev_m.edge_m.key and edge_m.ti < prev_m.edge_m.ti:
+                # Going back on edge
+                logprob -= self.gobackonedge_factor_log  # slight preference to avoid going back
+        else:
+            # Moving states
+            logprob -= self.transition_factor
+            if self.avoid_goingback:
+                # Goin back on state
+                going_back = False
+                for m in prev_m.prev:
+                    if edge_m.label == m.edge_m.label:
+                        going_back = True
+                        break
+                if going_back:
+                    logprob -= self.gobacktoedge_factor_log  # Pr==0.5, prefer not going back
+        return logprob  # All probabilities are 1 (thus technically not a distribution)
 
     def logprob_obs(self, dist, prev_m, new_edge_m, new_edge_o):
-        """Emission probability for emitting states."""
+        """Emission probability for emitting states.
+
+        Note: In contrast with a regular HMM, this cannot be a probability density function, it needs
+              to be a proper probability (thus values between 0.0 and 1.0).
+        """
         result = self.obs_noise_dist.logpdf(dist) + self.obs_noise_logint
         # print("logprob_obs: {} -> {:.5f} = {:.5f}".format(dist, result, math.exp(result)))
         return result
 
     def logprob_obs_ne(self, dist, prev_m, new_edge_m, new_edge_o):
-        """Emission probability for non-emitting states."""
+        """Emission probability for non-emitting states.
+
+        Note: This needs to be a proper probability (thus values between 0.0 and 1.0).
+        """
         result = self.obs_noise_dist_ne.logpdf(dist) + self.obs_noise_logint_ne
         # print("logprob_obs: {} -> {:.5f} = {:.5f}".format(dist, result, math.exp(result)))
         return result
@@ -373,11 +403,11 @@ class Matcher:
 
     def do_stop(self, logprob_norm, dist, logprob_trans, logprob_obs):
         if logprob_norm < self.min_logprob_norm:
-            logger.debug(f"     Stopped trace: norm(log(Pr)) too small: {logprob_norm} < {self.min_logprob_norm}"
+            logger.debug(f"   | Stopped trace: norm(log(Pr)) too small: {logprob_norm} < {self.min_logprob_norm}"
                          f"  -- lPr_t = {logprob_trans:.3f}, lPr_o = {logprob_obs:.3f}")
             return True
         if dist > self.max_dist:
-            logger.debug(f"     Stopped trace: distance too large: {dist} > {self.max_dist}")
+            logger.debug(f"   | Stopped trace: distance too large: {dist} > {self.max_dist}")
             return True
         return False
 
@@ -404,7 +434,7 @@ class Matcher:
 
         # Initialisation
         self.path = path
-        nb_start_nodes = self._create_start_nodes()
+        nb_start_nodes = self._create_start_nodes(use_edges=self.only_edges)
         if nb_start_nodes == 0:
             self.lattice_best = []
             return [], 0
@@ -530,7 +560,7 @@ class Matcher:
         node_path = self._build_node_path(start_idx, unique, max_depth=max_depth)
         return node_path, start_idx
 
-    def _create_start_nodes(self):
+    def _create_start_nodes(self, use_edges=True):
         """
 
         :return: Number of created start points.
@@ -541,40 +571,37 @@ class Matcher:
         for idx in range(len(self.path)):
             self.lattice[idx] = dict()
 
-        nodes = self.map.nodes_closeto(self.path[0], max_dist=self.max_dist_init)
+        if use_edges:
+            nodes = self.map.edges_closeto(self.path[0], max_dist=self.max_dist_init)
+        else:
+            nodes = self.map.nodes_closeto(self.path[0], max_dist=self.max_dist_init)
         if __debug__:
             logger.debug("--- obs {} --- {} ---".format(0, self.path[0]))
         t_delta = time.time() - t_start
         logger.info("Initialized map with {} starting points in {} seconds".format(len(nodes), t_delta))
         if len(nodes) == 0:
             logger.info(f'Stopped early at observation 0'
-                        f', no starting points x found for which '
+                        f', no starting points/edges x found for which '
                         f'|x - ({self.path[0][0]:.2f},{self.path[0][1]:.2f})| < {self.max_dist_init}')
             return 0
         if __debug__:
             logger.debug(self.matching.repr_header())
         logprob_init = 0  # math.log(1.0/len(nodes))
-        if self.only_edges:
+        if use_edges:
             # Search for nearby edges
-            # TODO: Search for nearby edges, not first nodes
-            for dist_obs, label, loc in nodes:
-                # TODO: update dist_obs to be distance to line
-                nbrs = self.map.nodes_nbrto(label)
-                for nbr_label, nbr_loc in nbrs:
-                    if nbr_label == label:
-                        continue
-                    edge_m = Segment(label, loc, nbr_label, nbr_loc, loc, 0.0)
-                    edge_o = Segment(f"O{0}", self.path[0])
-                    # dist_obs, pi, _ = self.map.distance_point_to_segment(edge_o.pi, edge_m.p1, edge_m.p2)
-                    # edge_m.pi = pi
-                    m_next = self.matching.first(logprob_init, edge_m, edge_o, self, dist_obs)
-                    if m_next is not None:
-                        if m_next.key in self.lattice[0]:
-                            self.lattice[0][m_next.key].update(m_next)
-                        else:
-                            self.lattice[0][m_next.key] = m_next
-                        if __debug__:
-                            logger.debug(str(m_next))
+            for dist_obs, label1, loc1, label2, loc2, pi, ti in nodes:
+                if label2 == label1:
+                    continue
+                edge_m = Segment(label1, loc1, label2, loc2, pi, ti)
+                edge_o = Segment(f"O{0}", self.path[0])
+                m_next = self.matching.first(logprob_init, edge_m, edge_o, self, dist_obs)
+                if m_next is not None:
+                    if m_next.key in self.lattice[0]:
+                        self.lattice[0][m_next.key].update(m_next)
+                    else:
+                        self.lattice[0][m_next.key] = m_next
+                    if __debug__:
+                        logger.debug(str(m_next))
         else:
             # Search for nearby nodes
             for dist_obs, label, loc in nodes:
@@ -597,7 +624,7 @@ class Matcher:
         :param obs_idx:
         :return: True is new states have been found, False otherwise.
         """
-        prev_lattice = self.lattice[obs_idx - 1].values()
+        prev_lattice = [m for m in self.lattice[obs_idx - 1].values() if not m.stop]
         count = 0
         for m in prev_lattice:  # type: Matching
             if m.stop:
@@ -641,7 +668,7 @@ class Matcher:
             else:
                 # == Move to neighbour from edge ==
                 if __debug__:
-                    logger.debug("   Move to neighbour from edge {}".format(m.key))
+                    logger.debug("   + Move to neighbour from edge {}".format(m.label))
                     logger.debug(m.repr_header())
 
                 # === Stay on edge ===
@@ -702,10 +729,10 @@ class Matcher:
         else:
             obs_next = None
         # The current states are the current observation's states
-        cur_lattice = dict((m.key, m) for m in self.lattice[obs_idx].values())
+        cur_lattice = dict((m.key, m) for m in self.lattice[obs_idx].values() if not m.stop)
         lattice_toinsert = list()
         # The current best states are the next observation's states if you would ignore non-emitting states
-        lattice_best = dict((m.shortkey, m) for m in self.lattice[obs_idx + 1].values())
+        lattice_best = dict((m.shortkey, m) for m in self.lattice[obs_idx + 1].values() if not m.stop)
         # cur_lattice = set(self.lattice[obs_idx].values())
         nb_ne = 0
         while len(cur_lattice) > 0 and nb_ne < self.non_emitting_states_maxnb:
@@ -771,7 +798,7 @@ class Matcher:
                         logger.debug(f"No neighbours found for node {m.edge_m.l2} ({m.label}, non-emitting)")
                     continue
                 if __debug__:
-                    logger.debug(f"   Move to {len(nbrs)} neighbours from node {m.edge_m.l2} ({m.label}, non-emitting)")
+                    logger.debug(f"   Move to {len(nbrs)} neighbours from edge {m.edge_m.l2} ({m.label}, non-emitting)")
                     logger.debug(m.repr_header())
                 for nbr_label, nbr_loc in nbrs:
                     if self._node_in_prev_ne(m, nbr_label):
@@ -785,20 +812,30 @@ class Matcher:
                         m_next = m.next(edge_m, edge_o, obs=obs_idx, obs_ne=nb_ne)
                         if m_next is not None:
                             if m_next.key in cur_lattice_new:
-                                cur_lattice_new[m_next.key].update(m_next)
+                                if m_next.shortkey in lattice_best:
+                                    if approx_leq(m_next.dist_obs, lattice_best[m_next.shortkey].dist_obs):
+                                        cur_lattice_new[m_next.key].update(m_next)
+                                    elif __debug__ and logger.isEnabledFor(logging.DEBUG):
+                                        logger.debug(f"   | Stopped trace: distance larger than best for key {m_next.shortkey}: "
+                                                     f"{m_next.dist_obs} > {lattice_best[m_next.shortkey].dist_obs}")
+                                        m_next.stop = True
+                                else:
+                                    cur_lattice_new[m_next.key].update(m_next)
                             else:
                                 if m_next.shortkey in lattice_best:
                                     # if m_next.logprob > lattice_best[m_next.shortkey].logprob:
-                                    if m_next.dist_obs < lattice_best[m_next.shortkey].dist_obs:
+                                    if approx_leq(m_next.dist_obs, lattice_best[m_next.shortkey].dist_obs):
                                         cur_lattice_new[m_next.key] = m_next
-                                        lattice_best[m_next.shortkey] = m_next
+                                        # lattice_best[m_next.shortkey] = m_next
                                         lattice_toinsert.append(m_next)
-                                    elif __debug__ and logger.isEnabledFor(logging.DEBUG):
+                                    else:
+                                        if __debug__ and logger.isEnabledFor(logging.DEBUG):
+                                            logger.debug(f"   | Stopped trace: distance larger than best for key {m_next.shortkey}: "
+                                                         f"{m_next.dist_obs} > {lattice_best[m_next.shortkey].dist_obs}")
                                         m_next.stop = True
-                                        self._insert(m_next)
                                 else:
                                     cur_lattice_new[m_next.key] = m_next
-                                    lattice_best[m_next.shortkey] = m_next
+                                    # lattice_best[m_next.shortkey] = m_next
                                     lattice_toinsert.append(m_next)
                             # cur_lattice_new.add(m_next)
                             if __debug__:
@@ -842,7 +879,7 @@ class Matcher:
                                         lattice_toinsert.append(m_next)
                                     elif __debug__ and logger.isEnabledFor(logging.DEBUG):
                                         m_next.stop = True
-                                        self._insert(m_next)
+                                        lattice_toinsert.append(m_next)
                                 else:
                                     cur_lattice_new[m_next.key] = m_next
                                     lattice_best[m_next.shortkey] = m_next
@@ -852,11 +889,8 @@ class Matcher:
                                 logger.debug(str(m_next))
                     else:
                         if __debug__:
-                            logger.debug(
-                                self.matching.repr_static(('x', f'{m.edge_m.l1}-{nbr_label} <')))
-            else:
-                if __debug__:
-                    logger.debug(f"   Ignoring, non-emitting is only node-node or edge-edge")
+                            logger.debug(f"x  | {m.edge_m.l1}-{nbr_label} < self-loop")
+
         return cur_lattice_new
 
     def _match_non_emitting_states_end(self, cur_lattice, obs_idx, obs_next,
@@ -887,15 +921,14 @@ class Matcher:
                         edge_o = Segment(f"O{obs_idx+1}", obs_next)
                         m_next = m.next(edge_m, edge_o, obs=obs_idx)
                         if m_next is not None:
-                            self._insert(m_next)
                             if m_next.shortkey in lattice_best:
-                                # if m_next.logprob > lattice_best[m_next.shortkey].logprob:
-                                if m_next.dist_obs < lattice_best[m_next.shortkey].dist_obs:
+                                # if m_next.dist_obs < lattice_best[m_next.shortkey].dist_obs:
+                                if m_next.logprob > lattice_best[m_next.shortkey].logprob:
                                     lattice_best[m_next.shortkey] = m_next
                                     lattice_toinsert.append(m_next)
                                 elif __debug__ and logger.isEnabledFor(logging.DEBUG):
                                     m_next.stop = True
-                                    self._insert(m_next)
+                                    lattice_toinsert.append(m_next)
                             else:
                                 lattice_best[m_next.shortkey] = m_next
                                 lattice_toinsert.append(m_next)
@@ -922,22 +955,21 @@ class Matcher:
                         if __debug__:
                             logger.debug(self.matching.repr_static(('x', '{} <'.format(nbr_label))))
                         continue
-                    # Move to next edge
+                    # Move to next node
                     if m.edge_m.l1 != nbr_label:
                         # edge_m = Segment(m.edge_m.l1, m.edge_m.p1, nbr_label, nbr_loc)
                         edge_m = Segment(nbr_label, nbr_loc)
                         edge_o = Segment(f"O{obs_idx+1}", obs_next)
                         m_next = m.next(edge_m, edge_o, obs=obs_idx)
                         if m_next is not None:
-                            self._insert(m_next)
                             if m_next.shortkey in lattice_best:
-                                # if m_next.logprob > lattice_best[m_next.shortkey].logprob:
-                                if m_next.dist_obs < lattice_best[m_next.shortkey].dist_obs:
+                                # if m_next.dist_obs < lattice_best[m_next.shortkey].dist_obs:
+                                if m_next.logprob > lattice_best[m_next.shortkey].logprob:
                                     lattice_best[m_next.shortkey] = m_next
                                     lattice_toinsert.append(m_next)
                                 elif __debug__ and logger.isEnabledFor(logging.DEBUG):
                                     m_next.stop = True
-                                    self._insert(m_next)
+                                    lattice_toinsert.append(m_next)
                             else:
                                 lattice_best[m_next.shortkey] = m_next
                                 lattice_toinsert.append(m_next)

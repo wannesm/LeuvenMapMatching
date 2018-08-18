@@ -18,6 +18,7 @@ try:
 except ImportError:
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir)))
     import leuvenmapmatching as mm
+from leuvenmapmatching.matching_distance import MatcherDistance
 
 
 directory = None
@@ -27,7 +28,7 @@ def setup_map():
     from leuvenmapmatching.map.inmemmap import InMemMap
     path1 = [(1.8, 0.1), (1.8, 3.5), (3.0, 4.9)]  # More nodes than observations
     path2 = [(1.8, 0.1), (1.8, 2.0), (1.8, 3.5), (3.0, 4.9)]
-    path_sol = ['X', 'C', 'D', ('D', 'F')]
+    path_sol = ['X', 'C', 'D', 'F']
     mapdb = InMemMap("map", graph={
         "A": ((1, 1), ["B", "C", "X"]),
         "B": ((1, 3), ["A", "C", "D", "K"]),
@@ -62,7 +63,7 @@ def test_path1():
                                   obs_noise=0.5,
                                   non_emitting_states=True, only_edges=False)
     matcher.match(path1, unique=True)
-    path_pred = matcher.path_pred
+    path_pred = matcher.path_pred_onlynodes
     if directory:
         from leuvenmapmatching import visualization as mmviz
         matcher.print_lattice_stats()
@@ -74,13 +75,36 @@ def test_path1():
     assert path_pred == path_sol, f"Nodes not equal:\n{path_pred}\n{path_sol}"
 
 
+def test_path1_newson():
+    mapdb, path1, path2, path_sol = setup_map()
+
+    matcher = MatcherDistance(mapdb, max_dist_init=1,
+                              min_prob_norm=0.5,
+                              obs_noise=0.5,
+                              non_emitting_states=True, only_edges=True)
+    matcher.match(path1, unique=True)
+    path_pred = matcher.path_pred_onlynodes
+    if directory:
+        from leuvenmapmatching import visualization as mmviz
+        matcher.print_lattice_stats()
+        matcher.print_lattice()
+        print("LATTICE BEST")
+        for m in matcher.lattice_best:
+            print(m)
+        with (directory / 'lattice_path1.gv').open('w') as ofile:
+            matcher.lattice_dot(file=ofile)
+        mmviz.plot_map(mapdb, matcher=matcher, show_labels=True, show_matching=True,
+                       filename=str(directory / "test_nonemitting_test_path1_newson.png"))
+    assert path_pred == path_sol, f"Nodes not equal:\n{path_pred}\n{path_sol}"
+
+
 def test_path2():
     mapdb, path1, path2, path_sol = setup_map()
 
     matcher = mm.matching.Matcher(mapdb, max_dist_init=1, min_prob_norm=0.5, obs_noise=0.5,
                                   non_emitting_states=True, only_edges=False)
     matcher.match(path2, unique=True)
-    path_pred = matcher.path_pred
+    path_pred = matcher.path_pred_onlynodes
     if directory:
         from leuvenmapmatching import visualization as mmviz
         matcher.print_lattice_stats()
@@ -98,9 +122,9 @@ def test_path2_incremental():
     matcher = mm.matching.Matcher(mapdb, max_dist_init=1, min_prob_norm=0.5, obs_noise=0.5,
                                   non_emitting_states=True, only_edges=False)
     matcher.match_incremental(path2[:2])
-    path_pred_1 = matcher.path_pred
+    path_pred_1 = matcher.path_pred_onlynodes
     matcher.match_incremental(path2[2:], backtrace_len=len(path2))
-    path_pred = matcher.path_pred
+    path_pred = matcher.path_pred_onlynodes
     if directory:
         from leuvenmapmatching import visualization as mmviz
         matcher.print_lattice_stats()
@@ -246,6 +270,7 @@ if __name__ == "__main__":
     print(f"Saving files to {directory}")
     # visualize_map(pathnb=1)
     # test_path1()
+    # test_path1_newson()
     # test_path2()
     # test_path2_incremental()
     # test_path_duplicate()

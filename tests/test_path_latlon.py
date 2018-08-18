@@ -96,7 +96,6 @@ def plot_path(max_nodes=None):
     if max_nodes is not None:
         track = track[:max_nodes]
     path = [(lat, lon) for lat, lon, _ in track]
-    print(path)
     map_con = create_map2()
 
     # fig, ax = plt.subplots(ncols=1, nrows=1, figsize=(100, 100))
@@ -147,9 +146,12 @@ def test_path2_proj_e():
         mm_viz.plot_map(map_con, matcher=matcher, path=track, use_osm=False,
                         show_lattice=True, show_matching=True, show_labels=3,
                         filename=str(directory / "test_path_latlon_path2_proj_e.png"))
-    nodes_sol = [5435850758, 2634474829, 5435850755, 1096512241, 1096512240, 1096508366, 1096508372, 16483861,
-                 3051083900, 16483864, 16483865, 3060515058, 16526534, 16526532, 1274158119, 16526540, 3060597377,
-                 16526541, 16424220, 1233373340, 613125597, 1076057753]
+    # print(nodes)
+    nodes_sol = [5435850758, 2634474831, 1096512242, 3051083902, 1096512239, 1096512241, 1096512240,
+                 159654664, 1096508373, 1096508381, 16483859, 1096508369, 159654663, 1096508363,
+                 16483862, 3051083898, 16526535, 3060597381, 3060515059, 16526534, 3060515058,
+                 16483865, 16483866, 3060725817, 611867918, 16526532, 1274158119, 16526540,
+                 3060597377, 16526541, 16424220, 1233373340, 613125597, 1076057753]
     assert nodes == nodes_sol, f"Nodes do not match: {nodes}"
 
 
@@ -174,10 +176,11 @@ def test_path2_proj_ne():
         mm_viz.plot_map(map_con, matcher=matcher, path=track, use_osm=False,
                         show_lattice=True, show_matching=True, show_labels=3,
                         filename=str(directory / "test_path_latlon_path2_proj_ne.png"))
+    # print(nodes)
     nodes_sol = [5435850758, 2634474829, 5435850755, 1096512241, 1096512240, 1096508366, 1096508372,
-                 16483861, 1096508360, 159656075, 1096508382, 16483862, 3051083898, 16526535, 3060597381,
-                 3060515059, 16526534, 16526532, 1274158119, 16526540, 3060597377, 16526541, 16424220,
-                 1233373340, 613125597, 1076057753]
+                 16483861, 1096508360, 159656075, 1096508382, 16483862, 3051083898, 16526535,
+                 3060597381, 3060515059, 16526534, 16526532, 1274158119, 16526540, 3060597377,
+                 16526541, 16424220, 16483842, 16424220, 1233373340, 613125597, 1076057753]
     assert nodes == nodes_sol, f"Nodes do not match: {nodes}"
 
 
@@ -230,7 +233,7 @@ if __name__ == "__main__":
     print(f"Saving files to {directory}")
     # test_path1()
     # plot_path(max_nodes=None)
-    test_path2_proj_e()
-    # test_path2_proj_ne()
+    # test_path2_proj_e()
+    test_path2_proj_ne()
     # test_path2()
     # test_path2_onlyedges()
