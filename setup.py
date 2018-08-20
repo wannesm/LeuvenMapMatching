@@ -8,7 +8,7 @@ setup.py
 :copyright: Copyright 2017-2018 DTAI, KU Leuven and Sirris.
 :license: Apache License, Version 2.0, see LICENSE for details.
 """
-from setuptools import setup, Command
+from setuptools import setup, Command, find_packages
 from setuptools.command.sdist import sdist
 import re
 import os
@@ -43,6 +43,9 @@ class PrepReadme(Command):
         except sp.CalledProcessError as err:
             print('Running pandoc failed')
             print(err)
+        except FileNotFoundError as err:
+            print('Running pandoc failed')
+            print(err)
 
 
 with open(os.path.join('leuvenmapmatching', '__init__.py'), 'r') as fd:
@@ -55,14 +58,19 @@ if not version:
 readme_path = os.path.join(here, 'README')
 if not os.path.exists(readme_path):
     PrepReadme.run_pandoc()
-with open(readme_path, 'r') as f:
-    long_description = f.read()
+try:
+    with open(readme_path, 'r') as f:
+        long_description = f.read()
+except FileNotFoundError as err:
+    long_description = ""
+    print("No Readme found")
+    print(err)
 
 
 setup(
     name='leuvenmapmatching',
     version=version,
-    packages=['leuvenmapmatching'],
+    packages=find_packages(),
     author='Wannes Meert',
     author_email='wannes.meert@cs.kuleuven.be',
     url='https://dtai.cs.kuleuven.be',

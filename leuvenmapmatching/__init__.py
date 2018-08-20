@@ -10,4 +10,4 @@ leuvenmapmatching
 from . import map, matching, util
 # visualization is not loaded by default (avoid loading unnecessary dependencies such as matplotlib).
 
-__version__ = '0.3.1'
+__version__ = '0.3.2'

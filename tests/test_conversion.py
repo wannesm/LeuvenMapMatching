@@ -4,11 +4,13 @@ import sys
 import logging
 from datetime import datetime
 import pytest
+import math
 
 import leuvenmapmatching as mm
 from leuvenmapmatching.util.gpx import path_to_gpx
 from leuvenmapmatching.util.projections import latlon2grs80
-from leuvenmapmatching.util.dist_euclidean import distance_point_to_segment
+from leuvenmapmatching.util import dist_euclidean as de
+from leuvenmapmatching.util import dist_latlon as dll
 
 
 def test_path_to_gpx():
@@ -32,13 +34,39 @@ def test_grs80():
     assert point[1] == pytest.approx(5636043.991970774)
 
 
-def test_dist1():
+def test_distance1():
+    p1 = (38.898556, -77.037852)
+    p2 = (38.897147, -77.043934)
+    d = dll.distance(p1, p2)
+    assert d == pytest.approx(549.1557912048178), f"Got: {d}"
+
+
+def test_distance2():
     o_p1 = (6007539.987516373, -13607675.997610645)
     m_p1 = (6007518.475594072, -13607641.049711559)
     m_p2 = (6007576.295597112, -13607713.306589901)
-    dist, proj_m, t_m = distance_point_to_segment(o_p1, m_p1, m_p2)
+    dist, proj_m, t_m = de.distance_point_to_segment(o_p1, m_p1, m_p2)
     assert dist == pytest.approx(5.038773480896327), f"dist = {dist}"
     assert t_m == pytest.approx(0.4400926470800718), f"t_m = {t_m}"
+
+
+def test_bearing1():
+    lat1, lon1 = math.radians(38.898556), math.radians(-77.037852)
+    lat2, lon2 = math.radians(38.897147), math.radians(-77.043934)
+    b = dll.bearing_radians(lat1, lon1, lat2, lon2)
+    b = math.degrees(b)
+    # assert b == pytest.approx(253.42138889), f"Got: {b}"
+    assert b == pytest.approx(-106.5748183426045), f"Got: {b}"
+
+
+def test_destination1():
+    lat1, lon1 = math.radians(53.32055556), math.radians(1.72972222)
+    bearing = math.radians(96.02166667)
+    dist = 124800
+    lat2, lon2 = dll.destination_radians(lat1, lon1, bearing, dist)
+    lat2, lon2 = (math.degrees(lat2), math.degrees(lon2))
+    print(lat2, lon2)
+    assert (lat2, lon2) == (53.188269553709034, 3.592721390871882), f"Got ({lat2}, {lon2})"
 
 
 if __name__ == "__main__":
@@ -47,4 +75,6 @@ if __name__ == "__main__":
     mm.matching.logger.addHandler(logging.StreamHandler(sys.stdout))
     # test_path_to_gpx()
     # test_grs80()
-    test_dist1()
+    # test_distance1()
+    # test_bearing1()
+    test_destination1()
