@@ -126,7 +126,6 @@ class MatcherDistance(Matcher):
         P(d) = 2 * (1 - p(d > D)) = 2 * (1 - cdf)
 
         """
-        print(dist)
         result = 2 * (1 - self.obs_noise_dist.cdf(dist))
         if result == 0:
             return -float("inf")
