@@ -103,16 +103,26 @@ class MatcherDistance(Matcher):
         :param edge_o:
         :return:
         """
+        if prev_m.label == "A-B-3-0":
+            print("XXX")
         d_z = self.map.distance(prev_m.edge_o.pi, edge_o.pi)
         if prev_m.edge_m.label == edge_m.label:
+            print(f"d_x(1), {prev_m.edge_m}, {edge_m}")
             d_x = self.map.distance(prev_m.edge_m.pi, edge_m.pi)
         else:
+            print(f"d_x(2), {prev_m.edge_m}, {edge_m}")
+            print(f"self.map.distance({prev_m.edge_m.pi}, {prev_m.edge_m.p2}) = {self.map.distance(prev_m.edge_m.pi, prev_m.edge_m.p2)}")
+            print(f"self.map.distance({prev_m.edge_m.p2}, {edge_m.pi}) = {self.map.distance(prev_m.edge_m.p2, edge_m.pi)}")
+            print(f"obs: {prev_m.edge_o.pi}, {edge_o.pi}")
             d_x = self.map.distance(prev_m.edge_m.pi, prev_m.edge_m.p2) + self.map.distance(prev_m.edge_m.p2, edge_m.pi)
         d_t = abs(d_z - d_x)
         beta = 1 / 6
         # p_dt = 1 / beta * math.exp(-d_t / beta)
         icp_dt = math.exp(-d_t / beta)
-        licp_dt = math.log(icp_dt)
+        try:
+            licp_dt = math.log(icp_dt)
+        except ValueError:
+            licp_dt = float('-inf')
         return licp_dt
 
     def logprob_obs(self, dist, prev_m, new_edge_m, new_edge_o):
@@ -126,7 +136,6 @@ class MatcherDistance(Matcher):
         P(d) = 2 * (1 - p(d > D)) = 2 * (1 - cdf)
 
         """
-        print(dist)
         result = 2 * (1 - self.obs_noise_dist.cdf(dist))
         if result == 0:
             return -float("inf")

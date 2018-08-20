@@ -8,6 +8,7 @@ import pytest
 import leuvenmapmatching as mm
 from leuvenmapmatching.util.gpx import path_to_gpx
 from leuvenmapmatching.util.projections import latlon2grs80
+from leuvenmapmatching.util.dist_euclidean import distance_point_to_segment
 
 
 def test_path_to_gpx():
@@ -31,9 +32,19 @@ def test_grs80():
     assert point[1] == pytest.approx(5636043.991970774)
 
 
+def test_dist1():
+    o_p1 = (6007539.987516373, -13607675.997610645)
+    m_p1 = (6007518.475594072, -13607641.049711559)
+    m_p2 = (6007576.295597112, -13607713.306589901)
+    dist, proj_m, t_m = distance_point_to_segment(o_p1, m_p1, m_p2)
+    assert dist == pytest.approx(5.038773480896327), f"dist = {dist}"
+    assert t_m == pytest.approx(0.4400926470800718), f"t_m = {t_m}"
+
+
 if __name__ == "__main__":
     # mm.matching.logger.setLevel(logging.INFO)
     mm.matching.logger.setLevel(logging.DEBUG)
     mm.matching.logger.addHandler(logging.StreamHandler(sys.stdout))
     # test_path_to_gpx()
-    test_grs80()
+    # test_grs80()
+    test_dist1()

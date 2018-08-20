@@ -340,7 +340,7 @@ class Matcher:
 
         # Penalties
         self.ne_length_factor_log = math.log(non_emitting_length_factor)
-        # Transition probability is divided (in next) by this factor if we move back on the
+        # Transition probability is divided (in logprob_trans) by this factor if we move back on the
         # current edge.
         self.avoid_goingback = avoid_goingback
         self.gobackonedge_factor_log = 0.004345  # -math.log(0.99)
@@ -465,7 +465,8 @@ class Matcher:
                 # Fill in non-emitting states between previous and current observation
                 self._match_non_emitting_states(obs_idx - 1)
             if __debug__ and logger.isEnabledFor(logging.DEBUG):
-                    self.print_lattice(obs_idx=obs_idx, label_width=default_label_width)
+                self.print_lattice(obs_idx=obs_idx, label_width=default_label_width)
+                logger.debug(f"--- end obs {obs_idx} ---")
 
         t_delta = time.time() - t_start
         logger.info("--- end ---")
