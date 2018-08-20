@@ -62,7 +62,7 @@ try:
     with open(readme_path, 'r') as f:
         long_description = f.read()
 except FileNotFoundError as err:
-    long_decscript = ""
+    long_decscription = ""
     print("No Readme found")
     print(err)
 
