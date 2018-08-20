@@ -43,6 +43,9 @@ class PrepReadme(Command):
         except sp.CalledProcessError as err:
             print('Running pandoc failed')
             print(err)
+        except FileNotFoundError as err:
+            print('Running pandoc failed')
+            print(err)
 
 
 with open(os.path.join('leuvenmapmatching', '__init__.py'), 'r') as fd:
