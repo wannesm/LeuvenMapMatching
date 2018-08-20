@@ -8,7 +8,7 @@ setup.py
 :copyright: Copyright 2017-2018 DTAI, KU Leuven and Sirris.
 :license: Apache License, Version 2.0, see LICENSE for details.
 """
-from setuptools import setup, Command
+from setuptools import setup, Command, find_packages
 from setuptools.command.sdist import sdist
 import re
 import os
@@ -70,7 +70,7 @@ except FileNotFoundError as err:
 setup(
     name='leuvenmapmatching',
     version=version,
-    packages=['leuvenmapmatching'],
+    packages=find_packages(),
     author='Wannes Meert',
     author_email='wannes.meert@cs.kuleuven.be',
     url='https://dtai.cs.kuleuven.be',
