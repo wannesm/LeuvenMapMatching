@@ -58,8 +58,13 @@ if not version:
 readme_path = os.path.join(here, 'README')
 if not os.path.exists(readme_path):
     PrepReadme.run_pandoc()
-with open(readme_path, 'r') as f:
-    long_description = f.read()
+try:
+    with open(readme_path, 'r') as f:
+        long_description = f.read()
+except FileNotFoundError as err:
+    long_decscript = ""
+    print("No Readme found")
+    print(err)
 
 
 setup(
