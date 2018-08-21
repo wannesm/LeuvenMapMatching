@@ -12,9 +12,9 @@ https://www.movable-type.co.uk/scripts/latlong-vectors.html
 :license: Apache License, Version 2.0, see LICENSE for details.
 """
 import logging
-from math import radians, cos, sin, asin, acos, sqrt, atan2, fabs
+from math import radians, cos, sin, asin, acos, sqrt, atan2, fabs, degrees, ceil
 
-import numpy as np
+from . import dist_euclidean as diste
 
 
 logger = logging.getLogger("be.kuleuven.cs.dtai.mapmatching")
@@ -79,7 +79,40 @@ def distance_segment_to_segment(f1, f2, t1, t2):
     :param t2:
     :return: (distance, proj on f, proj on t, rel pos on t)
     """
-    raise Exception(f"Not yet implemented. Use Eucledian distances")
+    # Translate lat-lon to x-y and apply the Euclidean function
+    latf1, lonf1 = f1
+    latf1, lonf1 = radians(latf1), radians(lonf1)
+    f1 = 0, 0  # Origin
+
+    latf2, lonf2 = f2
+    latf2, lonf2 = radians(latf2), radians(lonf2)
+    df1f2 = distance_haversine_radians(latf1, lonf1, latf2, lonf2)
+    bf1f2 = bearing_radians(latf1, lonf1, latf2, lonf2)
+    # print(f"bf1f2 = {bf1f2} = {degrees(bf1f2)} degrees")
+    f2 = (df1f2 * cos(bf1f2),  df1f2 * sin(bf1f2))
+
+    latt1, lont1 = t1
+    latt1, lont1 = radians(latt1), radians(lont1)
+    df1t1 = distance_haversine_radians(latf1, lonf1, latt1, lont1)
+    bf1t1 = bearing_radians(latf1, lonf1, latt1, lont1)
+    # print(f"bf1t1 = {bf1t1} = {degrees(bf1t1)} degrees")
+    t1 = (df1t1 * cos(bf1t1), df1t1 * sin(bf1t1))
+
+    latt2, lont2 = t2
+    latt2, lont2 = radians(latt2), radians(lont2)
+    dt1t2 = distance_haversine_radians(latt1, lont1, latt2, lont2)
+    # print(f"dt1t2 = {dt1t2}")
+    bt1t2 = bearing_radians(latt1, lont1, latt2, lont2)
+    # print(f"bt1t2 = {bt1t2} = {degrees(bt1t2)} degrees")
+    t2 = (t1[0] + dt1t2 * cos(bt1t2), t1[1] + dt1t2 * sin(bt1t2))
+
+    d, pf, pt, u_f, u_t = diste.distance_segment_to_segment(f1, f2, t1, t2)
+    pf = destination_radians(latf1, lonf1, bf1f2, u_f * df1f2)
+    pf = (degrees(pf[0]), degrees(pf[1]))
+    pt = destination_radians(latt1, lont1, bt1t2, u_t * dt1t2)
+    pt = (degrees(pt[0]), degrees(pt[1]))
+
+    return d, pf, pt, u_f, u_t
 
 
 def project(s1, s2, p, delta=0.0):
@@ -93,7 +126,24 @@ def interpolate_path(path, dd):
     :param dd: Distance difference (meter)
     :return:
     """
-    raise Exception(f"Not yet implemented. Use Eucledian distances")
+    path_new = [path[0]]
+    for p1, p2 in zip(path, path[1:]):
+        lat1, lon1 = p1
+        lat2, lon2 = p2
+        lat1, lon1 = radians(lat1), radians(lon1)
+        lat2, lon2 = radians(lat2), radians(lon2)
+        dist = distance_haversine_radians(lat1, lon1, lat2, lon2)
+        if dist > dd:
+            dt = int(ceil(dist / dd))
+            distd = dist/dt
+            disti = 0
+            brng = bearing_radians(lat1, lon1, lat2, lon2)
+            for _ in range(dt):
+                disti += distd
+                pi = destination_radians(lat1, lon1, brng, disti)
+                path_new.append(pi)
+        path_new.append(p2)
+    return path_new
 
 
 def bearing_radians(lat1, lon1, lat2, lon2):

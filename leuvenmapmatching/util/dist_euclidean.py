@@ -114,7 +114,7 @@ def project(s1, s2, p, delta=0.0):
 def interpolate_path(path, dd):
     """
     TODO: interplate time as third term
-    :param path: (lat, lon)
+    :param path: (y, x)
     :param dd: Distance difference (meter)
     :return:
     """
@@ -122,9 +122,9 @@ def interpolate_path(path, dd):
     for p1, p2 in zip(path, path[1:]):
         dist = distance(p1, p2)
         if dist > dd:
-            dt = int(math.floor(dist / dd))
-            dx = p2[0] - p1[0]
-            dy = p2[1] - p1[1]
+            dt = int(math.ceil(dist / dd))
+            dx = (p2[0] - p1[0]) / dt
+            dy = (p2[1] - p1[1]) / dt
             px, py = p1[0], p1[1]
             for _ in range(dt):
                 px += dx

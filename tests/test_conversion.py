@@ -5,12 +5,17 @@ import logging
 from datetime import datetime
 import pytest
 import math
+import os
+from pathlib import Path
 
 import leuvenmapmatching as mm
 from leuvenmapmatching.util.gpx import path_to_gpx
 from leuvenmapmatching.util.projections import latlon2grs80
 from leuvenmapmatching.util import dist_euclidean as de
 from leuvenmapmatching.util import dist_latlon as dll
+
+
+directory = None
 
 
 def test_path_to_gpx():
@@ -69,12 +74,79 @@ def test_destination1():
     assert (lat2, lon2) == (53.188269553709034, 3.592721390871882), f"Got ({lat2}, {lon2})"
 
 
+def test_distance_segment_to_segment1():
+    f1 = (50.900393, 4.728607)
+    f2 = (50.900389, 4.734047)
+    t1 = (50.898538, 4.726107)
+    t2 = (50.898176, 4.735463)
+    d, pf, pt, u_f, u_t = dll.distance_segment_to_segment(f1, f2, t1, t2)
+    if directory:
+        plot_distance_segment_to_segment_latlon(f1, f2, t1, t2, pf, pt, "test_distance_segment_to_segment1")
+    assert d == pytest.approx(216.60187728486514)
+    assert pf == pytest.approx((50.900392999999994, 4.728607))
+    assert pt == pytest.approx((50.898448650708666, 4.728418070396815))
+    assert u_f == pytest.approx(0)
+    assert u_t == pytest.approx(0.2470133466162735)
+
+
+def test_distance_segment_to_segment2():
+    f1 = (0, 0)
+    f2 = (-0.43072496752146333, 381.4928613075559)
+    t1 = (-206.26362055248765, -175.32538004745732)
+    t2 = (-246.4746107556939, 480.8174213050763)
+    d, pf, pt, u_f, u_t = de.distance_segment_to_segment(f1, f2, t1, t2)
+    if directory:
+        plot_distance_segment_to_segment_euc(f1, f2, t1, t2, pf, pt, "test_distance_segment_to_segment2")
+    assert d == pytest.approx(216.60187728486514)
+    assert pf == pytest.approx((0.0, 0.0))
+    assert pt == pytest.approx((-216.1962718133358, -13.249350827191222))
+    assert u_f == pytest.approx(0)
+    assert u_t == pytest.approx(0.2470133466162735)
+
+
+def plot_distance_segment_to_segment_latlon(f1, f2, t1, t2, pf, pt, fn):
+    import smopy
+    import matplotlib.pyplot as plt
+    lat_min = min(f1[0], f2[0], t1[0], t2[0])
+    lat_max = max(f1[0], f2[0], t1[0], t2[0])
+    lon_min = min(f1[1], f2[1], t1[1], t2[1])
+    lon_max = max(f1[1], f2[1], t1[1], t2[1])
+    bb = [lat_min, lon_min, lat_max, lon_max]
+    m = smopy.Map(bb)
+    ax = m.show_mpl(figsize=(10, 10))
+    p1 = m.to_pixels(f1)
+    p2 = m.to_pixels(f2)
+    p3 = m.to_pixels(t1)
+    p4 = m.to_pixels(t2)
+    p5 = m.to_pixels(pf)
+    p6 = m.to_pixels(pt)
+    ax.plot([p1[0], p2[0]], [p1[1], p2[1]], 'o-')
+    ax.plot([p3[0], p4[0]], [p3[1], p4[1]], 'o-')
+    ax.plot([p5[0], p6[0]], [p5[1], p6[1]], 'o-')
+    plt.savefig(str(directory / fn))
+
+
+def plot_distance_segment_to_segment_euc(f1, f2, t1, t2, pf, pt, fn):
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots(1, 1, figsize=(10, 10))
+    ax.plot([f1[1], f2[1]], [f1[0], f2[0]], 'o-')
+    ax.plot([t1[1], t2[1]], [t1[0], t2[0]], 'o-')
+    ax.plot([pf[1], pt[1]], [pf[0], pt[0]], 'o-')
+    ax.axis('equal')
+    ax.set_aspect('equal')
+    plt.savefig(str(directory / fn))
+
+
 if __name__ == "__main__":
     # mm.matching.logger.setLevel(logging.INFO)
     mm.matching.logger.setLevel(logging.DEBUG)
     mm.matching.logger.addHandler(logging.StreamHandler(sys.stdout))
+    directory = Path(os.environ.get('TESTDIR', Path(__file__).parent))
+    print(f"Saving files to {directory}")
     # test_path_to_gpx()
     # test_grs80()
     # test_distance1()
     # test_bearing1()
-    test_destination1()
+    # test_destination1()
+    test_distance_segment_to_segment1()
+    # test_distance_segment_to_segment2()
