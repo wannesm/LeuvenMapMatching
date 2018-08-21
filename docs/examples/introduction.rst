@@ -21,9 +21,9 @@ But it is slightly less efficient because more possible states are tried.
 
 .. code-block:: python
 
-    import leuvenmapmatching as mm
+    from leuvenmapmatching.map.inmemmap import InMemMap
 
-    map_con = mm.map.InMemMap("mymap", graph={
+    map_con = InMemMap("mymap", graph={
         "A": ((1, 1), ["B", "C", "X"]),
         "B": ((1, 3), ["A", "C", "D", "K"]),
         "C": ((2, 2), ["A", "B", "D", "E", "X", "Y"]),
@@ -68,11 +68,12 @@ non-emitting states that ignore observations completely.
 
 .. code-block:: python
 
+    from leuvenmapmatching.map.inmemmap import InMemMap
     import leuvenmapmatching as mm
     from leuvenmapmatching import visualization as mmviz
 
     path = [(1, 0), (7.5, 0.65), (10.1, 1.9)]
-    mapdb = mm.map.InMemMap("mymap", graph={
+    mapdb = InMemMap("mymap", graph={
         "A": ((1, 0.00), ["B"]),
         "B": ((3, 0.00), ["A", "C"]),
         "C": ((4, 0.70), ["B", "D"]),
@@ -109,8 +110,9 @@ The lattice will be built further every time a new subsequence of the path is gi
 .. code-block:: python
 
     import leuvenmapmatching as mm
+    from leuvenmapmatching.map.inmemmap import InMemMap
 
-    map_con = mm.map.InMemMap("mymap", graph={
+    map_con = InMemMap("mymap", graph={
         "A": ((1, 1), ["B", "C", "X"]),
         "B": ((1, 3), ["A", "C", "D", "K"]),
         "C": ((2, 2), ["A", "B", "D", "E", "X", "Y"]),
