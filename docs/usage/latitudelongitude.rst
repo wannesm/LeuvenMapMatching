@@ -9,13 +9,49 @@ use these coordinates for map matching.
 
 There are three options:
 
-Option 1: Project Latitude-Longitude to X-Y
+Option 1: Use Latitude-Longitude directly
+-----------------------------------------
+
+Set the ``use_latlon`` flag in the :class:`Map` to true.
+
+For example to read in an OpenStreetMap file directly to a :class:`InMemMap` object:
+
+.. code-block:: python
+
+    from leuvenmapmatching.map.inmemmap import InMemMap
+
+    map_con = InMemMap("myosm", use_latlon=True)
+
+    for entity in osmread.parse_file(osm_fn):
+        if isinstance(entity, osmread.Way) and 'highway' in entity.tags:
+            for node_a, node_b in zip(entity.nodes, entity.nodes[1:]):
+                map_con.add_edge(node_a, None, node_b, None)
+                map_con.add_edge(node_b, None, node_a, None)
+        if isinstance(entity, osmread.Node):
+            map_con.add_node(entity.id, (entity.lat, entity.lon))
+    map_con.purge()
+
+
+Option 2: Project Latitude-Longitude to X-Y
 -------------------------------------------
 
-This is the recommended approach.
-
 Latitude-Longitude coordinates can be transformed two a frame with two orthogonal axis.
-For example, using the Lambert Conformal projection. When using the `pyproj` toolbox this can be done as follows:
+
+.. code-block:: python
+
+   from leuvenmapmatching.map.inmemmap import InMemMap
+
+   map_con_latlon = InMemMap("myosm", use_latlon=True)
+   # Add edges/nodes
+   map_con_xy = map_con_latlon.to_xy()
+
+   route_latlon = []
+   # Add GPS locations
+   route_xy = [map_con_xy.latlon2yx(latlon) for latlon in route_latlon]
+
+
+This can also be done directly using the ``pyproj`` toolbox.
+For example, using the Lambert Conformal projection:
 
 .. code-block:: python
 
@@ -51,27 +87,6 @@ Or if you want to define from and to projections:
        ys.append(y)
 
 
-Option 2: Use Latitude-Longitude directly
------------------------------------------
-
-Set the `use_latlon` flag in the :class:`Map` to true. The Leuven.MapMatching toolbox will use
-the `nvector` package to compute distance between latitude-longitude coordinates.
-
-For example to read in an OpenStreetMap file directly to a :class:`InMemMap` object:
-
-.. code-block:: python
-
-    map_con = mm.map.InMemMap("myosm", use_latlon=True)
-    for entity in osmread.parse_file(osm_fn):
-        if isinstance(entity, osmread.Way) and 'highway' in entity.tags:
-            for node_a, node_b in zip(entity.nodes, entity.nodes[1:]):
-                map_con.add_edge(node_a, None, node_b, None)
-                map_con.add_edge(node_b, None, node_a, None)
-        if isinstance(entity, osmread.Node):
-            map_con.add_node(entity.id, (entity.lat, entity.lon))
-    map_con.purge()
-
-
 Option 3: Use Latitude-Longitude as if they are X-Y points
 ----------------------------------------------------------
 
@@ -87,5 +102,3 @@ of the intersection using latitude-longitude while the red line is the intersect
 
 .. figure:: https://people.cs.kuleuven.be/wannes.meert/leuvenmapmatching/latlon_mismatch_2.png?v=1
    :alt: Latitude-Longitude mismatch detail
-
-
