@@ -44,7 +44,7 @@ def distance_segment_to_segment(f1, f2, t1, t2):
     x3, y3 = t1
     x4, y4 = t2
     n = ((y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1))
-    if np.allclose([n], [0]):
+    if np.allclose([n], [0], rtol=0):
         # parallel
         is_parallel = True
         n = 0.0001  # TODO: simulates a point far away
@@ -95,8 +95,16 @@ def distance_segment_to_segment(f1, f2, t1, t2):
 
 
 def project(s1, s2, p, delta=0.0):
-    if np.isclose(s1[0], s2[0]) and np.isclose(s1[1], s2[1]):
-        return s1, distance(s1, p)
+    """
+
+    :param s1: Segment start
+    :param s2: Segment end
+    :param p: Point
+    :param delta: Keep delta fraction away from ends
+    :return: Point of projection, Relative position on segment
+    """
+    if np.isclose(s1[0], s2[0], rtol=0) and np.isclose(s1[1], s2[1], rtol=0):
+        return s1, 0.0
 
     l2 = (s1[0]-s2[0])**2 + (s1[1]-s2[1])**2
     t = max(delta, min(1-delta, ((p[0]-s1[0])*(s2[0]-s1[0]) + (p[1]-s1[1])*(s2[1]-s1[1])) / l2))
@@ -106,7 +114,7 @@ def project(s1, s2, p, delta=0.0):
 def interpolate_path(path, dd):
     """
     TODO: interplate time as third term
-    :param path: (lat, lon)
+    :param path: (y, x)
     :param dd: Distance difference (meter)
     :return:
     """
@@ -114,9 +122,9 @@ def interpolate_path(path, dd):
     for p1, p2 in zip(path, path[1:]):
         dist = distance(p1, p2)
         if dist > dd:
-            dt = int(math.floor(dist / dd))
-            dx = p2[0] - p1[0]
-            dy = p2[1] - p1[1]
+            dt = int(math.ceil(dist / dd))
+            dx = (p2[0] - p1[0]) / dt
+            dy = (p2[1] - p1[1]) / dt
             px, py = p1[0], p1[1]
             for _ in range(dt):
                 px += dx

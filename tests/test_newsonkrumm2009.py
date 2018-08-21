@@ -174,18 +174,20 @@ def load_data():
 
 @pytest.mark.skip(reason="Not yet fully implemented")
 def test_route():
+    if directory:
+        import matplotlib.pyplot as plt
     nodes, map_con, map_con_latlon, route, route_latlon = load_data()
     zoom_path = True
     # zoom_path = slice(2645, 2665)
 
-    if directory is not None:
-        mm.matching.logger.debug("Plotting pre map ...")
-        mm_viz.plot_map(map_con_latlon, path=route_latlon, use_osm=True,
-                        show_lattice=False, show_labels=False, show_graph=False, zoom_path=zoom_path,
-                        filename=str(directory / "test_newson_route.png"))
-        mm.matching.logger.debug("... done")
+    # if directory is not None:
+    #     mm.matching.logger.debug("Plotting pre map ...")
+    #     mm_viz.plot_map(map_con_latlon, path=route_latlon, use_osm=True,
+    #                     show_lattice=False, show_labels=False, show_graph=False, zoom_path=zoom_path,
+    #                     filename=str(directory / "test_newson_route.png"))
+    #     mm.matching.logger.debug("... done")
 
-    matcher = MatcherDistance(map_con, min_prob_norm=0.000001,
+    matcher = MatcherDistance(map_con, min_prob_norm=0.001,
                               max_dist=200, obs_noise=4.07, only_edges=True,  # Newson Krumm defaults
                               non_emitting_states=False)
     matcher.match(route[2650:2662])
@@ -194,10 +196,49 @@ def test_route():
     if directory:
         matcher.print_lattice_stats()
         mm.matching.logger.debug("Plotting post map ...")
-        mm_viz.plot_map(map_con, matcher=matcher, use_osm=True,
+        fig = plt.figure(figsize=(100,100))
+        ax = fig.get_axes()
+        mm_viz.plot_map(map_con, matcher=matcher, use_osm=True, ax=ax,
                         show_lattice=False, show_labels=True, show_graph=True, zoom_path=zoom_path,
-                        coord_trans=map_con.yx2latlon,
-                        filename=str(directory / "test_newson_route_matched.png"))
+                        coord_trans=map_con.yx2latlon)
+        plt.savefig(str(directory / "test_newson_route_matched.png"))
+        plt.close(fig)
+        mm.matching.logger.debug("... done")
+
+
+def test_bug1():
+    map_con_ll = InMemMap("map", graph={
+        "A": ((47.590439915657, -122.238368690014), ["B"]),
+        "B": ((47.5910192728043, -122.239519357681), ["C"]),
+        "C": ((47.5913706421852, -122.240168452263), [])
+    }, use_latlon=True)
+    map_con = map_con_ll.to_xy(name="road_network_xy")
+    path_ll = [
+        # (47.59043333, -122.2384167),
+        (47.59058333, -122.2387),
+        (47.59071667, -122.2389833),
+        (47.59086667, -122.2392667),
+        (47.59101667, -122.23955),
+        (47.59115,    -122.2398333)
+    ]
+    path = [map_con.latlon2yx(lat, lon) for lat, lon in path_ll]
+    matcher = MatcherDistance(map_con, min_prob_norm=0.001,
+                              max_dist=200, obs_noise=4.07, only_edges=True,
+                              non_emitting_states=False)
+    matcher.match(path)
+    path_pred = matcher.path_pred
+    print(path_pred)
+    if directory:
+        import matplotlib.pyplot as plt
+        matcher.print_lattice_stats()
+        mm.matching.logger.debug("Plotting post map ...")
+        fig = plt.figure(figsize=(100,100))
+        ax = fig.get_axes()
+        mm_viz.plot_map(map_con, matcher=matcher, use_osm=True, ax=ax,
+                        show_lattice=False, show_labels=True, show_graph=True, zoom_path=True,
+                        coord_trans=map_con.yx2latlon)
+        plt.savefig(str(directory / "test_newson_bug1.png"))
+        plt.close(fig)
         mm.matching.logger.debug("... done")
 
 
@@ -206,4 +247,5 @@ if __name__ == "__main__":
     mm.matching.logger.addHandler(logging.StreamHandler(sys.stdout))
     directory = Path(os.environ.get('TESTDIR', Path(__file__).parent))
     print(f"Saving files to {directory}")
-    test_route()
+    # test_route()
+    test_bug1()

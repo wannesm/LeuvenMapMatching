@@ -19,14 +19,13 @@ import smopy
 
 
 logger = logging.getLogger("be.kuleuven.cs.dtai.mapmatching")
+graph_color = mcolors.CSS4_COLORS['black']
 match_color = mcolors.CSS4_COLORS['green']
 match_ne_color = mcolors.CSS4_COLORS['olive']
 lattice_color = mcolors.CSS4_COLORS['magenta']
-# nodes_color = mcolors.CSS4_COLORS['orange']
-nodes_color = mcolors.CSS4_COLORS['black']
-# path_color = mcolors.CSS4_COLORS['blue']
+nodes_color = mcolors.CSS4_COLORS['cyan']
 path_color = mcolors.CSS4_COLORS['blue']
-fontsize = 7
+fontsize = 8
 
 
 def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False, z=None, bb=None,
@@ -140,18 +139,18 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
             if coord_trans:
                 coord = coord_trans(*coord)
             coord = to_pixels(coord)
-            plt.plot(coord[0], coord[1], marker='o', markersize=2, color="k", alpha=0.4)
+            plt.plot(coord[0], coord[1], marker='o', markersize=2, color=graph_color, alpha=0.4)
             if show_labels:
                 key = str(key)
                 if type(show_labels) is int:
                     key = key[-show_labels:]
                 xytext = ax.transLimits.transform(coord)
-                xytext = (xytext[0]+0.01, xytext[1]+0.01)
+                xytext = (xytext[0]+0.001, xytext[1]+0.0)
                 xytext = ax.transLimits.inverted().transform(xytext)
                 ax.annotate(key, xy=coord, xytext=xytext,
                             # textcoords=('axes fraction', 'axes fraction'),
                             # arrowprops=dict(arrowstyle='->'),
-                            color="k", fontsize=fontsize)
+                            color=graph_color, fontsize=fontsize)
             cnt += 1
         logger.debug(f'... done, {cnt} nodes')
 
@@ -163,7 +162,7 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
                 loc_b = coord_trans(*loc_b)
             x_a, y_a = to_pixels(*loc_a)
             x_b, y_b = to_pixels(*loc_b)
-            ax.plot([x_a, x_b], [y_a, y_b], 'k', linewidth=0.3)
+            ax.plot([x_a, x_b], [y_a, y_b], graph_color, linewidth=0.3)
             cnt += 1
         logger.debug(f'... done, {cnt} edges')
 
@@ -191,6 +190,8 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
     if nodes:
         logger.debug('Plot nodes ...')
         xs, ys, ls = [], [], []
+        prev = None
+        next = None
         for node in nodes:
             if type(node) == tuple:
                 node = node[0]
@@ -198,11 +199,19 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
             if coord_trans:
                 lat, lon = coord_trans(lat, lon)
             if bb[0] <= lat <= bb[2] and bb[1] <= lon <= bb[3]:
+                if prev is not None:
+                    x, y = to_pixels(*prev)
+                    xs.append(x)
+                    ys.append(y)
+                    ls.append(node)
+                    prev = None
                 x, y = to_pixels(lat, lon)
                 xs.append(x)
                 ys.append(y)
                 ls.append(node)
-        ax.plot(xs, ys, 'o-', linewidth=linewidth, markersize=linewidth * 2, alpha=0.75,
+            else:
+                prev = lat, lon
+        ax.plot(xs, ys, 'o-', linewidth=linewidth * 3, markersize=linewidth * 3, alpha=0.75,
                 color=nodes_color)
         # if show_labels:
         #     for label, lx, ly in zip(ls, xs, ys):

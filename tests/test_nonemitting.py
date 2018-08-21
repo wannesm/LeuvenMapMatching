@@ -229,7 +229,7 @@ def test_path3_few_obs_en():
         matcher.print_lattice_stats()
         matcher.print_lattice()
         from leuvenmapmatching import visualization as mmviz
-        mmviz.plot_map(mapdb, matcher=matcher, show_labels=True, show_matching=True,
+        mmviz.plot_map(mapdb, matcher=matcher, show_labels=True, show_matching=True, linewidth=10,
                        filename=str(directory / "test_test_path_ne_3_fo.png"))
     assert path_pred == path_sol, f"Nodes not equal:\n{path_pred}\n{path_sol}"
 
@@ -258,7 +258,7 @@ def test_path3_few_obs_e():
         matcher.print_lattice()
         from leuvenmapmatching import visualization as mmviz
         mmviz.plot_map(mapdb, matcher=matcher, show_labels=True, show_matching=True, linewidth=10,
-                       filename=str(directory / "test_test_path_ne_3_fo.png"))
+                       filename=str(directory / "test_test_path_e_3_fo.png"))
     assert path_pred == path_sol, f"Nodes not equal:\n{path_pred}\n{path_sol}"
 
 
@@ -276,4 +276,4 @@ if __name__ == "__main__":
     # test_path_duplicate()
     # test_path3_many_obs()
     test_path3_few_obs_en()
-    # test_path3_few_obs_e()
+    test_path3_few_obs_e()
