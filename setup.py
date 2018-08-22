@@ -79,7 +79,8 @@ setup(
     install_requires=['numpy', 'scipy'],
     extras_require={
         'vis': ['smopy', 'matplotlib>=2.0.0'],
-        'all': ['rtree', 'pyproj', 'nvector==0.5.2', 'gpxpy', 'pykalman']
+        'db': ['rtree', 'pyproj'],
+        'all': ['smopy', 'matplotlib>=2.0.0', 'rtree', 'pyproj', 'nvector==0.5.2', 'gpxpy', 'pykalman']
     },
     setup_requires=['pytest-runner'],
     tests_require=['pytest'],

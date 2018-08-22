@@ -14,7 +14,7 @@ Notes:
   disconnected, nodes.
   For example, nodes 884147801204 and 884148400033 are on the same location and
   should be connected because the given path runs over this road.
-* At index 2662, the path is missing a number of observations. First part where
+* At index 2659, the path is missing a number of observations. First part where
   non-emitting nodes are required.
 
 :author: Wannes Meert
@@ -222,12 +222,12 @@ def test_bug1():
         (47.59115,    -122.2398333)
     ]
     path = [map_con.latlon2yx(lat, lon) for lat, lon in path_ll]
+    path_sol = [('A', 'B'), ('B', 'C')]
     matcher = MatcherDistance(map_con, min_prob_norm=0.001,
                               max_dist=200, obs_noise=4.07, only_edges=True,
                               non_emitting_states=False)
     matcher.match(path)
     path_pred = matcher.path_pred
-    print(path_pred)
     if directory:
         import matplotlib.pyplot as plt
         matcher.print_lattice_stats()
@@ -236,10 +236,12 @@ def test_bug1():
         ax = fig.get_axes()
         mm_viz.plot_map(map_con, matcher=matcher, use_osm=True, ax=ax,
                         show_lattice=False, show_labels=True, show_graph=True, zoom_path=True,
+                        show_matching=True,
                         coord_trans=map_con.yx2latlon)
         plt.savefig(str(directory / "test_newson_bug1.png"))
         plt.close(fig)
         mm.matching.logger.debug("... done")
+    assert path_pred == path_sol, f"Edges not equal:\n{path_pred}\n{path_sol}"
 
 
 if __name__ == "__main__":
