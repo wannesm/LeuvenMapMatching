@@ -1,13 +1,11 @@
 Dealing with Latitude-Longitude
 ===============================
 
-The toolbox can deal with latitude-longitude coordinates and uses the nvector package for this.
+The toolbox can deal with latitude-longitude coordinates directly.
 Map matching, however, requires a lot of repeated computations between points and latitude-longitude
-computations can be rather expensive compared to simple Euclidean distances.
-Therefore, it is recommended to project your latitude-longitude coordinates first to an x-y plane and
-use these coordinates for map matching.
+computations will be more expensive than Euclidean distances.
 
-There are three options:
+There are three different options how you can handle latitude-longitude coordinates:
 
 Option 1: Use Latitude-Longitude directly
 -----------------------------------------
@@ -50,8 +48,8 @@ Latitude-Longitude coordinates can be transformed two a frame with two orthogona
    route_xy = [map_con_xy.latlon2yx(latlon) for latlon in route_latlon]
 
 
-This can also be done directly using the ``pyproj`` toolbox.
-For example, using the Lambert Conformal projection:
+This can also be done directly using the `pyproj <https://github.com/jswhit/pyproj>`_ toolbox.
+For example, using the Lambert Conformal projection to project the route GPS coordinates:
 
 .. code-block:: python
 
@@ -69,7 +67,13 @@ For example, using the Lambert Conformal projection:
        ys.append(y)
 
 
-Or if you want to define from and to projections:
+Notice that the pyproj package uses the convention to express coordinates as x-y which is
+longitude-latitude because it is defined this way in the CRS definitions while the Leuven.MapMatching
+toolbox follows the ISO 6709 standard and expresses coordinates as latitude-longitude. If you
+want ``pyproj`` to use latitude-longitude you can use set the
+`axisswap option <https://proj4.org/operations/conversions/axisswap.html>`_.
+
+If you want to define both the from and to projections:
 
 .. code-block:: python
 

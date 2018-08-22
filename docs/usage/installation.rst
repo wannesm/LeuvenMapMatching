@@ -9,8 +9,9 @@ Required:
 -  `numpy <http://www.numpy.org>`__
 -  `scipy <https://www.scipy.org>`__
 
-Optional (only loaded when methods are called to rely on these packages):
+Optional (only loaded when methods are called that rely on these packages):
 
+-  `rtree <http://toblerity.org/rtree/>`__
 -  `nvector <https://github.com/pbrod/Nvector>`__
 -  `gpxpy <https://github.com/tkrajina/gpxpy>`__
 -  `pyproj <https://jswhit.github.io/pyproj/>`__
