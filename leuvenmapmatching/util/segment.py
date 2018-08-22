@@ -68,6 +68,13 @@ class Segment(object):
             return self.p1
         return self.p2
 
+    def loc_to_str(self):
+        if self.p2 is None:
+            return f"{self.p1}"
+        if self._pi is not None:
+            return f"{self.p1}-{self.pi}/{self.ti}-{self.p2}"
+        return f"{self.p1}-{self.p2}"
+
     def __str__(self):
         if self.p2 is None:
             return f"{self.l1}"

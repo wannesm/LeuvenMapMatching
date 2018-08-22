@@ -26,12 +26,17 @@ class MatchingDistance(Matching):
             self.dist_betw_states: float = 1.0
             if len(self.prev) != 0:
                 m_prev = list(self.prev)[0]  # type: MatchingDistance
-                if m_prev.edge_m.label == self.label:
+                if m_prev.edge_m.label == self.edge_m.label:
                     self.dist_betw_states = self.matcher.map.distance(m_prev.edge_m.pi, self.edge_m.pi)
                 else:
-                    self.dist_betw_states = self.matcher.map.distance(m_prev.edge_m.pi, m_prev.edge_m.p2) +\
+                    self.dist_betw_states = self.matcher.map.distance(m_prev.edge_m.pi, m_prev.edge_m.p2) + \
                                             self.matcher.map.distance(m_prev.edge_m.p2, self.edge_m.pi)
                 self.dist_betw_obs = self.matcher.map.distance(m_prev.edge_o.pi, self.edge_o.pi)
+
+    def _update_inner(self, m_other: 'MatchingDistance'):
+        super()._update_inner(m_other)
+        self.dist_betw_states = m_other.dist_betw_states
+        self.dist_betw_obs = m_other.dist_betw_obs
 
     @staticmethod
     def repr_header(label_width=None, stop=""):
@@ -103,17 +108,10 @@ class MatcherDistance(Matcher):
         :param edge_o:
         :return:
         """
-        if prev_m.label == "A-B-3-0":
-            print("XXX")
         d_z = self.map.distance(prev_m.edge_o.pi, edge_o.pi)
         if prev_m.edge_m.label == edge_m.label:
-            print(f"d_x(1), {prev_m.edge_m}, {edge_m}")
             d_x = self.map.distance(prev_m.edge_m.pi, edge_m.pi)
         else:
-            print(f"d_x(2), {prev_m.edge_m}, {edge_m}")
-            print(f"self.map.distance({prev_m.edge_m.pi}, {prev_m.edge_m.p2}) = {self.map.distance(prev_m.edge_m.pi, prev_m.edge_m.p2)}")
-            print(f"self.map.distance({prev_m.edge_m.p2}, {edge_m.pi}) = {self.map.distance(prev_m.edge_m.p2, edge_m.pi)}")
-            print(f"obs: {prev_m.edge_o.pi}, {edge_o.pi}")
             d_x = self.map.distance(prev_m.edge_m.pi, prev_m.edge_m.p2) + self.map.distance(prev_m.edge_m.p2, edge_m.pi)
         d_t = abs(d_z - d_x)
         beta = 1 / 6
