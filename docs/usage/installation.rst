@@ -29,6 +29,13 @@ If you want to install the latest released version using pip:
 
     $ pip install leuvenmapmatching
 
+If you want to install the latest non-released version (add ``@develop``) for the
+latest development version:
+
+::
+
+    $ pip install git+https://github.com/wannesm/leuvenmapmatching
+
 
 From source
 -----------
