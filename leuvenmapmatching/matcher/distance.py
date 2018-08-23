@@ -1,31 +1,31 @@
 # encoding: utf-8
 """
-leuvenmapmatching.matching_distance
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+leuvenmapmatching.matcher.distance
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 :author: Wannes Meert
 :copyright: Copyright 2018 DTAI, KU Leuven and Sirris.
 :license: Apache License, Version 2.0, see LICENSE for details.
 """
-from .matching import Matching, Matcher
 from scipy.stats import norm
 import math
 import logging
 
+from .base import BaseMatching, BaseMatcher
 
 logger = logging.getLogger("be.kuleuven.cs.dtai.mapmatching")
 
 
-class MatchingDistance(Matching):
+class DistanceMatching(BaseMatching):
     __slots__ = ['dist_betw_obs', 'dist_betw_states']  # Additional fields
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.dist_betw_obs: float = 1.0
+        self.dist_betw_states: float = 1.0
         if logger.isEnabledFor(logging.DEBUG):
-            self.dist_betw_obs: float = 1.0
-            self.dist_betw_states: float = 1.0
             if len(self.prev) != 0:
-                m_prev = list(self.prev)[0]  # type: MatchingDistance
+                m_prev = list(self.prev)[0]  # type: DistanceMatching
                 if m_prev.edge_m.label == self.edge_m.label:
                     self.dist_betw_states = self.matcher.map.distance(m_prev.edge_m.pi, self.edge_m.pi)
                 else:
@@ -33,14 +33,14 @@ class MatchingDistance(Matching):
                                             self.matcher.map.distance(m_prev.edge_m.p2, self.edge_m.pi)
                 self.dist_betw_obs = self.matcher.map.distance(m_prev.edge_o.pi, self.edge_o.pi)
 
-    def _update_inner(self, m_other: 'MatchingDistance'):
+    def _update_inner(self, m_other: 'DistanceMatching'):
         super()._update_inner(m_other)
         self.dist_betw_states = m_other.dist_betw_states
         self.dist_betw_obs = m_other.dist_betw_obs
 
     @staticmethod
     def repr_header(label_width=None, stop=""):
-        res = Matching.repr_header(label_width)
+        res = BaseMatching.repr_header(label_width)
         if logger.isEnabledFor(logging.DEBUG):
             res += f" {'d(o)':<5} | {'d(s)':<5} |"
         return res
@@ -52,7 +52,7 @@ class MatchingDistance(Matching):
         return res
 
 
-class MatcherDistance(Matcher):
+class DistanceMatcher(BaseMatcher):
     """
     Take distance between observations vs states into account. Based on the
     method presented in:
@@ -85,12 +85,12 @@ class MatcherDistance(Matcher):
             logger.warning("The MatcherDistance method only works on edges as states. Nodes have been disabled.")
         kwargs["only_edges"] = True
         if "matching" not in kwargs:
-            kwargs["matching"] = MatchingDistance
+            kwargs["matching"] = DistanceMatching
         super().__init__(*args, **kwargs)
         self.obs_noise_dist = norm(scale=self.obs_noise)
         self.obs_noise_dist_ne = norm(scale=self.obs_noise_ne)
 
-    def logprob_trans(self, prev_m: MatchingDistance, edge_m, edge_o):
+    def logprob_trans(self, prev_m: DistanceMatching, edge_m, edge_o):
         """Transition probability.
 
         Original PDF:

@@ -1,9 +1,10 @@
 # encoding: utf-8
 """
-leuvenmapmatching.map.gdfmap
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+leuvenmapmatching.map.inmem
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Map based on the GeoPandas GeoDataFrame.
+Simple in-memory map representation. Not suited for production purposes.
+Write your own map class that connects to your map (e.g. a database instance).
 
 :author: Wannes Meert
 :copyright: Copyright 2018 DTAI, KU Leuven and Sirris.
@@ -13,7 +14,7 @@ import logging
 import time
 from pathlib import Path
 import pickle
-from . import Map
+from .base import BaseMap
 try:
     import rtree
 except ImportError:
@@ -28,11 +29,11 @@ from functools import partial
 logger = logging.getLogger("be.kuleuven.cs.dtai.mapmatching")
 
 
-class InMemMap(Map):
+class InMemMap(BaseMap):
     def __init__(self, name, use_latlon=True, use_rtree=False, index_edges=False,
                  crs_lonlat=None, crs_xy=None, graph=None, dir=None, deserializing=False):
         """
-        In-memory representation of a map based on a GeoDataFrame.
+        In-memory representation of a map.
         """
         super(InMemMap, self).__init__(name, use_latlon=use_latlon)
         self.dir = Path(".") if dir is None else Path(dir)
@@ -127,15 +128,6 @@ class InMemMap(Map):
 
     def size(self):
         return len(self.graph)
-
-    def coordinates(self, bb=None):
-        if bb is None or self.rtree is None:
-            nodes = self.graph.values()
-        else:
-            node_idxs = self.rtree.intersection(bb)
-            nodes = [self.graph[idx] for idx in node_idxs]
-        for t in nodes:
-            yield t[0]
 
     def node_coordinates(self, node_key):
         """Get the coordinates of the given node.

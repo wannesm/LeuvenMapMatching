@@ -13,9 +13,11 @@ import os
 import logging
 from pathlib import Path
 import leuvenmapmatching as mm
-from leuvenmapmatching.map.inmemmap import InMemMap
+from leuvenmapmatching.map.inmem import InMemMap
+from leuvenmapmatching.matcher.simple import SimpleMatcher
 
 
+logger = mm.logger
 directory = None
 
 
@@ -35,8 +37,8 @@ def test_path1():
         "F": ((3, 5), ["D", "E"])
     }, use_latlon=False)
 
-    matcher = mm.matching.Matcher(mapdb, max_dist=None, min_prob_norm=None,
-                                  non_emitting_states=False, only_edges=False)
+    matcher = SimpleMatcher(mapdb, max_dist=None, min_prob_norm=None,
+                            non_emitting_states=False, only_edges=False)
     path_pred, _ = matcher.match(path, unique=True)
     if directory:
         matcher.print_lattice_stats()
@@ -69,8 +71,8 @@ def test_path2():
         "L": ((2, 6), ["K", "D", "F"])
     }, use_latlon=False)
 
-    matcher = mm.matching.Matcher(mapdb, max_dist=None, min_prob_norm=0.001,
-                                  non_emitting_states=False, only_edges=False)
+    matcher = SimpleMatcher(mapdb, max_dist=None, min_prob_norm=0.001,
+                            non_emitting_states=False, only_edges=False)
     path_pred, _ = matcher.match(path, unique=True)
     if directory:
         matcher.print_lattice_stats()
@@ -104,9 +106,9 @@ def test_path_outlier():
         "L": ((2, 6), ["K", "D", "F"])
     }, use_latlon=False)
 
-    matcher = mm.matching.Matcher(mapdb, max_dist=None, min_prob_norm=0.0001,
-                                  max_dist_init=1, obs_noise=0.5, obs_noise_ne=10,
-                                  non_emitting_states=True)
+    matcher = SimpleMatcher(mapdb, max_dist=None, min_prob_norm=0.0001,
+                            max_dist_init=1, obs_noise=0.5, obs_noise_ne=10,
+                            non_emitting_states=True)
     matcher.match(path, unique=True)
     path_pred = matcher.path_pred_onlynodes
     if directory:
@@ -129,9 +131,9 @@ def test_path3():
         "F": ((3, 5), ["E"]),
     }, use_latlon=False)
 
-    matcher = mm.matching.Matcher(mapdb, max_dist=None, min_prob_norm=0.0001,
-                                  max_dist_init=1, obs_noise=0.25, obs_noise_ne=10,
-                                  non_emitting_states=True)
+    matcher = SimpleMatcher(mapdb, max_dist=None, min_prob_norm=0.0001,
+                            max_dist_init=1, obs_noise=0.25, obs_noise_ne=10,
+                            non_emitting_states=True)
     matcher.match(path, unique=True)
     path_pred = matcher.path_pred_onlynodes
     if directory:
@@ -147,8 +149,8 @@ def test_path3():
 
 
 if __name__ == "__main__":
-    mm.matching.logger.setLevel(logging.DEBUG)
-    mm.matching.logger.addHandler(logging.StreamHandler(sys.stdout))
+    logger.setLevel(logging.DEBUG)
+    logger.addHandler(logging.StreamHandler(sys.stdout))
     directory = Path(os.environ.get('TESTDIR', Path(__file__).parent))
     print(f"Saving files to {directory}")
     # test_path1()

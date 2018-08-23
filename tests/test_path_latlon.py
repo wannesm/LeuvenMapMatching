@@ -20,7 +20,10 @@ import leuvenmapmatching.visualization as mm_viz
 from leuvenmapmatching.util.gpx import gpx_to_path
 from leuvenmapmatching.util.dist_latlon import interpolate_path
 from leuvenmapmatching.util.projections import latlon2grs80
+from leuvenmapmatching.map.inmem import InMemMap
+from leuvenmapmatching.matcher.simple import SimpleMatcher
 
+logger = mm.logger
 this_path = Path(os.path.realpath(__file__)).parent / "rsrc"
 osm_fn = this_path / "osm_downloaded.xml"
 osm2_fn = this_path / "osm_downloaded2.xml"
@@ -53,7 +56,6 @@ def prepare_files(verbose=False):
 
 
 def create_map():
-    from leuvenmapmatching.map.inmemmap import InMemMap
     map_con = InMemMap("map", use_latlon=True)
     cnt = 0
     for entity in osmread.parse_file(str(osm_fn)):
@@ -69,7 +71,6 @@ def create_map():
 
 
 def create_map2(convert_latlon=None):
-    from leuvenmapmatching.map.inmemmap import InMemMap
     use_latlon = True if convert_latlon is None else False
     map_con = InMemMap("map2", use_latlon=use_latlon)
     cnt = 0
@@ -112,7 +113,7 @@ def test_path1():
     track_int = interpolate_path(track, 5)
     map_con = create_map()
 
-    matcher = mm.matching.Matcher(map_con, max_dist=50, obs_noise=50, min_prob_norm=0.1)
+    matcher = SimpleMatcher(map_con, max_dist=50, obs_noise=50, min_prob_norm=0.1)
     nodes, last_idx = matcher.match(track_int, unique=False)
     if len(nodes) < len(track_int):
         raise Exception(f"Could not find a match for the full path. Last index = {last_idx}")
@@ -133,10 +134,10 @@ def test_path2_proj_e():
     # track = track[:3]
     # track = mm.util.interpolate_path(track, 5)
     map_con = create_map2(convert_latlon=proj)
-    matcher = mm.matching.Matcher(map_con, max_dist=300, max_dist_init=25,
-                                  obs_noise=75, obs_noise_ne=125, min_prob_norm=0.1,
-                                  max_lattice_width=5, only_edges=True,
-                                  non_emitting_states=True)
+    matcher = SimpleMatcher(map_con, max_dist=300, max_dist_init=25,
+                            obs_noise=75, obs_noise_ne=125, min_prob_norm=0.1,
+                            max_lattice_width=5, only_edges=True,
+                            non_emitting_states=True)
     path, last_idx = matcher.match(track, unique=False)
     nodes = matcher.path_pred_onlynodes
     if len(path) < len(track):
@@ -163,10 +164,10 @@ def test_path2_proj_ne():
     # track = track[:3]
     # track = mm.util.interpolate_path(track, 5)
     map_con = create_map2(convert_latlon=proj)
-    matcher = mm.matching.Matcher(map_con, max_dist=300, max_dist_init=25,
-                                  obs_noise=75, obs_noise_ne=125, min_prob_norm=0.1,
-                                  max_lattice_width=5, only_edges=False,
-                                  non_emitting_states=True)
+    matcher = SimpleMatcher(map_con, max_dist=300, max_dist_init=25,
+                            obs_noise=75, obs_noise_ne=125, min_prob_norm=0.1,
+                            max_lattice_width=5, only_edges=False,
+                            non_emitting_states=True)
     path, last_idx = matcher.match(track, unique=False)
     nodes = matcher.path_pred_onlynodes
     if len(path) < len(track):
@@ -191,10 +192,10 @@ def test_path2():
     # track = track[:3]
     # track = mm.util.interpolate_path(track, 5)
     map_con = create_map2()
-    matcher = mm.matching.Matcher(map_con, max_dist=100, max_dist_init=20,
-                                  obs_noise=50, min_prob_norm=0.1,
-                                  max_lattice_width=5,
-                                  non_emitting_states=True)
+    matcher = SimpleMatcher(map_con, max_dist=100, max_dist_init=20,
+                            obs_noise=50, min_prob_norm=0.1,
+                            max_lattice_width=5,
+                            non_emitting_states=True)
     nodes, last_idx = matcher.match(track, unique=False)
     if len(nodes) < len(track):
         raise Exception(f"Could not find a match for the full path. Last index = {last_idx}")
@@ -212,10 +213,10 @@ def test_path2_onlyedges():
     # track = track[:3]
     # track = mm.util.interpolate_path(track, 5)
     map_con = create_map2()
-    matcher = mm.matching.Matcher(map_con, max_dist=100, max_dist_init=20,
-                                  obs_noise=50, min_prob_norm=0.1,
-                                  max_lattice_width=5,
-                                  non_emitting_states=True, only_edges=True)
+    matcher = SimpleMatcher(map_con, max_dist=100, max_dist_init=20,
+                            obs_noise=50, min_prob_norm=0.1,
+                            max_lattice_width=5,
+                            non_emitting_states=True, only_edges=True)
     nodes, last_idx = matcher.match(track, unique=False)
     if len(nodes) < len(track):
         raise Exception(f"Could not find a match for the full path. Last index = {last_idx}")
@@ -227,8 +228,8 @@ def test_path2_onlyedges():
 
 
 if __name__ == "__main__":
-    mm.matching.logger.setLevel(logging.DEBUG)
-    mm.matching.logger.addHandler(logging.StreamHandler(sys.stdout))
+    logger.setLevel(logging.DEBUG)
+    logger.addHandler(logging.StreamHandler(sys.stdout))
     directory = Path(os.environ.get('TESTDIR', Path(__file__).parent))
     print(f"Saving files to {directory}")
     # test_path1()

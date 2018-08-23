@@ -2,10 +2,10 @@ Custom probability distributions
 ================================
 
 You can use your own custom probability distributions for the transition and emission probabilities.
-This is achieved by inheriting from the :class:`Matcher` class.
+This is achieved by inheriting from the :class:`BaseMatcher` class.
 
-An elaborate example is available in the :class:`MatchingDistance` class that implements a variation
-based on Newson and Krumm (2009).
+Examples are available in the :class:`SimpleMatching` class and :class:`DistanceMatching` class.
+The latter implements a variation based on Newson and Krumm (2009).
 
 Transition probability distribution
 -----------------------------------
@@ -58,7 +58,9 @@ pass your custom object to the :class:`Matcher` object.
 
 .. code-block:: python
 
-   class MyMatching(Matching):
+   from leuvenmapmatching.map.base import BaseMatching
+
+   class MyMatching(BaseMatching):
        ...
 
    matcher = MyMatcher(mapdb, non_emitting_states=True, only_edges=True, matching=MyMatching)

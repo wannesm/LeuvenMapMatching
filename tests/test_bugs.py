@@ -13,7 +13,8 @@ import sys
 import logging
 from pathlib import Path
 import leuvenmapmatching as mm
-from leuvenmapmatching.map.inmemmap import InMemMap
+from leuvenmapmatching.map.inmem import InMemMap
+from leuvenmapmatching.matcher.simple import SimpleMatcher
 
 
 directory = None
@@ -45,7 +46,7 @@ def test_bug1():
             # (3, len*i/nb_steps)
             ]
 
-    matcher = mm.matching.Matcher(map_con, max_dist=dist + 1, obs_noise=dist + 1, min_prob_norm=None,
+    matcher = SimpleMatcher(map_con, max_dist=dist + 1, obs_noise=dist + 1, min_prob_norm=None,
                                   non_emitting_states=True)
 
     nodes = matcher.match(path, unique=False)
@@ -59,8 +60,8 @@ def test_bug1():
 
 
 if __name__ == "__main__":
-    mm.matching.logger.setLevel(logging.DEBUG)
-    mm.matching.logger.addHandler(logging.StreamHandler(sys.stdout))
+    mm.logger.setLevel(logging.DEBUG)
+    mm.logger.addHandler(logging.StreamHandler(sys.stdout))
     directory = Path(os.environ.get('TESTDIR', Path(__file__).parent))
     print(f"Saving files to {directory}")
     test_bug1()

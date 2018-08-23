@@ -5,23 +5,17 @@ Example 1: Simple
 -----------------
 
 A first, simple example. Some parameters are given to tune the algorithm.
-The `max_dist` and `obs_noise` are distances that indicate the maximal distance between observation and road
+The ``max_dist`` and ``obs_noise`` are distances that indicate the maximal distance between observation and road
 segment and the expected noise in the measurements, respectively.
-The `min_prob_norm` prunes the lattice in that it drops paths that drop below 0.5 normalized probability.
+The ``min_prob_norm`` prunes the lattice in that it drops paths that drop below 0.5 normalized probability.
 The probability is normalized to allow for easier reasoning about the probability of a path.
 It is computed as the exponential smoothed log probability components instead of the sum as would be the case
 for log likelihood.
 
-Most HMM based matching algorithms only use edges as states (`only_edges`).
-This toolbox also allows a mix of edges
-and nodes on a map.
-The advantage of this is that it forces the path to follow the road over crossroads and allow
-for a more accurate matching.
-But it is slightly less efficient because more possible states are tried.
-
 .. code-block:: python
 
-    from leuvenmapmatching.map.inmemmap import InMemMap
+    from leuvenmapmatching.matcher.distance import DistanceMatcher
+    from leuvenmapmatching.map.inmem import InMemMap
 
     map_con = InMemMap("mymap", graph={
         "A": ((1, 1), ["B", "C", "X"]),
@@ -41,7 +35,7 @@ But it is slightly less efficient because more possible states are tried.
             (2.3, 3.5), (2.4, 3.2), (2.6, 3.1), (2.9, 3.1), (3.0, 3.2),
             (3.1, 3.8), (3.0, 4.0), (3.1, 4.3), (3.1, 4.6), (3.0, 4.9)]
 
-    matcher = mm.matching.Matcher(map_con, only_edges=False, max_dist=2, obs_noise=1, min_prob_norm=0.5)
+    matcher = DistanceMatcher(map_con, max_dist=2, obs_noise=1, min_prob_norm=0.5)
     states, _ = matcher.match(path)
     nodes = matcher.path_pred_onlynodes
 
@@ -68,8 +62,8 @@ non-emitting states that ignore observations completely.
 
 .. code-block:: python
 
-    from leuvenmapmatching.map.inmemmap import InMemMap
-    import leuvenmapmatching as mm
+    from leuvenmapmatching.matcher.distance import DistanceMatcher
+    from leuvenmapmatching.map.inmem import InMemMap
     from leuvenmapmatching import visualization as mmviz
 
     path = [(1, 0), (7.5, 0.65), (10.1, 1.9)]
@@ -84,8 +78,8 @@ non-emitting states that ignore observations completely.
         "H": ((10, 0.0), ["G", "I"]),
         "I": ((10, 2.0), ["H"])
     }, use_latlon=False)
-    matcher = mm.matching.Matcher(mapdb, max_dist_init=0.2, obs_noise=1, obs_noise_ne=10,
-                                  non_emitting_states=True, only_edges=True)
+    matcher = DistanceMatcher(mapdb, max_dist_init=0.2, obs_noise=1, obs_noise_ne=10,
+                              non_emitting_states=True, only_edges=True)
     states, _ = matcher.match(path)
     nodes = matcher.path_pred_onlynodes
 
@@ -109,7 +103,7 @@ The lattice will be built further every time a new subsequence of the path is gi
 
 .. code-block:: python
 
-    import leuvenmapmatching as mm
+    from leuvenmapmatching.matcher.distance import DistanceMatcher
     from leuvenmapmatching.map.inmemmap import InMemMap
 
     map_con = InMemMap("mymap", graph={
@@ -130,7 +124,7 @@ The lattice will be built further every time a new subsequence of the path is gi
             (2.3, 3.5), (2.4, 3.2), (2.6, 3.1), (2.9, 3.1), (3.0, 3.2),
             (3.1, 3.8), (3.0, 4.0), (3.1, 4.3), (3.1, 4.6), (3.0, 4.9)]
 
-    matcher = mm.matching.Matcher(map_con, max_dist=2, obs_noise=1, min_prob_norm=0.5)
+    matcher = DistanceMatcher(map_con, max_dist=2, obs_noise=1, min_prob_norm=0.5)
     states, _ = matcher.match_incremental(path[:5])
     states, _ = matcher.match_incremental(path[5:], backtrace_len=-1)
     nodes = matcher.path_pred_onlynodes
@@ -149,7 +143,7 @@ contain the last part of the lattice.
 
 .. code-block:: python
 
-    matcher = mm.matching.Matcher(map_con, max_dist=2, obs_noise=1, min_prob_norm=0.5)
+    matcher = DistanceMatcher(map_con, max_dist=2, obs_noise=1, min_prob_norm=0.5)
     states, _ = matcher.match_incremental(path[:5])
     matcher = matcher.copy_lastinterface()
     states, _ = matcher.match_incremental(path[5:], backtrace_len=-1)

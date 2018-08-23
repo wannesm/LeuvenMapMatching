@@ -13,9 +13,11 @@ import os
 import logging
 from pathlib import Path
 import leuvenmapmatching as mm
-from leuvenmapmatching.map.inmemmap import InMemMap
+from leuvenmapmatching.map.inmem import InMemMap
+from leuvenmapmatching.matcher.simple import SimpleMatcher
 
 
+logger = mm.logger
 directory = None
 
 
@@ -34,8 +36,8 @@ def test_path1():
         "F": ((3, 5), ["D", "E"])
     }, use_latlon=False)
 
-    matcher = mm.matching.Matcher(mapdb, max_dist=None, min_prob_norm=None,
-                                  only_edges=True, non_emitting_states=False)
+    matcher = SimpleMatcher(mapdb, max_dist=None, min_prob_norm=None,
+                            only_edges=True, non_emitting_states=False)
     matcher.match(path, unique=True)
     path_pred = matcher.path_pred_onlynodes
     if directory:
@@ -58,10 +60,10 @@ def test_path3():
         "F": ((3, 5), ["E"]),
     }, use_latlon=False)
 
-    matcher = mm.matching.Matcher(mapdb, max_dist=None, min_prob_norm=0.0001,
-                                  max_dist_init=1, obs_noise=0.25, obs_noise_ne=10,
-                                  non_emitting_states=True,
-                                  only_edges=True)
+    matcher = SimpleMatcher(mapdb, max_dist=None, min_prob_norm=0.0001,
+                            max_dist_init=1, obs_noise=0.25, obs_noise_ne=10,
+                            non_emitting_states=True,
+                            only_edges=True)
     matcher.match(path, unique=True)
     path_pred = matcher.path_pred_onlynodes
     if directory:
@@ -77,8 +79,8 @@ def test_path3():
 
 
 if __name__ == "__main__":
-    mm.matching.logger.setLevel(logging.DEBUG)
-    mm.matching.logger.addHandler(logging.StreamHandler(sys.stdout))
+    logger.setLevel(logging.DEBUG)
+    logger.addHandler(logging.StreamHandler(sys.stdout))
     directory = Path(os.environ.get('TESTDIR', Path(__file__).parent))
     print(f"Saving files to {directory}")
     test_path1()

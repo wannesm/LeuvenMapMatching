@@ -38,7 +38,7 @@ But any other projection can be used by using the pyproj package directly.
 
 .. code-block:: python
 
-    from leuvenmapmatching.map.inmemmap import InMemMap
+    from leuvenmapmatching.map.inmem import InMemMap
     from leuvenmapmatching.util.projections import latlon2grs80
     import osmread
 

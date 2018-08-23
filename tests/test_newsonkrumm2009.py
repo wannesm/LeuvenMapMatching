@@ -30,14 +30,15 @@ import csv
 from datetime import datetime
 import pytest
 import leuvenmapmatching as mm
-from leuvenmapmatching.matching_distance import MatcherDistance
-from leuvenmapmatching.map.inmemmap import InMemMap
+from leuvenmapmatching.matcher.distance import DistanceMatcher
+from leuvenmapmatching.map.inmem import InMemMap
 import leuvenmapmatching.visualization as mm_viz
 MYPY = False
 if MYPY:
     from typing import List, Tuple
 
 
+logger = mm.logger
 this_path = Path(os.path.realpath(__file__)).parent / "rsrc" / "newson_krumm_2009"
 gps_data = this_path / "gps_data.txt"
 gps_data_pkl = gps_data.with_suffix(".pkl")
@@ -62,7 +63,7 @@ def read_gps(route_fn):
             lat = float(lat)
             lon = float(lon)
             route.append((lat, lon, ts))
-    mm.matching.logger.debug(f"Read GPS trace of {len(route)} points")
+    logger.debug(f"Read GPS trace of {len(route)} points")
     return route
 
 
@@ -76,7 +77,7 @@ def read_nodes(nodes_fn):
             nodeid = int(nodeid)
             trav = int(trav)
             nodes.append((nodeid, trav))
-    mm.matching.logger.debug(f"Read correct trace of {len(nodes)} nodes")
+    logger.debug(f"Read correct trace of {len(nodes)} nodes")
     return nodes
 
 
@@ -120,7 +121,7 @@ def read_map(map_fn):
                 prev_node = innernode_id
             mmap.add_edge(prev_node, nt)
             mmap.add_edge(nt, prev_node)
-    mm.matching.logger.debug(f"Read map with {node_cnt} nodes and {edge_cnt} edges")
+    logger.debug(f"Read map with {node_cnt} nodes and {edge_cnt} edges")
     return mmap
 
 
@@ -141,17 +142,17 @@ def load_data():
     # Map
     if road_network_pkl.exists() and road_network_xy_pkl.exists():
         map_con_latlon = InMemMap.from_pickle(road_network_pkl)
-        mm.matching.logger.debug(f"Read latlon road network from file ({map_con_latlon.size()} nodes)")
+        logger.debug(f"Read latlon road network from file ({map_con_latlon.size()} nodes)")
         map_con = InMemMap.from_pickle(road_network_xy_pkl)
-        mm.matching.logger.debug(f"Read xy road network from file ({map_con.size()} nodes)")
+        logger.debug(f"Read xy road network from file ({map_con.size()} nodes)")
     else:
         map_con_latlon = read_map(road_network)
         map_con_latlon.dump()
-        mm.matching.logger.debug(f"Saved latlon road network to file ({map_con_latlon.size()} nodes)")
+        logger.debug(f"Saved latlon road network to file ({map_con_latlon.size()} nodes)")
         map_con = map_con_latlon.to_xy(name="road_network_xy", use_rtree=True)
         # correct_map(map_con)
         map_con.dump()
-        mm.matching.logger.debug(f"Saved xy road network to file ({map_con.size()} nodes)")
+        logger.debug(f"Saved xy road network to file ({map_con.size()} nodes)")
 
     # Route
     if gps_data_pkl.exists() and gps_data_xy_pkl.exists():
@@ -181,13 +182,13 @@ def test_route():
     # zoom_path = slice(2645, 2665)
 
     # if directory is not None:
-    #     mm.matching.logger.debug("Plotting pre map ...")
+    #     logger.debug("Plotting pre map ...")
     #     mm_viz.plot_map(map_con_latlon, path=route_latlon, use_osm=True,
     #                     show_lattice=False, show_labels=False, show_graph=False, zoom_path=zoom_path,
     #                     filename=str(directory / "test_newson_route.png"))
-    #     mm.matching.logger.debug("... done")
+    #     logger.debug("... done")
 
-    matcher = MatcherDistance(map_con, min_prob_norm=0.001,
+    matcher = DistanceMatcher(map_con, min_prob_norm=0.001,
                               max_dist=200, obs_noise=4.07, only_edges=True,  # Newson Krumm defaults
                               non_emitting_states=False)
     matcher.match(route[2650:2662])
@@ -195,7 +196,7 @@ def test_route():
 
     if directory:
         matcher.print_lattice_stats()
-        mm.matching.logger.debug("Plotting post map ...")
+        logger.debug("Plotting post map ...")
         fig = plt.figure(figsize=(100,100))
         ax = fig.get_axes()
         mm_viz.plot_map(map_con, matcher=matcher, use_osm=True, ax=ax,
@@ -203,7 +204,7 @@ def test_route():
                         coord_trans=map_con.yx2latlon)
         plt.savefig(str(directory / "test_newson_route_matched.png"))
         plt.close(fig)
-        mm.matching.logger.debug("... done")
+        logger.debug("... done")
 
 
 def test_bug1():
@@ -223,7 +224,7 @@ def test_bug1():
     ]
     path = [map_con.latlon2yx(lat, lon) for lat, lon in path_ll]
     path_sol = [('A', 'B'), ('B', 'C')]
-    matcher = MatcherDistance(map_con, min_prob_norm=0.001,
+    matcher = DistanceMatcher(map_con, min_prob_norm=0.001,
                               max_dist=200, obs_noise=4.07, only_edges=True,
                               non_emitting_states=False)
     matcher.match(path)
@@ -231,7 +232,7 @@ def test_bug1():
     if directory:
         import matplotlib.pyplot as plt
         matcher.print_lattice_stats()
-        mm.matching.logger.debug("Plotting post map ...")
+        logger.debug("Plotting post map ...")
         fig = plt.figure(figsize=(100,100))
         ax = fig.get_axes()
         mm_viz.plot_map(map_con, matcher=matcher, use_osm=True, ax=ax,
@@ -240,13 +241,13 @@ def test_bug1():
                         coord_trans=map_con.yx2latlon)
         plt.savefig(str(directory / "test_newson_bug1.png"))
         plt.close(fig)
-        mm.matching.logger.debug("... done")
+        logger.debug("... done")
     assert path_pred == path_sol, f"Edges not equal:\n{path_pred}\n{path_sol}"
 
 
 if __name__ == "__main__":
-    mm.matching.logger.setLevel(logging.DEBUG)
-    mm.matching.logger.addHandler(logging.StreamHandler(sys.stdout))
+    # logger.setLevel(logging.DEBUG)
+    # logger.addHandler(logging.StreamHandler(sys.stdout))
     directory = Path(os.environ.get('TESTDIR', Path(__file__).parent))
     print(f"Saving files to {directory}")
     # test_route()
