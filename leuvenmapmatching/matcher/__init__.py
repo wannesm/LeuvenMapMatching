@@ -1,7 +1,7 @@
 # encoding: utf-8
 """
-leuvenmapmatching.map
-~~~~~~~~~~~~~~~~~~~~~
+leuvenmapmatching.matcher
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 :author: Wannes Meert
 :copyright: Copyright 2018 DTAI, KU Leuven and Sirris.

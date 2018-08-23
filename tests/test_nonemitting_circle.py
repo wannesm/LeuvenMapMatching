@@ -19,13 +19,14 @@ try:
 except ImportError:
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir)))
     import leuvenmapmatching as mm
+from leuvenmapmatching.matcher.simple import SimpleMatcher
+from leuvenmapmatching.map.inmem import InMemMap
 
 
 directory = None
 
 
 def setup_map(disconnect=True):
-    from leuvenmapmatching.map.inmemmap import InMemMap
     theta = np.linspace(0, 2 * math.pi, 4 * 5 + 1)[:-1]
 
     ox = 0.1 + np.cos(theta * 0.95)
@@ -95,7 +96,7 @@ def visualize_path(matcher, mapdb, name="test"):
 
 def test_path1():
     mapdb, path1, path2, path_sol = setup_map()
-    matcher = mm.matching.Matcher(mapdb, max_dist_init=1, min_prob_norm=0.8, obs_noise=0.5,
+    matcher = SimpleMatcher(mapdb, max_dist_init=1, min_prob_norm=0.8, obs_noise=0.5,
                                   non_emitting_states=True)
     matcher.match(path1, unique=True)
     path_pred = matcher.path_pred_onlynodes
@@ -107,7 +108,7 @@ def test_path1():
 def test_path2():
     mapdb, path1, path2, _ = setup_map()
     path_sol = [f"N{i}" for i in range(20)]
-    matcher = mm.matching.Matcher(mapdb, max_dist_init=0.2, min_prob_norm=0.1,
+    matcher = SimpleMatcher(mapdb, max_dist_init=0.2, min_prob_norm=0.1,
                                   obs_noise=0.1, obs_noise_ne=1,
                                   non_emitting_states=True, only_edges=True)
     path_pred = matcher.match(path2, unique=True)
@@ -125,8 +126,8 @@ def test_path2():
 
 if __name__ == "__main__":
     # mm.matching.logger.setLevel(logging.INFO)
-    mm.matching.logger.setLevel(logging.DEBUG)
-    mm.matching.logger.addHandler(logging.StreamHandler(sys.stdout))
+    mm.logger.setLevel(logging.DEBUG)
+    mm.logger.addHandler(logging.StreamHandler(sys.stdout))
     directory = Path(os.environ.get('TESTDIR', Path(__file__).parent))
     print(f"Saving files to {directory}")
     visualize_map()

@@ -1,7 +1,9 @@
 # encoding: utf-8
 """
-leuvenmapmatching.matching
-~~~~~~~~~~~~~~~~~~~~~~~~
+leuvenmapmatching.matcher.base
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Base Matcher and Matching classes.
 
 :author: Wannes Meert
 :copyright: Copyright 2015-2018 DTAI, KU Leuven and Sirris.
@@ -17,10 +19,9 @@ from collections import OrderedDict, defaultdict, namedtuple
 from typing import Optional, Set
 
 import numpy as np
-from scipy.stats import halfnorm, norm
 
-from .util.segment import Segment
-from .util import approx_equal, approx_leq
+from ..util.segment import Segment
+from ..util import approx_equal, approx_leq
 
 
 logger = logging.getLogger("be.kuleuven.cs.dtai.mapmatching")
@@ -29,17 +30,17 @@ ema_const = namedtuple('EMAConst', ['prev', 'cur'])(0.7, 0.3)
 default_label_width = 25
 
 
-class Matching(object):
+class BaseMatching(object):
     """Matching object that represents a node in the Viterbi lattice."""
     __slots__ = ['matcher', 'edge_m', 'edge_o',
                  'logprob', 'logprobema', 'logprobe', 'logprobne',
                  'obs', 'obs_ne', 'dist_obs',
                  'prev', 'prev_other', 'stop', 'length']
 
-    def __init__(self, matcher: 'Matcher', edge_m: Segment, edge_o: Segment,
+    def __init__(self, matcher: 'BaseMatcher', edge_m: Segment, edge_o: Segment,
                  logprob=-np.inf, logprobema=-np.inf, logprobe=-np.inf, logprobne=-np.inf,
                  dist_obs: float=0.0, obs: int=0, obs_ne: int=0,
-                 prev: Optional[Set['Matching']]=None, stop: bool=False, length: int=1):
+                 prev: Optional[Set['BaseMatching']]=None, stop: bool=False, length: int=1):
         self.edge_m: Segment = edge_m
         self.edge_o: Segment = edge_o
         self.logprob: float = logprob        # max probability
@@ -49,11 +50,11 @@ class Matching(object):
         self.obs: int = obs  # reference to path entry index (observation)
         self.obs_ne: int = obs_ne  # number of non-emitting states for this observation
         self.dist_obs: float = dist_obs  # Distance between map point and observation
-        self.prev: Set[Matching] = set() if prev is None else prev  # Previous best matching objects
-        self.prev_other: Set[Matching] = set()  # Previous matching objects with lower logprob
+        self.prev: Set[BaseMatching] = set() if prev is None else prev  # Previous best matching objects
+        self.prev_other: Set[BaseMatching] = set()  # Previous matching objects with lower logprob
         self.stop: bool = stop
         self.length: int = length
-        self.matcher: Matcher = matcher
+        self.matcher: BaseMatcher = matcher
 
     def next(self, edge_m: Segment, edge_o: Segment, obs: int=0, obs_ne: int=0):
         """Create a next lattice Matching object with this Matching object as the previous one in the lattice."""
@@ -165,7 +166,7 @@ class Matching(object):
             self.prev_other.update(m_next.prev)
             return False
 
-    def _update_inner(self, m_other: 'Matching'):
+    def _update_inner(self, m_other: 'BaseMatching'):
         self.edge_m = m_other.edge_m
         self.edge_o = m_other.edge_o
         self.logprob = m_other.logprob
@@ -266,11 +267,11 @@ class Matching(object):
         return self.cname.__hash__()
 
 
-class Matcher:
+class BaseMatcher:
 
     def __init__(self, map_con, obs_noise=1, max_dist_init=None, max_dist=None, min_prob_norm=None,
                  non_emitting_states=True, max_lattice_width=None,
-                 only_edges=True, obs_noise_ne=None, matching=Matching, avoid_goingback=True,
+                 only_edges=True, obs_noise_ne=None, matching=BaseMatching,
                  non_emitting_length_factor=1.0):
         """Initialize a matcher for map matching.
 
@@ -290,8 +291,6 @@ class Matcher:
             If there are more possible next states, the states with the best likelihood so far are selected.
         :param only_edges: Do not include nodes as states, only edges. This is the typical setting for HMM methods.
         :param matching: Matching type
-        :param avoid_goingback: Change the transition probability to be lower for the direction the path is coming
-            from.
         :param non_emitting_length_factor: Reduce the probability of a sequence of non-emitting states the longer it
             is. This can be used to prefer shorter paths. This is separate from the transition probabilities because
             transition probabilities are averaged for non-emitting states and thus the length is also averaged out.
@@ -327,11 +326,6 @@ class Matcher:
         self.lattice = None  # dict[idx,dict[label,Matching]]
         self.lattice_best = None
         self.node_path = None
-        self.obs_noise_dist = halfnorm(scale=self.obs_noise)
-        self.obs_noise_dist_ne = halfnorm(scale=self.obs_noise_ne)
-        # normalize to max 1 to simulate a prob instead of density
-        self.obs_noise_logint = math.log(self.obs_noise * math.sqrt(2 * math.pi) / 2)
-        self.obs_noise_logint_ne = math.log(self.obs_noise_ne * math.sqrt(2 * math.pi) / 2)
         self.matching = matching
         self.non_emitting_states = non_emitting_states
         self.non_emitting_states_maxnb = 100
@@ -340,41 +334,14 @@ class Matcher:
 
         # Penalties
         self.ne_length_factor_log = math.log(non_emitting_length_factor)
-        # Transition probability is divided (in logprob_trans) by this factor if we move back on the
-        # current edge.
-        self.avoid_goingback = avoid_goingback
-        self.gobackonedge_factor_log = 0.004345  # -math.log(0.99)
-        # Transition probability is divided (in logprob_trans) by this factor if the next state is
-        # also the previous state, thus if we go back
-        self.gobacktoedge_factor_log = 0.3  # -math.log(0.5)
-        # Transition probability is divided (in logprob_trans) by this factor if a transition is made
-        self.transition_factor = 0.3# -math.log(0.9)
 
-    def logprob_trans(self, prev_m:Matching, edge_m:Segment, edge_o:Segment):
+    def logprob_trans(self, prev_m:BaseMatching, edge_m:Segment, edge_o:Segment):
         """Transition probability.
 
         Note: In contrast with a regular HMM, this cannot be a probability density function, it needs
               to be a proper probability (thus values between 0.0 and 1.0).
         """
-        logprob = 0
-        if prev_m.edge_m.label == edge_m.label:
-            # Staying in same state
-            if self.avoid_goingback and edge_m.key == prev_m.edge_m.key and edge_m.ti < prev_m.edge_m.ti:
-                # Going back on edge
-                logprob -= self.gobackonedge_factor_log  # slight preference to avoid going back
-        else:
-            # Moving states
-            logprob -= self.transition_factor
-            if self.avoid_goingback:
-                # Goin back on state
-                going_back = False
-                for m in prev_m.prev:
-                    if edge_m.label == m.edge_m.label:
-                        going_back = True
-                        break
-                if going_back:
-                    logprob -= self.gobacktoedge_factor_log  # Pr==0.5, prefer not going back
-        return logprob  # All probabilities are 1 (thus technically not a distribution)
+        return 0  # All probabilities are 1 (thus technically not a distribution)
 
     def logprob_obs(self, dist, prev_m, new_edge_m, new_edge_o):
         """Emission probability for emitting states.
@@ -382,22 +349,18 @@ class Matcher:
         Note: In contrast with a regular HMM, this cannot be a probability density function, it needs
               to be a proper probability (thus values between 0.0 and 1.0).
         """
-        result = self.obs_noise_dist.logpdf(dist) + self.obs_noise_logint
-        # print("logprob_obs: {} -> {:.5f} = {:.5f}".format(dist, result, math.exp(result)))
-        return result
+        return 0
 
     def logprob_obs_ne(self, dist, prev_m, new_edge_m, new_edge_o):
         """Emission probability for non-emitting states.
 
         Note: This needs to be a proper probability (thus values between 0.0 and 1.0).
         """
-        result = self.obs_noise_dist_ne.logpdf(dist) + self.obs_noise_logint_ne
-        # print("logprob_obs: {} -> {:.5f} = {:.5f}".format(dist, result, math.exp(result)))
-        return result
+        return 0
 
     def match_gpx(self, gpx_file, unique=True):
         """Map matching from a gpx file"""
-        from .util.gpx import gpx_to_path
+        from ..util.gpx import gpx_to_path
         path = gpx_to_path(gpx_file)
         return self.match(path, unique=unique)
 
@@ -627,7 +590,7 @@ class Matcher:
         """
         prev_lattice = [m for m in self.lattice[obs_idx - 1].values() if not m.stop]
         count = 0
-        for m in prev_lattice:  # type: Matching
+        for m in prev_lattice:  # type: BaseMatching
             if m.stop:
                 continue
             count += 1
@@ -762,7 +725,7 @@ class Matcher:
         :return: True or False
         """
         # for m in itertools.chain(m_next.prev, m_next.prev_other):
-        for m in m_next.prev:  # type: Matching
+        for m in m_next.prev:  # type: BaseMatching
             if m.obs != m_next.obs:
                 return False
             assert(m_next.obs_ne != m.obs_ne)
@@ -787,7 +750,7 @@ class Matcher:
     def _match_non_emitting_states_inner(self, cur_lattice, obs_idx, obs, obs_next, nb_ne,
                                          lattice_toinsert, lattice_best):
         cur_lattice_new = dict()
-        for m in cur_lattice.values():  # type: Matching
+        for m in cur_lattice.values():  # type: BaseMatching
             if m.stop:
                 continue
             # == Move to neighbour edge from edge ==
@@ -896,7 +859,7 @@ class Matcher:
 
     def _match_non_emitting_states_end(self, cur_lattice, obs_idx, obs_next,
                                        lattice_toinsert, lattice_best):
-        for m in cur_lattice.values():  # type: Matching
+        for m in cur_lattice.values():  # type: BaseMatching
             if m.stop:
                 continue
             if m.edge_m.l2 is not None:
@@ -1020,7 +983,7 @@ class Matcher:
         if node_max is None:
             raise Exception("Did not find a matching node for path point at index {}".format(start_idx))
         if __debug__ and logger.isEnabledFor(logging.DEBUG):
-            logger.debug(Matching.repr_header(stop="             "))
+            logger.debug(self.matching.repr_header(stop="             "))
         logger.debug("Start ({}): {}".format(node_max.obs, node_max))
         node_path_rev = [node_max.shortkey]
         self.lattice_best.append(node_max)
@@ -1031,7 +994,7 @@ class Matcher:
             max_depth = len(self.lattice) + 1
         while cur_depth < max_depth and len(node_max.prev) > 0:
             node_max_last = node_max
-            node_max: Optional[Matching] = None
+            node_max: Optional[BaseMatching] = None
             for prev_m in node_max_last.prev:
                 if prev_m is not None and (node_max is None or prev_m.logprob > node_max.logprob):
                     node_max = prev_m

@@ -139,8 +139,8 @@ def plot_distance_segment_to_segment_euc(f1, f2, t1, t2, pf, pt, fn):
 
 if __name__ == "__main__":
     # mm.matching.logger.setLevel(logging.INFO)
-    mm.matching.logger.setLevel(logging.DEBUG)
-    mm.matching.logger.addHandler(logging.StreamHandler(sys.stdout))
+    mm.logger.setLevel(logging.DEBUG)
+    mm.logger.addHandler(logging.StreamHandler(sys.stdout))
     directory = Path(os.environ.get('TESTDIR', Path(__file__).parent))
     print(f"Saving files to {directory}")
     # test_path_to_gpx()

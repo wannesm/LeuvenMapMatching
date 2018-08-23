@@ -16,7 +16,7 @@ For example to read in an OpenStreetMap file directly to a :class:`InMemMap` obj
 
 .. code-block:: python
 
-    from leuvenmapmatching.map.inmemmap import InMemMap
+    from leuvenmapmatching.map.inmem import InMemMap
 
     map_con = InMemMap("myosm", use_latlon=True)
 
@@ -37,7 +37,7 @@ Latitude-Longitude coordinates can be transformed two a frame with two orthogona
 
 .. code-block:: python
 
-   from leuvenmapmatching.map.inmemmap import InMemMap
+   from leuvenmapmatching.map.inmem import InMemMap
 
    map_con_latlon = InMemMap("myosm", use_latlon=True)
    # Add edges/nodes
