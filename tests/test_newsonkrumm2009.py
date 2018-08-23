@@ -12,8 +12,10 @@ Notes:
 * There is a bug in the map available from the website.
   Multiple segments (streets) in the map are not connected but have overlappen, but
   disconnected, nodes.
-  For example, nodes 884147801204 and 884148400033 are on the same location and
-  should be connected because the given path runs over this road.
+  For example, the following nodes are on the same location and
+  should be connected because the given path runs over this road:
+  - 884147801204 and 884148400033
+  - 884148100260 and 884148001002
 * At index 2659, the path is missing a number of observations. First part where
   non-emitting nodes are required.
 
@@ -30,6 +32,7 @@ import csv
 from datetime import datetime
 import pytest
 import leuvenmapmatching as mm
+from leuvenmapmatching.matcher import base
 from leuvenmapmatching.matcher.distance import DistanceMatcher
 from leuvenmapmatching.map.inmem import InMemMap
 import leuvenmapmatching.visualization as mm_viz
@@ -49,6 +52,7 @@ road_network_pkl = road_network.with_suffix(".pkl")
 road_network_xy_pkl = this_path / "road_network_xy.pkl"
 
 directory = None
+base.default_label_width = 34
 
 
 def read_gps(route_fn):
@@ -96,6 +100,8 @@ def read_map(map_fn):
                     index_edges=True, dir=this_path)
     node_cnt = 0
     edge_cnt = 0
+    # new_node_id = 1000000000000
+    new_node_id = 1
     with map_fn.open("r") as map_f:
         reader = csv.reader(map_f, delimiter='\t')
         next(reader)
@@ -112,7 +118,9 @@ def read_map(map_fn):
             prev_node = nf
             assert(length < 1000)
             for idx, innernode in enumerate(innernodes[1:-1]):
-                innernode_id = nf * 1000 + idx
+                # innernode_id = nf * 1000 + idx
+                innernode_id = new_node_id
+                new_node_id += 1
                 mmap.add_node(innernode_id, innernode)
                 node_cnt += 1
                 mmap.add_edge(prev_node, innernode_id)
@@ -150,7 +158,7 @@ def load_data():
         map_con_latlon.dump()
         logger.debug(f"Saved latlon road network to file ({map_con_latlon.size()} nodes)")
         map_con = map_con_latlon.to_xy(name="road_network_xy", use_rtree=True)
-        # correct_map(map_con)
+        correct_map(map_con)
         map_con.dump()
         logger.debug(f"Saved xy road network to file ({map_con.size()} nodes)")
 
@@ -189,22 +197,27 @@ def test_route():
     #     logger.debug("... done")
 
     matcher = DistanceMatcher(map_con, min_prob_norm=0.001,
-                              max_dist=200, obs_noise=4.07, only_edges=True,  # Newson Krumm defaults
-                              non_emitting_states=False)
-    matcher.match(route[2650:2662])
+                              max_dist=200, obs_noise=4.07,  # Newson Krumm defaults
+                              obs_noise_ne=50, beta_ne=1,
+                              non_emitting_states=True)
+    # matcher.match(route[2657:2662])  # First location where some observations are missing
+    matcher.match(route[2671:2681])
     path_pred = matcher.path_pred_onlynodes
 
     if directory:
         matcher.print_lattice_stats()
         logger.debug("Plotting post map ...")
-        fig = plt.figure(figsize=(100,100))
+        fig = plt.figure(figsize=(100, 100))
         ax = fig.get_axes()
         mm_viz.plot_map(map_con, matcher=matcher, use_osm=True, ax=ax,
                         show_lattice=False, show_labels=True, show_graph=True, zoom_path=zoom_path,
+                        show_matching=True,
                         coord_trans=map_con.yx2latlon)
         plt.savefig(str(directory / "test_newson_route_matched.png"))
         plt.close(fig)
         logger.debug("... done")
+
+    print(path_pred)
 
 
 def test_bug1():
@@ -225,8 +238,8 @@ def test_bug1():
     path = [map_con.latlon2yx(lat, lon) for lat, lon in path_ll]
     path_sol = [('A', 'B'), ('B', 'C')]
     matcher = DistanceMatcher(map_con, min_prob_norm=0.001,
-                              max_dist=200, obs_noise=4.07, only_edges=True,
-                              non_emitting_states=False)
+                              max_dist=200, obs_noise=4.07,
+                              non_emitting_states=True)
     matcher.match(path)
     path_pred = matcher.path_pred
     if directory:
@@ -246,9 +259,9 @@ def test_bug1():
 
 
 if __name__ == "__main__":
-    # logger.setLevel(logging.DEBUG)
-    # logger.addHandler(logging.StreamHandler(sys.stdout))
+    logger.setLevel(logging.DEBUG)
+    logger.addHandler(logging.StreamHandler(sys.stdout))
     directory = Path(os.environ.get('TESTDIR', Path(__file__).parent))
     print(f"Saving files to {directory}")
-    # test_route()
-    test_bug1()
+    test_route()
+    # test_bug1()
