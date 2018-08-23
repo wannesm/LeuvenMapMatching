@@ -93,11 +93,11 @@ class BaseMatching(object):
         else:
             raise Exception(f"Should not happen")
 
-        logprob_trans = self.matcher.logprob_trans(self, edge_m, edge_o)
-        if obs_ne == 0:
-            logprob_obs = self.matcher.logprob_obs(dist, self, edge_m, edge_o)
-        else:
-            logprob_obs = self.matcher.logprob_obs_ne(dist, self, edge_m, edge_o)
+        logprob_trans = self.matcher.logprob_trans(self, edge_m, edge_o,
+                                                   is_prev_ne=self.obs_ne!=0,
+                                                   is_next_ne=obs_ne!=0)
+        logprob_obs = self.matcher.logprob_obs(dist, self, edge_m, edge_o,
+                                               is_ne=(obs_ne!=0))
         new_logprob_delta = logprob_trans + logprob_obs
         if obs_ne == 0:
             new_logprobe = self.logprob + new_logprob_delta
@@ -272,7 +272,7 @@ class BaseMatcher:
     def __init__(self, map_con, obs_noise=1, max_dist_init=None, max_dist=None, min_prob_norm=None,
                  non_emitting_states=True, max_lattice_width=None,
                  only_edges=True, obs_noise_ne=None, matching=BaseMatching,
-                 non_emitting_length_factor=1.0):
+                 non_emitting_length_factor=1.0, **kwargs):
         """Initialize a matcher for map matching.
 
         Distances are in meters when using latitude-longitude.
@@ -298,7 +298,6 @@ class BaseMatcher:
         To define a custom transition and/or emission probability distribtion, overwrite the following functions:
 
         - :meth:`logprob_trans`
-        - :meth:`logprob_obs_ne`
         - :meth:`logprob_obs`
 
         """
@@ -335,7 +334,8 @@ class BaseMatcher:
         # Penalties
         self.ne_length_factor_log = math.log(non_emitting_length_factor)
 
-    def logprob_trans(self, prev_m:BaseMatching, edge_m:Segment, edge_o:Segment):
+    def logprob_trans(self, prev_m: BaseMatching, edge_m: Segment, edge_o: Segment,
+                      is_prev_ne=False, is_next_ne=False):
         """Transition probability.
 
         Note: In contrast with a regular HMM, this cannot be a probability density function, it needs
@@ -343,18 +343,11 @@ class BaseMatcher:
         """
         return 0  # All probabilities are 1 (thus technically not a distribution)
 
-    def logprob_obs(self, dist, prev_m, new_edge_m, new_edge_o):
-        """Emission probability for emitting states.
+    def logprob_obs(self, dist, prev_m, new_edge_m, new_edge_o, is_ne=False):
+        """Emission probability.
 
         Note: In contrast with a regular HMM, this cannot be a probability density function, it needs
               to be a proper probability (thus values between 0.0 and 1.0).
-        """
-        return 0
-
-    def logprob_obs_ne(self, dist, prev_m, new_edge_m, new_edge_o):
-        """Emission probability for non-emitting states.
-
-        Note: This needs to be a proper probability (thus values between 0.0 and 1.0).
         """
         return 0
 
@@ -424,7 +417,7 @@ class BaseMatcher:
                 logger.info(f'Stopped early at observation {early_stop_idx}')
                 break
             self._match_states(obs_idx)
-            if self.non_emitting_states:
+            if self.non_emitting_states and not self._skip_ne_states(obs_idx):
                 # Fill in non-emitting states between previous and current observation
                 self._match_non_emitting_states(obs_idx - 1)
             if __debug__ and logger.isEnabledFor(logging.DEBUG):
@@ -498,7 +491,7 @@ class BaseMatcher:
                 logger.info(f'Stopped early at observation {early_stop_idx}')
                 break
             self._match_states(obs_idx)
-            if self.non_emitting_states:
+            if self.non_emitting_states and not self._skip_ne_states(obs_idx):
                 # Fill in non-emitting states between previous and current observation
                 self._match_non_emitting_states(obs_idx - 1)
             if __debug__:
@@ -523,6 +516,9 @@ class BaseMatcher:
             max_depth = backtrace_len
         node_path = self._build_node_path(start_idx, unique, max_depth=max_depth)
         return node_path, start_idx
+
+    def _skip_ne_states(self, obs_idx):
+        return False
 
     def _create_start_nodes(self, use_edges=True):
         """

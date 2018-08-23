@@ -19,7 +19,7 @@ import smopy
 
 
 logger = logging.getLogger("be.kuleuven.cs.dtai.mapmatching")
-graph_color = mcolors.CSS4_COLORS['black']
+graph_color = mcolors.CSS4_COLORS['darkmagenta']
 match_color = mcolors.CSS4_COLORS['green']
 match_ne_color = mcolors.CSS4_COLORS['olive']
 lattice_color = mcolors.CSS4_COLORS['magenta']
@@ -139,7 +139,7 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
             if coord_trans:
                 coord = coord_trans(*coord)
             coord = to_pixels(coord)
-            plt.plot(coord[0], coord[1], marker='o', markersize=2, color=graph_color, alpha=0.4)
+            plt.plot(coord[0], coord[1], marker='o', markersize=2*linewidth, color=graph_color, alpha=0.75)
             if show_labels:
                 key = str(key)
                 if type(show_labels) is int:
@@ -162,7 +162,7 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
                 loc_b = coord_trans(*loc_b)
             x_a, y_a = to_pixels(*loc_a)
             x_b, y_b = to_pixels(*loc_b)
-            ax.plot([x_a, x_b], [y_a, y_b], graph_color, linewidth=0.3)
+            ax.plot([x_a, x_b], [y_a, y_b], color=graph_color, linewidth=linewidth, markersize=linewidth)
             cnt += 1
         logger.debug(f'... done, {cnt} edges')
 
@@ -191,7 +191,6 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
         logger.debug('Plot nodes ...')
         xs, ys, ls = [], [], []
         prev = None
-        next = None
         for node in nodes:
             if type(node) == tuple:
                 node = node[0]
@@ -210,6 +209,11 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
                 ys.append(y)
                 ls.append(node)
             else:
+                if prev is None:
+                    x, y = to_pixels(lat, lon)
+                    xs.append(x)
+                    ys.append(y)
+                    ls.append(node)
                 prev = lat, lon
         ax.plot(xs, ys, 'o-', linewidth=linewidth * 3, markersize=linewidth * 3, alpha=0.75,
                 color=nodes_color)

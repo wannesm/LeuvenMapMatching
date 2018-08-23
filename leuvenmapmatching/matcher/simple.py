@@ -47,7 +47,8 @@ class SimpleMatcher(BaseMatcher):
         # Transition probability is divided (in logprob_trans) by this factor if a transition is made
         self.transition_factor = 0.3  # -math.log(0.9)
 
-    def logprob_trans(self, prev_m:BaseMatching, edge_m:Segment, edge_o:Segment):
+    def logprob_trans(self, prev_m:BaseMatching, edge_m:Segment, edge_o:Segment,
+                      is_prev_ne=False, is_next_ne=False):
         """Transition probability.
 
         Note: In contrast with a regular HMM, this cannot be a probability density function, it needs
@@ -73,21 +74,15 @@ class SimpleMatcher(BaseMatcher):
                     logprob -= self.gobacktoedge_factor_log  # Pr==0.5, prefer not going back
         return logprob  # All probabilities are 1 (thus technically not a distribution)
 
-    def logprob_obs(self, dist, prev_m, new_edge_m, new_edge_o):
-        """Emission probability for emitting states.
+    def logprob_obs(self, dist, prev_m, new_edge_m, new_edge_o, is_ne=False):
+        """Emission probability.
 
         Note: In contrast with a regular HMM, this cannot be a probability density function, it needs
               to be a proper probability (thus values between 0.0 and 1.0).
         """
-        result = self.obs_noise_dist.logpdf(dist) + self.obs_noise_logint
-        # print("logprob_obs: {} -> {:.5f} = {:.5f}".format(dist, result, math.exp(result)))
-        return result
-
-    def logprob_obs_ne(self, dist, prev_m, new_edge_m, new_edge_o):
-        """Emission probability for non-emitting states.
-
-        Note: This needs to be a proper probability (thus values between 0.0 and 1.0).
-        """
-        result = self.obs_noise_dist_ne.logpdf(dist) + self.obs_noise_logint_ne
+        if is_ne:
+            result = self.obs_noise_dist_ne.logpdf(dist) + self.obs_noise_logint_ne
+        else:
+            result = self.obs_noise_dist.logpdf(dist) + self.obs_noise_logint
         # print("logprob_obs: {} -> {:.5f} = {:.5f}".format(dist, result, math.exp(result)))
         return result

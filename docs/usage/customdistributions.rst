@@ -23,8 +23,8 @@ For example, if you want to use a uniform distribution over the possible road se
 Emission probability distribution
 ---------------------------------
 
-Overwrite the :meth:`logprob_obs` method for emitting nodes and the :meth:`logprob_obs_ne` method for
-non-emitting nodes. These methods are given the closest distance as `dist`, the previous :class:`Matching` object
+Overwrite the :meth:`logprob_obs` method for non-emitting nodes.
+These methods are given the closest distance as `dist`, the previous :class:`Matching` object
 in the lattice, the state as `edge_m`, and the observation as `edge_o`. The latter two are :class:`Segment` objects
 that can represent either a segment or a point.
 Each segment also has a project point which is the point on the segment that is the closest point.
@@ -47,7 +47,8 @@ For example, a simple step function with more tolerance for non-emitting nodes:
 Note that an emission probability can be given for a non-emitting node. This allows you to rank non-emitting nodes
 even when no observations are available. It will then insert pseudo-observations on the line between the previous
 and next observations.
-To have a pure non-emitting node, the `logprob_obs_ne` method should always return 0.
+To have a pure non-emitting node, the `logprob_obs` method should always return 0 if the
+``is_ne`` argument is true.
 
 
 Custom lattice objects
