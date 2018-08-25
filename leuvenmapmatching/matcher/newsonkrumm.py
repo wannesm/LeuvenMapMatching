@@ -1,7 +1,9 @@
 # encoding: utf-8
 """
-leuvenmapmatching.matcher.distance
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+leuvenmapmatching.matcher.newsonkrumm
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Methods similar to Newson Krumm 2009 for comparison purposes.
 
 :author: Wannes Meert
 :copyright: Copyright 2018 DTAI, KU Leuven and Sirris.
@@ -60,39 +62,36 @@ class DistanceMatching(BaseMatching):
 
 class DistanceMatcher(BaseMatcher):
     """
-    Take distance between observations vs states into account. Inspired on the
+    Take distance between observations vs states into account. Based on the
     method presented in:
 
         P. Newson and J. Krumm. Hidden markov map matching through noise and sparseness.
         In Proceedings of the 17th ACM SIGSPATIAL international conference on advances
         in geographic information systems, pages 336–343. ACM, 2009.
+
+    Two important differences:
+
+    * Newson and Krumm use shortest path to handle situations where the distances between
+      observations are larger than distances between nodes in the graph. The LeuvenMapMatching
+      toolbox uses non-emitting states to handle this. We thus do not implement the shortest
+      path algorithm in this class.
+    * Transition and emission probability are transformed from densities to probababilities by
+      taking the 1 - CDF instead of the PDF.
+
+
+    Newson and Krumm defaults:
+
+    - max_dist = 200 m
+    - obs_noise = 4.07 m
+    - beta = 1/6
+    - only_edges = True
     """
 
     def __init__(self, *args, **kwargs):
-        """Map Matching that takes into account the distance on the map wrt distance between the
-        observations.
+        """
 
-        :param map_con: Map object to connect to map database
-        :param obs_noise: Standard deviation of noise
-        :param obs_noise_ne: Standard deviation of noise for non-emitting states (is set to obs_noise if not give)
-        :param max_dist_init: Maximum distance from start location (if not given, uses max_dist)
-        :param max_dist: Maximum distance from path (this is a hard cut, min_prob_norm should be better)
-        :param min_prob_norm: Minimum normalized probability of observations (ema)
-        :param non_emitting_states: Allow non-emitting states. A non-emitting state is a state that is
-            not associated with an observation. Here we assume it can be associated with a location in between
-            two observations to allow for pruning. It is advised to set min_prob_norm and/or max_dist to avoid
-            visiting all possible nodes in the graph.
-        :param max_lattice_width: Restrict the lattice (or possible candidate states per observation) to this value.
-            If there are more possible next states, the states with the best likelihood so far are selected.
-        :param only_edges: Do not include nodes as states, only edges. This is the typical setting for HMM methods.
-        :param matching: Matching type
-        :param non_emitting_length_factor: Reduce the probability of a sequence of non-emitting states the longer it
-            is. This can be used to prefer shorter paths. This is separate from the transition probabilities because
-            transition probabilities are averaged for non-emitting states and thus the length is also averaged out.
-
-        :param dist_noise: Default is 10
-        :param dist_noise_ne: Default is dist_noise
-
+        :param beta: Default is 1/6
+        :param beta_ne: Default is beta
         :param args: Arguments for BaseMatcher
         :param kwargs: Arguments for BaseMatcher
         """
@@ -103,18 +102,14 @@ class DistanceMatcher(BaseMatcher):
         if "matching" not in kwargs:
             kwargs["matching"] = DistanceMatching
         super().__init__(*args, **kwargs)
-        self.use_original = kwargs.get('use_original', False)
 
         # if not use_original, the following value for beta gives a prob of 0.5 at dist=x_half:
         # beta = np.sqrt(np.power(x_half, 2) / (np.log(2)*2))
-        self.dist_noise = kwargs.get('dist_noise', 10)
-        self.dist_noise_ne = kwargs.get('dist_noise_ne', self.dist_noise)
-        self.beta = 2 * self.dist_noise**2
-        self.beta_ne = 2 * self.dist_noise_ne ** 2
+        self.beta = kwargs.get('beta', 1/6)
+        self.beta_ne = kwargs.get('beta_ne', self.beta)
 
-        self.sigma = 2 * self.obs_noise**2
-        self.sigma_ne = 2 * self.obs_noise_ne ** 2
-
+        self.obs_noise_dist = norm(scale=self.obs_noise)
+        self.obs_noise_dist_ne = norm(scale=self.obs_noise_ne)
         self.ne_thr = 1.25
         self.exact_dt_s = True  # Newson and Krumm is 'True'
 
@@ -122,12 +117,15 @@ class DistanceMatcher(BaseMatcher):
                       is_prev_ne=False, is_next_ne=False):
         """Transition probability.
 
-        P(dt) = e^(-d_t^2 / (2 * dist_noise^2))
+        Main difference with Newson and Krumm: we know all points are connected thus do not compute the
+        shortest path but the distance between two points.
 
-        with d_t = |d_s - d_o|, d_s = |loc_prev_state - loc_cur_state|, d_o = |loc_prev_obs - loc_cur_obs|
+        Original PDF:
+        p(dt) = 1 / beta * e^(-dt / beta)
+        with beta = 1/6
 
-        This function is more tolerant for low values. The intuition is that values under a certain
-        distance should all be close to probability 1.0.
+        Transformed to probability:
+        P(dt) = p(d > dt) = e^(-dt / beta)
 
         :param prev_m:
         :param edge_m:
@@ -147,7 +145,12 @@ class DistanceMatcher(BaseMatcher):
             beta = self.beta_ne
         else:
             beta = self.beta
-        licp_dt = -d_t**2 / beta
+        # icp_dt = math.exp(-d_t / beta)
+        # try:
+        #     licp_dt = math.log(icp_dt)
+        # except ValueError:
+        #     licp_dt = float('-inf')
+        licp_dt = -d_t / beta
         props = {
             'd_o': d_z,
             'd_s': d_x,
@@ -158,16 +161,22 @@ class DistanceMatcher(BaseMatcher):
     def logprob_obs(self, dist, prev_m, new_edge_m, new_edge_o, is_ne=False):
         """Emission probability for emitting states.
 
-        P(dt) = e^(-d_o^2 / (2 * obs_noise^2))
+        Original pdf:
+        p(d) = N(0, sigma)
+        with sigma = 4.07m
 
-        with d_o = |loc_state - loc_obs|
+        Transformed to probability:
+        P(d) = 2 * (1 - p(d > D)) = 2 * (1 - cdf)
 
         """
         if is_ne:
-            sigma = self.sigma_ne
+            result = 2 * (1 - self.obs_noise_dist_ne.cdf(dist))
         else:
-            sigma = self.sigma
-        result = -dist**2 / sigma
+            result = 2 * (1 - self.obs_noise_dist.cdf(dist))
+        try:
+            result = math.log(result)
+        except ValueError:
+            result = -float("inf")
         props = {
             'lpe': result
         }

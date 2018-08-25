@@ -16,6 +16,9 @@ import sys
 import logging
 import time
 from collections import OrderedDict, defaultdict, namedtuple
+MYPY = False
+if MYPY:
+    from typing import List, Tuple, Dict, Any
 from typing import Optional, Set
 
 import numpy as np
@@ -40,7 +43,8 @@ class BaseMatching(object):
     def __init__(self, matcher: 'BaseMatcher', edge_m: Segment, edge_o: Segment,
                  logprob=-np.inf, logprobema=-np.inf, logprobe=-np.inf, logprobne=-np.inf,
                  dist_obs: float=0.0, obs: int=0, obs_ne: int=0,
-                 prev: Optional[Set['BaseMatching']]=None, stop: bool=False, length: int=1):
+                 prev: Optional[Set['BaseMatching']]=None, stop: bool=False, length: int=1,
+                 **_kwargs):
         self.edge_m: Segment = edge_m
         self.edge_o: Segment = edge_o
         self.logprob: float = logprob        # max probability
@@ -93,11 +97,11 @@ class BaseMatching(object):
         else:
             raise Exception(f"Should not happen")
 
-        logprob_trans = self.matcher.logprob_trans(self, edge_m, edge_o,
-                                                   is_prev_ne=self.obs_ne!=0,
-                                                   is_next_ne=obs_ne!=0)
-        logprob_obs = self.matcher.logprob_obs(dist, self, edge_m, edge_o,
-                                               is_ne=(obs_ne!=0))
+        logprob_trans, props_trans = self.matcher.logprob_trans(self, edge_m, edge_o,
+                                                                is_prev_ne=(self.obs_ne != 0),
+                                                                is_next_ne=(obs_ne != 0))
+        logprob_obs, props_obs = self.matcher.logprob_obs(dist, self, edge_m, edge_o,
+                                                          is_ne=(obs_ne != 0))
         new_logprob_delta = logprob_trans + logprob_obs
         if obs_ne == 0:
             new_logprobe = self.logprob + new_logprob_delta
@@ -120,7 +124,7 @@ class BaseMatching(object):
                                     logprob=new_logprob, logprobne=new_logprobne,
                                     logprobe=new_logprobe, logprobema=new_logprobema,
                                     obs=obs, obs_ne=obs_ne, prev={self}, dist_obs=dist,
-                                    stop=new_stop, length=new_length)
+                                    stop=new_stop, length=new_length, **props_trans, **props_obs)
             return m_next
         else:
             return None
@@ -128,13 +132,13 @@ class BaseMatching(object):
     @classmethod
     def first(cls, logprob_init, edge_m, edge_o, matcher, dist_obs):
         """Create an initial lattice Matching object."""
-        logprob_obs = matcher.logprob_obs(dist_obs, None, edge_m, edge_o)
+        logprob_obs, props_obs = matcher.logprob_obs(dist_obs, None, edge_m, edge_o)
         logprob = logprob_init + logprob_obs
         new_stop = matcher.do_stop(logprob, dist_obs, logprob_init, logprob_obs)
         if not new_stop or logger.isEnabledFor(logging.DEBUG):
             m_next = cls(matcher, edge_m=edge_m, edge_o=edge_o,
                          logprob=logprob, logprobema=logprob, logprobe=logprob, logprobne=0,
-                         dist_obs=dist_obs, obs=0, stop=new_stop)
+                         dist_obs=dist_obs, obs=0, stop=new_stop, **props_obs)
             return m_next
         else:
             return None
@@ -334,22 +338,27 @@ class BaseMatcher:
         # Penalties
         self.ne_length_factor_log = math.log(non_emitting_length_factor)
 
-    def logprob_trans(self, prev_m: BaseMatching, edge_m: Segment, edge_o: Segment,
+    def logprob_trans(self, prev_m, edge_m, edge_o,
                       is_prev_ne=False, is_next_ne=False):
+        # type: (BaseMatcher, BaseMatching, Segment, Segment, bool, bool) -> Tuple[float, Dict[str, Any]]
         """Transition probability.
 
         Note: In contrast with a regular HMM, this cannot be a probability density function, it needs
               to be a proper probability (thus values between 0.0 and 1.0).
+
+        :return: probability, properties that are passed to the matching object
         """
-        return 0  # All probabilities are 1 (thus technically not a distribution)
+        return 0, {}  # All probabilities are 1 (thus technically not a distribution)
 
     def logprob_obs(self, dist, prev_m, new_edge_m, new_edge_o, is_ne=False):
         """Emission probability.
 
         Note: In contrast with a regular HMM, this cannot be a probability density function, it needs
               to be a proper probability (thus values between 0.0 and 1.0).
+
+        :return: probability, properties that are passed to the matching object
         """
-        return 0
+        return 0, {}
 
     def match_gpx(self, gpx_file, unique=True):
         """Map matching from a gpx file"""

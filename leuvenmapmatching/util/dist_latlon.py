@@ -120,6 +120,17 @@ def project(s1, s2, p, delta=0.0):
     return pi, ti
 
 
+def box_around_point(p, dist):
+    lat, lon = p
+    latr, lonr = radians(lat), radians(lon)
+    diag_dist = sqrt(2 * dist ** 2)
+    lat_t, lon_r = destination_radians(latr, lonr, radians(45), diag_dist)
+    lat_b, lon_l = destination_radians(latr, lonr, radians(225), diag_dist)
+    lat_t, lon_r = degrees(lat_t), degrees(lon_r)
+    lat_b, lon_l = degrees(lat_b), degrees(lon_l)
+    return lat_b, lon_l, lat_t, lon_r
+
+
 def interpolate_path(path, dd):
     """
     :param path: (lat, lon)

@@ -72,7 +72,7 @@ class SimpleMatcher(BaseMatcher):
                         break
                 if going_back:
                     logprob -= self.gobacktoedge_factor_log  # Pr==0.5, prefer not going back
-        return logprob  # All probabilities are 1 (thus technically not a distribution)
+        return logprob, {}  # All probabilities are 1 (thus technically not a distribution)
 
     def logprob_obs(self, dist, prev_m, new_edge_m, new_edge_o, is_ne=False):
         """Emission probability.
@@ -85,4 +85,4 @@ class SimpleMatcher(BaseMatcher):
         else:
             result = self.obs_noise_dist.logpdf(dist) + self.obs_noise_logint
         # print("logprob_obs: {} -> {:.5f} = {:.5f}".format(dist, result, math.exp(result)))
-        return result
+        return result, {}

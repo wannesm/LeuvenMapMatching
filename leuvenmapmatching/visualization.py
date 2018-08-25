@@ -147,10 +147,11 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
                 xytext = ax.transLimits.transform(coord)
                 xytext = (xytext[0]+0.001, xytext[1]+0.0)
                 xytext = ax.transLimits.inverted().transform(xytext)
-                ax.annotate(key, xy=coord, xytext=xytext,
+                ann = ax.annotate(key, xy=coord, xytext=xytext,
                             # textcoords=('axes fraction', 'axes fraction'),
                             # arrowprops=dict(arrowstyle='->'),
                             color=graph_color, fontsize=fontsize)
+                # ann.set_rotation(45)
             cnt += 1
         logger.debug(f'... done, {cnt} nodes')
 
@@ -185,7 +186,8 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
         if show_labels:
             for li, (lx, ly) in enumerate(zip(px, py)):
                 # ax.text(lx, ly, f"O{li}", color=path_color)
-                ax.annotate(f"O{path_startidx + li}", xy=(lx, ly), color=path_color, fontsize=fontsize)
+                ann = ax.annotate(f"O{path_startidx + li}", xy=(lx, ly), color=path_color, fontsize=fontsize)
+                ann.set_rotation(45)
 
     if nodes:
         logger.debug('Plot nodes ...')

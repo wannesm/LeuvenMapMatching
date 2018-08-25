@@ -14,7 +14,7 @@ import logging
 import time
 from pathlib import Path
 import pickle
-from .base import BaseMap
+import math
 try:
     import rtree
 except ImportError:
@@ -26,6 +26,10 @@ except ImportError:
 from functools import partial
 
 
+from .base import BaseMap
+from ..util import dist_latlon
+
+
 logger = logging.getLogger("be.kuleuven.cs.dtai.mapmatching")
 
 
@@ -34,6 +38,15 @@ class InMemMap(BaseMap):
                  crs_lonlat=None, crs_xy=None, graph=None, dir=None, deserializing=False):
         """
         In-memory representation of a map.
+
+        This is a simple database-like object to perform experiments with map matching.
+        For production purposes it is recommended to use your own derived
+        class (e.g. to connect to your database instance).
+
+        This class supports:
+        - Indexing using rtrees to allow for fast searching of points on the map.
+        - Serializing to write and read from files.
+        - Projecting points to a different frame (e.g. GPS to Lambert)
         """
         super(InMemMap, self).__init__(name, use_latlon=use_latlon)
         self.dir = Path(".") if dir is None else Path(dir)
@@ -326,8 +339,9 @@ class InMemMap(BaseMap):
         t_start = time.time()
         lat, lon = loc[:2]
         if self.rtree is not None and max_dist is not None:
-            bb = (lat - max_dist, lon - max_dist,  # y_min, x_min
-                  lat + max_dist, lon + max_dist)  # y_max, x_max
+            lat_b, lon_l, lat_t, lon_r = self.box_around_point((lat, lon), max_dist)
+            bb = (lat_b, lon_l,  # y_min, x_min
+                  lat_t, lon_r)  # y_max, x_max
             logger.debug(f"Search closeby nodes to {loc}, bb={bb}")
             nodes = self.rtree.intersection(bb)
         else:
@@ -402,7 +416,7 @@ class InMemMap(BaseMap):
             idxs = list(self.rtree.nearest((lat, lon, lat, lon), num_results=1))
             idxs.remove(label)
             if len(idxs) > 0:
-                logger.info(f"Found doubles for {label}: {idxs}")
+                # logger.info(f"Found doubles for {label}: {idxs}")
                 if func:
                     func(label, idxs)
         logger.info(f"Found {cnt} doubles")
