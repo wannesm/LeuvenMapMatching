@@ -53,15 +53,13 @@ class BaseMap(object):
     def use_latlon(self, value):
         self._use_latlon = value
         if self._use_latlon:
-            from ..util import dist_latlon
-            self.distance = dist_latlon.distance
-            self.distance_point_to_segment = dist_latlon.distance_point_to_segment
-            self.distance_segment_to_segment = dist_latlon.distance_segment_to_segment
+            from ..util import dist_latlon as dist_lib
         else:
-            from ..util import dist_euclidean
-            self.distance = dist_euclidean.distance
-            self.distance_point_to_segment = dist_euclidean.distance_point_to_segment
-            self.distance_segment_to_segment = dist_euclidean.distance_segment_to_segment
+            from ..util import dist_euclidean as dist_lib
+        self.distance = dist_lib.distance
+        self.distance_point_to_segment = dist_lib.distance_point_to_segment
+        self.distance_segment_to_segment = dist_lib.distance_segment_to_segment
+        self.box_around_point = dist_lib.box_around_point
 
     @abstractmethod
     def get_graph(self):

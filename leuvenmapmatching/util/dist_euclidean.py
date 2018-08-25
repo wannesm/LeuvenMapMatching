@@ -132,3 +132,10 @@ def interpolate_path(path, dd):
                 path_new.append((px, py))
         path_new.append(p2)
     return path_new
+
+
+def box_around_point(p, dist):
+    lat, lon = p
+    lat_t, lon_r = lat + dist, lon + dist
+    lat_b, lon_l = lat - dist, lon - dist
+    return lat_b, lon_l, lat_t, lon_r

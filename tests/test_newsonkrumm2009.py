@@ -130,14 +130,19 @@ def read_map(map_fn):
             mmap.add_edge(prev_node, nt)
             mmap.add_edge(nt, prev_node)
     logger.debug(f"Read map with {node_cnt} nodes and {edge_cnt} edges")
+    assert(new_node_id < 100000000000)
     return mmap
 
 
 def correct_map(mmap):
     """Add edges between nodes with degree > 2 that are on the exact same location."""
     def correct_edge(label, others):
+        if label < 100000000000:
+            return
+        logger.info(f"Add connections between {label} and {others}")
         for other in others:
-            mmap.add_edge(label, other)
+            if other > 100000000000:
+                mmap.add_edge(label, other)
     mmap.find_duplicates(func=correct_edge)
 
 
@@ -168,6 +173,7 @@ def load_data():
             route_latlon = pickle.load(ifile)
         with gps_data_xy_pkl.open("rb") as ifile:
             route = pickle.load(ifile)
+        logger.debug(f"Read gps route from file ({len(route)} points)")
     else:
         route_latlon = read_gps(gps_data)
         if max_route_length:
@@ -197,25 +203,32 @@ def test_route():
     #     logger.debug("... done")
 
     matcher = DistanceMatcher(map_con, min_prob_norm=0.001,
-                              max_dist=200, obs_noise=4.07,  # Newson Krumm defaults
-                              obs_noise_ne=50, beta_ne=1,
+                              max_dist=200,
+                              dist_noise=6, dist_noise_ne=12,
+                              obs_noise=30, obs_noise_ne=150,
                               non_emitting_states=True)
     # matcher.match(route[2657:2662])  # First location where some observations are missing
-    matcher.match(route[2671:2681])
+    # matcher.match(route[2770:2800])  # Observations are missing
+    # matcher.match(route[2910:2950])
+    # matcher.match(route[2910:2929])
+    matcher.match(route[6000:])
     path_pred = matcher.path_pred_onlynodes
 
     if directory:
         matcher.print_lattice_stats()
         logger.debug("Plotting post map ...")
-        fig = plt.figure(figsize=(100, 100))
+        fig = plt.figure(figsize=(200, 200))
         ax = fig.get_axes()
         mm_viz.plot_map(map_con, matcher=matcher, use_osm=True, ax=ax,
-                        show_lattice=False, show_labels=True, show_graph=True, zoom_path=zoom_path,
-                        show_matching=True,
+                        show_lattice=False, show_labels=False, zoom_path=zoom_path,
+                        show_matching=True, show_graph=False,
                         coord_trans=map_con.yx2latlon)
         plt.savefig(str(directory / "test_newson_route_matched.png"))
         plt.close(fig)
         logger.debug("... done")
+        logger.debug("Best path:")
+        for m in matcher.lattice_best:
+            logger.debug(m)
 
     print(path_pred)
 
@@ -263,5 +276,5 @@ if __name__ == "__main__":
     logger.addHandler(logging.StreamHandler(sys.stdout))
     directory = Path(os.environ.get('TESTDIR', Path(__file__).parent))
     print(f"Saving files to {directory}")
-    test_route()
-    # test_bug1()
+    # test_route()
+    test_bug1()

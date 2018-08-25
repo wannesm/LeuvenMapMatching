@@ -33,12 +33,12 @@ For example, a simple step function with more tolerance for non-emitting nodes:
 
 .. code-block:: python
 
-   def logprob_obs(self, dist, prev_m, new_edge_m, new_edge_o):
+   def logprob_obs(self, dist, prev_m, new_edge_m, new_edge_o, is_prev_ne, is_next_ne):
        if dist < 10:
            return -math.log(10)
        return -np.inf
 
-   def logprob_obs(self, dist, prev_m, new_edge_m, new_edge_o):
+   def logprob_obs(self, dist, prev_m, new_edge_m, new_edge_o, is_ne):
        if dist < 50:
            return -math.log(50)
        return -np.inf
@@ -64,5 +64,5 @@ pass your custom object to the :class:`Matcher` object.
    class MyMatching(BaseMatching):
        ...
 
-   matcher = MyMatcher(mapdb, non_emitting_states=True, only_edges=True, matching=MyMatching)
+   matcher = MyMatcher(mapdb, matching=MyMatching)
 
