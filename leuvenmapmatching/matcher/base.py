@@ -426,7 +426,7 @@ class BaseMatcher:
                 logger.info(f'Stopped early at observation {early_stop_idx}')
                 break
             self._match_states(obs_idx)
-            if self.non_emitting_states and not self._skip_ne_states(obs_idx):
+            if self.non_emitting_states:
                 # Fill in non-emitting states between previous and current observation
                 self._match_non_emitting_states(obs_idx - 1)
             if __debug__ and logger.isEnabledFor(logging.DEBUG):
@@ -526,7 +526,8 @@ class BaseMatcher:
         node_path = self._build_node_path(start_idx, unique, max_depth=max_depth)
         return node_path, start_idx
 
-    def _skip_ne_states(self, obs_idx):
+    def _skip_ne_states(self, prev_m):
+        # type: (BaseMatcher, BaseMatching) -> bool
         return False
 
     def _create_start_nodes(self, use_edges=True):
@@ -701,7 +702,10 @@ class BaseMatcher:
         cur_lattice = dict((m.key, m) for m in self.lattice[obs_idx].values() if not m.stop)
         lattice_toinsert = list()
         # The current best states are the next observation's states if you would ignore non-emitting states
-        lattice_best = dict((m.shortkey, m) for m in self.lattice[obs_idx + 1].values() if not m.stop)
+        lattice_best = dict((m.shortkey, m)
+                            for m in self.lattice[obs_idx + 1].values() if not m.stop)
+        lattice_ne = set(m.shortkey
+                         for m in self.lattice[obs_idx + 1].values() if not m.stop and self._skip_ne_states(m))
         # cur_lattice = set(self.lattice[obs_idx].values())
         nb_ne = 0
         while len(cur_lattice) > 0 and nb_ne < self.non_emitting_states_maxnb:
@@ -709,7 +713,7 @@ class BaseMatcher:
             if __debug__:
                 logger.debug("--- obs {}:{} --- {} - {} ---".format(obs_idx, nb_ne, obs, obs_next))
             cur_lattice = self._match_non_emitting_states_inner(cur_lattice, obs_idx, obs, obs_next, nb_ne,
-                                                                lattice_toinsert, lattice_best)
+                                                                lattice_toinsert, lattice_best, lattice_ne)
             # Link to next observation
             self._match_non_emitting_states_end(cur_lattice, obs_idx + 1, obs_next,
                                                 lattice_toinsert, lattice_best)
@@ -753,10 +757,13 @@ class BaseMatcher:
             return True
 
     def _match_non_emitting_states_inner(self, cur_lattice, obs_idx, obs, obs_next, nb_ne,
-                                         lattice_toinsert, lattice_best):
+                                         lattice_toinsert, lattice_best, lattice_ne):
         cur_lattice_new = dict()
         for m in cur_lattice.values():  # type: BaseMatching
             if m.stop:
+                continue
+            if m.shortkey in lattice_ne:
+                logger.debug(f"Skip non-emitting states from {m.label}")
                 continue
             # == Move to neighbour edge from edge ==
             if m.edge_m.l2 is not None and self.only_edges:

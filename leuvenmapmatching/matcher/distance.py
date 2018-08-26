@@ -173,15 +173,15 @@ class DistanceMatcher(BaseMatcher):
         }
         return result, props
 
-    def _skip_ne_states(self, obs_idx):
+    def _skip_ne_states(self, next_ne_m):
+        # type: (DistanceMatcher, DistanceMatching) -> bool
         # Skip searching for non-emitting states when the distances between nodes
         # on the map are similar to the distances between the observation
-        min_ne_factor = self.ne_thr * 2
-        for m in self.lattice[obs_idx].values():
-            if m.d_s > 0:
-                min_ne_factor = min(min_ne_factor, m.d_o / m.d_s)
-        if min_ne_factor < self.ne_thr:
-            logger.debug(f"Skip non-emitting states between {obs_idx - 1} and {obs_idx}, "
-                         f"{min_ne_factor} < {self.ne_thr}")
+        if next_ne_m.d_s > 0:
+            factor = (next_ne_m.d_o + next_ne_m.dist_obs) / next_ne_m.d_s
+        else:
+            factor = 0
+        if factor < self.ne_thr:
+            logger.debug(f"Skip non-emitting states to {next_ne_m.label}: {factor} < {self.ne_thr}")
             return True
         return False

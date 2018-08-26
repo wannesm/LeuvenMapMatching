@@ -18,7 +18,7 @@ from .base import BaseMatching, BaseMatcher
 logger = logging.getLogger("be.kuleuven.cs.dtai.mapmatching")
 
 
-class DistanceMatching(BaseMatching):
+class NewsonKrummMatching(BaseMatching):
     __slots__ = ['d_s', 'd_o', 'lpe', 'lpt']  # Additional fields
 
     def __init__(self, *args, d_s=1.0, d_o=1.0, lpe=0.0, lpt=0.0, **kwargs):
@@ -37,7 +37,8 @@ class DistanceMatching(BaseMatching):
         self.lpe: float = lpe
         self.lpt: float = lpt
 
-    def _update_inner(self, m_other: 'DistanceMatching'):
+    def _update_inner(self, m_other):
+        # type: (NewsonKrummMatching, NewsonKrummMatching) -> None
         super()._update_inner(m_other)
         self.d_s = m_other.d_s
         self.d_o = m_other.d_o
@@ -60,7 +61,7 @@ class DistanceMatching(BaseMatching):
         return res
 
 
-class DistanceMatcher(BaseMatcher):
+class NewsonKrummMatcher(BaseMatcher):
     """
     Take distance between observations vs states into account. Based on the
     method presented in:
@@ -100,7 +101,7 @@ class DistanceMatcher(BaseMatcher):
             logger.warning("The MatcherDistance method only works on edges as states. Nodes have been disabled.")
         kwargs["only_edges"] = True
         if "matching" not in kwargs:
-            kwargs["matching"] = DistanceMatching
+            kwargs["matching"] = NewsonKrummMatching
         super().__init__(*args, **kwargs)
 
         # if not use_original, the following value for beta gives a prob of 0.5 at dist=x_half:
@@ -113,7 +114,7 @@ class DistanceMatcher(BaseMatcher):
         self.ne_thr = 1.25
         self.exact_dt_s = True  # Newson and Krumm is 'True'
 
-    def logprob_trans(self, prev_m: DistanceMatching, edge_m, edge_o,
+    def logprob_trans(self, prev_m: NewsonKrummMatching, edge_m, edge_o,
                       is_prev_ne=False, is_next_ne=False):
         """Transition probability.
 
@@ -181,16 +182,3 @@ class DistanceMatcher(BaseMatcher):
             'lpe': result
         }
         return result, props
-
-    def _skip_ne_states(self, obs_idx):
-        # Skip searching for non-emitting states when the distances between nodes
-        # on the map are similar to the distances between the observation
-        min_ne_factor = self.ne_thr * 2
-        for m in self.lattice[obs_idx].values():
-            if m.d_s > 0:
-                min_ne_factor = min(min_ne_factor, m.d_o / m.d_s)
-        if min_ne_factor < self.ne_thr:
-            logger.debug(f"Skip non-emitting states between {obs_idx - 1} and {obs_idx}, "
-                         f"{min_ne_factor} < {self.ne_thr}")
-            return True
-        return False
