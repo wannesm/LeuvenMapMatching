@@ -1,2 +1,2 @@
-include readme.md
-include examples/*.ipynb
+include README.md
+include LICENSE
