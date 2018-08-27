@@ -435,6 +435,7 @@ class InMemMap(BaseMap):
             for nbr in nbrs:
                 nbr_data = self.graph[nbr]
                 dist, pi, ti = self.distance_point_to_segment(loc, oloc, nbr_data[0])
+                # print(f"label={label}/{oloc}, nbr={nbr}/{nbr_data[0]}   -- loc={loc}  -> {dist}, {pi}, {ti}")
                 if dist < max_dist:
                     results.append((dist, label, oloc, nbr, nbr_data[0], pi, ti))
         results.sort()

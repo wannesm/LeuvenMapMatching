@@ -43,6 +43,7 @@ class BaseMap(object):
         self.distance = None
         self.distance_point_to_segment = None
         self.distance_segment_to_segment = None
+        self.box_around_point = None
         self.use_latlon = use_latlon
 
     @property

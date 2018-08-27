@@ -65,7 +65,16 @@ def distance_point_to_segment(p, s1, s2, delta=0.0):
     dat = acos(cos(d13) / cos(dxt)) * earth_radius
     dist_hs = distance_haversine_radians(lat1, lon1, lat2, lon2)
     ti = dat / dist_hs
-    lati, loni = destination_radians(lat1, lon1, b12, dist_hs)
+    if ti > 1.0:
+        ti = 1.0
+        lati, loni = lat2, lon2
+        dist_ct = distance_haversine_radians(lat3, lon3, lati, loni)
+    elif ti < 0.0:
+        ti = 0.0
+        lati, loni = lat1, lon1
+        dist_ct = distance_haversine_radians(lat3, lon3, lati, loni)
+    else:
+        lati, loni = destination_radians(lat1, lon1, b12, dat)
     pi = (degrees(lati), degrees(loni))
 
     return dist_ct, pi, ti
