@@ -65,7 +65,8 @@ def distance_point_to_segment(p, s1, s2, delta=0.0):
     dat = acos(cos(d13) / cos(dxt)) * earth_radius
     dist_hs = distance_haversine_radians(lat1, lon1, lat2, lon2)
     ti = dat / dist_hs
-    pi = destination_radians(lat1, lon1, b12, dist_hs)
+    lati, loni = destination_radians(lat1, lon1, b12, dist_hs)
+    pi = (degrees(lati), degrees(loni))
 
     return dist_ct, pi, ti
 
@@ -139,8 +140,8 @@ def interpolate_path(path, dd):
     """
     path_new = [path[0]]
     for p1, p2 in zip(path, path[1:]):
-        lat1, lon1 = p1
-        lat2, lon2 = p2
+        lat1, lon1 = p1[0], p1[1]
+        lat2, lon2 = p2[0], p2[1]
         lat1, lon1 = radians(lat1), radians(lon1)
         lat2, lon2 = radians(lat2), radians(lon2)
         dist = distance_haversine_radians(lat1, lon1, lat2, lon2)
@@ -151,8 +152,8 @@ def interpolate_path(path, dd):
             brng = bearing_radians(lat1, lon1, lat2, lon2)
             for _ in range(dt):
                 disti += distd
-                pi = destination_radians(lat1, lon1, brng, disti)
-                path_new.append(pi)
+                lati, loni = destination_radians(lat1, lon1, brng, disti)
+                path_new.append((degrees(lati), degrees(loni)))
         path_new.append(p2)
     return path_new
 

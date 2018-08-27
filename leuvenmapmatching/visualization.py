@@ -29,7 +29,7 @@ fontsize = 8
 
 
 def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False, z=None, bb=None,
-             show_labels=False, matcher=None, show_graph=True, zoom_path=False, show_lattice=False,
+             show_labels=False, matcher=None, show_graph=False, zoom_path=False, show_lattice=False,
              show_matching=False, filename=None, linewidth=2, coord_trans=None):
     """Plot the db/graph and optionally include the observed path and inferred nodes.
 
@@ -108,10 +108,10 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
         from .util import dist_euclidean
         project = dist_euclidean.project
 
-        lat_max += (lat_max - lat_min) * 0.1
-        lon_min -= (lon_max - lon_min) * 0.1
-        lat_min -= (lat_max - lat_min) * 0.1
-        lon_max += (lon_max - lon_min) * 0.1
+        lat_max += max(0.1, (lat_max - lat_min) * 0.1)
+        lon_min -= max(0.1, (lon_max - lon_min) * 0.1)
+        lat_min -= max(0.1, (lat_max - lat_min) * 0.1)
+        lon_max += max(0.1, (lon_max - lon_min) * 0.1)
 
         def to_pixels(lat, lon=None):
             if lon is None:

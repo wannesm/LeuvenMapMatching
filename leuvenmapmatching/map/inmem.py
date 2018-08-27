@@ -198,17 +198,28 @@ class InMemMap(BaseMap):
         if node_b not in self.graph[node_a][1]:
             self.graph[node_a][1].append(node_b)
 
+    def _items_in_bb(self, bb):
+        if self.rtree is not None:
+            node_idxs = self.rtree.intersection(bb)
+            for key in node_idxs:
+                yield (key, self.graph[key])
+        else:
+            lat_min, lon_min, lat_max, lon_max = bb
+            for key, value in self.graph.items():
+                ((lat, lon), nbrs) = value
+                if lat_min <= lat <= lat_max and lon_min <= lon <= lon_max:
+                    yield (key, value)
+
     def all_edges(self, bb=None):
         """Return all edges.
 
         :param bb: Bounding box
         :return:
         """
-        if bb is None or self.rtree is None:
+        if bb is None:
             keyvals = self.graph.items()
         else:
-            node_idxs = self.rtree.intersection(bb)
-            keyvals = ((idx, self.graph[idx]) for idx in node_idxs)
+            keyvals = self._items_in_bb(bb)
         for key_a, (loc_a, nbrs) in keyvals:
             if loc_a is not None:
                 for nbr in nbrs:
@@ -226,11 +237,10 @@ class InMemMap(BaseMap):
         :param bb: Bounding box
         :return:
         """
-        if bb is None or self.rtree is None:
+        if bb is None:
             keyvals = self.graph.items()
         else:
-            node_idxs = self.rtree.intersection(bb)
-            keyvals = ((idx, self.graph[idx]) for idx in node_idxs)
+            keyvals = self._items_in_bb(bb)
         for key_a, (loc_a, nbrs) in keyvals:
             if loc_a is not None:
                 yield key_a, loc_a

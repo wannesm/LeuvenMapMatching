@@ -383,7 +383,7 @@ class BaseMatcher:
             self.lattice[m_next.obs][m_next.key] = m_next
         return self.lattice[m_next.obs][m_next.key]
 
-    def match(self, path, unique=True, tqdm=None):
+    def match(self, path, unique=False, tqdm=None):
         """Dynamic Programming based (HMM-like) map matcher.
 
         If the matcher fails to match the entire path, the last matched index is returned.
@@ -1174,14 +1174,14 @@ class BaseMatcher:
         if self.node_path is None or len(self.node_path) == 0:
             return []
         nodes = []
-        if type(self.node_path[0]) is tuple:
-            nodes.append(self.node_path[0][0])
-            nodes.append(self.node_path[0][1])
-            prev_node = self.node_path[0][1]
+        prev_state = self.node_path[0]
+        if type(prev_state) is tuple:
+            nodes.append(prev_state[0])
+            nodes.append(prev_state[1])
+            prev_node = prev_state[1]
         else:
-            nodes.append(self.node_path[0])
-            prev_node = self.node_path[0]
-        prev_state = None
+            nodes.append(prev_state)
+            prev_node = prev_state
         for state in self.node_path[1:]:
             if state == prev_state:
                 continue
@@ -1199,7 +1199,7 @@ class BaseMatcher:
                         nodes.append(state[0])
                         prev_node = state[0]
                 else:
-                    raise Exception(f"No node in edge {state} is previous node {prev_node}")
+                    raise Exception(f"State {state} does not have as previous node {prev_node}")
             else:
                 raise Exception(f"Unknown type of state: {state} ({type(state)})")
             prev_state = state

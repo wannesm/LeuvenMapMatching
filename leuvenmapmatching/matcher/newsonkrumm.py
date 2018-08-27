@@ -5,6 +5,12 @@ leuvenmapmatching.matcher.newsonkrumm
 
 Methods similar to Newson Krumm 2009 for comparison purposes.
 
+    P. Newson and J. Krumm. Hidden markov map matching through noise and sparseness.
+    In Proceedings of the 17th ACM SIGSPATIAL international conference on advances
+    in geographic information systems, pages 336–343. ACM, 2009.
+
+
+
 :author: Wannes Meert
 :copyright: Copyright 2018 DTAI, KU Leuven and Sirris.
 :license: Apache License, Version 2.0, see LICENSE for details.
@@ -112,7 +118,6 @@ class NewsonKrummMatcher(BaseMatcher):
         self.obs_noise_dist = norm(scale=self.obs_noise)
         self.obs_noise_dist_ne = norm(scale=self.obs_noise_ne)
         self.ne_thr = 1.25
-        self.exact_dt_s = True  # Newson and Krumm is 'True'
 
     def logprob_trans(self, prev_m: NewsonKrummMatching, edge_m, edge_o,
                       is_prev_ne=False, is_next_ne=False):
@@ -136,7 +141,7 @@ class NewsonKrummMatcher(BaseMatcher):
         :return:
         """
         d_z = self.map.distance(prev_m.edge_o.pi, edge_o.pi)
-        if not self.exact_dt_s or prev_m.edge_m.label == edge_m.label:
+        if prev_m.edge_m.label == edge_m.label:
             d_x = self.map.distance(prev_m.edge_m.pi, edge_m.pi)
         else:
             d_x = self.map.distance(prev_m.edge_m.pi, prev_m.edge_m.p2) + self.map.distance(prev_m.edge_m.p2, edge_m.pi)

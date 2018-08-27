@@ -7,9 +7,8 @@ leuvenmapmatching.matcher.distance
 :copyright: Copyright 2018 DTAI, KU Leuven and Sirris.
 :license: Apache License, Version 2.0, see LICENSE for details.
 """
-from scipy.stats import norm
-import math
 import logging
+import math
 
 from .base import BaseMatching, BaseMatcher
 
@@ -19,7 +18,7 @@ logger = logging.getLogger("be.kuleuven.cs.dtai.mapmatching")
 class DistanceMatching(BaseMatching):
     __slots__ = ['d_s', 'd_o', 'lpe', 'lpt']  # Additional fields
 
-    def __init__(self, *args, d_s=1.0, d_o=1.0, lpe=0.0, lpt=0.0, **kwargs):
+    def __init__(self, *args, d_s=0.0, d_o=0.0, lpe=0.0, lpt=0.0, **kwargs):
         """
 
         :param args: Arguments for BaseMatching
@@ -35,7 +34,8 @@ class DistanceMatching(BaseMatching):
         self.lpe: float = lpe
         self.lpt: float = lpt
 
-    def _update_inner(self, m_other: 'DistanceMatching'):
+    def _update_inner(self, m_other):
+        # type: (DistanceMatching, DistanceMatching) -> None
         super()._update_inner(m_other)
         self.d_s = m_other.d_s
         self.d_o = m_other.d_o
@@ -74,7 +74,7 @@ class DistanceMatcher(BaseMatcher):
 
         :param map_con: Map object to connect to map database
         :param obs_noise: Standard deviation of noise
-        :param obs_noise_ne: Standard deviation of noise for non-emitting states (is set to obs_noise if not give)
+        :param obs_noise_ne: Standard deviation of noise for non-emitting states (is set to obs_noise if not given)
         :param max_dist_init: Maximum distance from start location (if not given, uses max_dist)
         :param max_dist: Maximum distance from path (this is a hard cut, min_prob_norm should be better)
         :param min_prob_norm: Minimum normalized probability of observations (ema)
@@ -82,16 +82,19 @@ class DistanceMatcher(BaseMatcher):
             not associated with an observation. Here we assume it can be associated with a location in between
             two observations to allow for pruning. It is advised to set min_prob_norm and/or max_dist to avoid
             visiting all possible nodes in the graph.
-        :param max_lattice_width: Restrict the lattice (or possible candidate states per observation) to this value.
-            If there are more possible next states, the states with the best likelihood so far are selected.
-        :param only_edges: Do not include nodes as states, only edges. This is the typical setting for HMM methods.
-        :param matching: Matching type
         :param non_emitting_length_factor: Reduce the probability of a sequence of non-emitting states the longer it
             is. This can be used to prefer shorter paths. This is separate from the transition probabilities because
             transition probabilities are averaged for non-emitting states and thus the length is also averaged out.
+        :param max_lattice_width: Restrict the lattice (or possible candidate states per observation) to this value.
+            If there are more possible next states, the states with the best likelihood so far are selected.
 
-        :param dist_noise: Default is 10
-        :param dist_noise_ne: Default is dist_noise
+        :param dist_noise: Standard deviation of difference between distance between states and distance
+            between observatoins. If not given, set to obs_noise
+        :param dist_noise_ne: If not given, set to dist_noise
+        :param restrained_ne: Avoid non-emitting states if the distance between states and between
+            observations is close to each other.
+        :param avoid_goingback: If true, the probability is lowered for a transition that returns back to a
+            previous edges or returns to a position on an edge.
 
         :param args: Arguments for BaseMatcher
         :param kwargs: Arguments for BaseMatcher
@@ -107,7 +110,7 @@ class DistanceMatcher(BaseMatcher):
 
         # if not use_original, the following value for beta gives a prob of 0.5 at dist=x_half:
         # beta = np.sqrt(np.power(x_half, 2) / (np.log(2)*2))
-        self.dist_noise = kwargs.get('dist_noise', 10)
+        self.dist_noise = kwargs.get('dist_noise', self.obs_noise)
         self.dist_noise_ne = kwargs.get('dist_noise_ne', self.dist_noise)
         self.beta = 2 * self.dist_noise**2
         self.beta_ne = 2 * self.dist_noise_ne ** 2
@@ -115,8 +118,13 @@ class DistanceMatcher(BaseMatcher):
         self.sigma = 2 * self.obs_noise**2
         self.sigma_ne = 2 * self.obs_noise_ne ** 2
 
-        self.ne_thr = 1.25
+        self.restrained_ne = kwargs.get('restrained_ne', True)
+        self.restrained_ne_thr = 1.25  # Threshold
         self.exact_dt_s = True  # Newson and Krumm is 'True'
+
+        self.avoid_goingback = kwargs.get('avoid_goingback', True)
+        self.gobackonedge_factor_log = -math.log(0.5)
+        self.gobacktoedge_factor_log = -math.log(0.5)
 
     def logprob_trans(self, prev_m: DistanceMatching, edge_m, edge_o,
                       is_prev_ne=False, is_next_ne=False):
@@ -128,6 +136,8 @@ class DistanceMatcher(BaseMatcher):
 
         This function is more tolerant for low values. The intuition is that values under a certain
         distance should all be close to probability 1.0.
+
+        Note: We could also smooth the distance between observations to handle outliers better.
 
         :param prev_m:
         :param edge_m:
@@ -147,13 +157,32 @@ class DistanceMatcher(BaseMatcher):
             beta = self.beta_ne
         else:
             beta = self.beta
-        licp_dt = -d_t**2 / beta
+        logprob = -d_t**2 / beta
+
+        # Penalties
+        if prev_m.edge_m.label == edge_m.label:
+            # Staying in same state
+            if self.avoid_goingback and edge_m.key == prev_m.edge_m.key and edge_m.ti < prev_m.edge_m.ti:
+                # Going back on edge
+                logprob -= self.gobackonedge_factor_log  # Prefer not going back
+        else:
+            # Moving states
+            if self.avoid_goingback:
+                # Goin back on state
+                going_back = False
+                for m in prev_m.prev:
+                    if edge_m.label == m.edge_m.label:
+                        going_back = True
+                        break
+                if going_back:
+                    logprob -= self.gobacktoedge_factor_log  # prefer not going back
+
         props = {
             'd_o': d_z,
             'd_s': d_x,
-            'lpt': licp_dt
+            'lpt': logprob
         }
-        return licp_dt, props
+        return logprob, props
 
     def logprob_obs(self, dist, prev_m, new_edge_m, new_edge_o, is_ne=False):
         """Emission probability for emitting states.
@@ -177,11 +206,13 @@ class DistanceMatcher(BaseMatcher):
         # type: (DistanceMatcher, DistanceMatching) -> bool
         # Skip searching for non-emitting states when the distances between nodes
         # on the map are similar to the distances between the observation
+        if not self.restrained_ne:
+            return False
         if next_ne_m.d_s > 0:
             factor = (next_ne_m.d_o + next_ne_m.dist_obs) / next_ne_m.d_s
         else:
             factor = 0
-        if factor < self.ne_thr:
-            logger.debug(f"Skip non-emitting states to {next_ne_m.label}: {factor} < {self.ne_thr}")
+        if factor < self.restrained_ne_thr:
+            logger.debug(f"Skip non-emitting states to {next_ne_m.label}: {factor} < {self.restrained_ne_thr}")
             return True
         return False
