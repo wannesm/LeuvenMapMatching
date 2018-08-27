@@ -383,15 +383,18 @@ class InMemMap(BaseMap):
         """
         t_start = time.time()
         lat, lon = loc[:2]
+        lat_b, lon_l, lat_t, lon_r = self.box_around_point((lat, lon), max_dist)
+        bb = (lat_b, lon_l,  # y_min, x_min
+              lat_t, lon_r)  # y_max, x_max
         if self.rtree is not None and max_dist is not None:
-            lat_b, lon_l, lat_t, lon_r = self.box_around_point((lat, lon), max_dist)
-            bb = (lat_b, lon_l,  # y_min, x_min
-                  lat_t, lon_r)  # y_max, x_max
             logger.debug(f"Search closeby nodes to {loc}, bb={bb}")
             nodes = self.rtree.intersection(bb)
         else:
             logger.warning("Searching closeby nodes with linear search, use an index and set max_dist")
-            nodes = self.graph.keys()
+            if max_dist is not None:
+                nodes = (key for key, _ in self._items_in_bb(self.box_around_point((lat, lon), max_dist)))
+            else:
+                nodes = self.graph.keys()
         t_delta_search = time.time() - t_start
         t_start = time.time()
         results = []
@@ -418,15 +421,20 @@ class InMemMap(BaseMap):
         t_start = time.time()
         lat, lon = loc[:2]
         if self.rtree is not None and max_dist is not None and self.index_edges:
-            bb = (lat - max_dist, lon - max_dist,  # y_min, x_min
-                  lat + max_dist, lon + max_dist)  # y_max, x_max
+            lat_b, lon_l, lat_t, lon_r = self.box_around_point((lat, lon), max_dist)
+            bb = (lat_b, lon_l,  # y_min, x_min
+                  lat_t, lon_r)  # y_max, x_max
             logger.debug(f"Search closeby edges to {loc}, bb={bb}")
             nodes = self.rtree.intersection(bb)
         else:
             if self.rtree is not None and max_dist is not None and not self.index_edges:
                 logger.warning("Index is built for nodes, not for edges, set the index_edges argument to true")
             logger.warning("Searching closeby nodes with linear search, use an index and set max_dist")
-            nodes = self.graph.keys()
+            if max_dist is not None:
+                bb = self.box_around_point((lat, lon), max_dist)
+                nodes = (key for key, _ in self._items_in_bb(bb))
+            else:
+                nodes = self.graph.keys()
         t_delta_search = time.time() - t_start
         t_start = time.time()
         results = []

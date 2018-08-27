@@ -156,7 +156,7 @@ def test_path2_proj():
     nodes = matcher.path_pred_onlynodes
     if directory:
         matcher.print_lattice_stats()
-        mm_viz.plot_map(map_con, matcher=matcher, path=track, use_osm=Falvse,
+        mm_viz.plot_map(map_con, matcher=matcher, path=track, use_osm=False,
                         show_lattice=True, show_matching=True, show_labels=3,
                         filename=str(directory / "test_path_latlon_path2_proj.png"))
     # print(nodes)
@@ -240,11 +240,11 @@ def test_path3():
              (50.880930000000006, 4.7020100000000005),(50.88078, 4.70223),(50.88046000000001, 4.70146),
              (50.88015000000001, 4.70101),(50.880030000000005, 4.700880000000001),(50.87997000000001, 4.70078),
              (50.879900000000006, 4.70061),(50.87984, 4.70052),(50.879960000000004, 4.70026)]
-    # track = track[:10]
+    track = track[:30]
     map_con = create_map(osm3_fn)
 
     matcher = DistanceMatcher(map_con,
-                              max_dist_init=5, max_dist=50, min_prob_norm=0.1,
+                              max_dist_init=30, max_dist=50, min_prob_norm=0.1,
                               obs_noise=10, obs_noise_ne=20, dist_noise=10,
                               non_emitting_states=True)
     states, last_idx = matcher.match(track)
@@ -254,6 +254,14 @@ def test_path3():
         mm_viz.plot_map(map_con, matcher=matcher, use_osm=True,
                         zoom_path=True, show_graph=False, show_matching=True,
                         filename=str(directory / "test_path_latlon_path3.png"))
+    assert 43 == len(states), f"States length ({len(states)}) != 43"  # For track[:30]
+    nodes = matcher.path_pred_onlynodes
+    nodes_sol = [3906576303, 1150903750, 4506996820, 4506996819, 4506996798, 3906576457, 130147477, 3906576346,
+                 231974072, 231974123, 1180606706, 19792164, 19792172, 1180606683, 1180606709, 5236409057,
+                 19792169, 5236409056, 180241961, 180241975, 4506996259, 19792156, 5236409048, 180241625,
+                 180241638, 231953030, 241928030, 241928031, 83796665, 231953028, 1125556965, 1380538625,
+                 1824115892, 4909655515, 16571387, 16737662, 16571388, 179425214, 3705540990, 4567021046]
+    assert nodes == nodes_sol, f"Nodes do not match {nodes_sol}"
 
 
 if __name__ == "__main__":
