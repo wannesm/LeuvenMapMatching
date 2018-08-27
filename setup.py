@@ -84,6 +84,7 @@ setup(
     },
     setup_requires=['pytest-runner'],
     tests_require=['pytest'],
+    python_requires='>=3.6',
     license='Apache 2.0',
     classifiers=(
         'Intended Audience :: Developers',
