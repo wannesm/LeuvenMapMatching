@@ -9,15 +9,17 @@ https://www.microsoft.com/en-us/research/publication/hidden-markov-map-matching-
 
 Notes:
 
-* There is a bug in the map available from the website.
+* There is a 'bug' in the map available from the website.
   Multiple segments (streets) in the map are not connected but have overlappen, but
   disconnected, nodes.
   For example, the following nodes are on the same location and
   should be connected because the given path runs over this road:
   - 884147801204 and 884148400033
   - 884148100260 and 884148001002
-* At index 2659, the path is missing a number of observations. First part where
-  non-emitting nodes are required.
+* The path is missing a number of observations. For those parts non-emitting nodes are required.
+  This occurs at:
+  - 2770:2800 (index 2659 is start)
+  - 2910:2929
 
 :author: Wannes Meert
 :copyright: Copyright 2018 DTAI, KU Leuven and Sirris.
@@ -187,50 +189,24 @@ def load_data():
     return nodes, map_con, map_con_latlon, route, route_latlon
 
 
-@pytest.mark.skip(reason="Not yet fully implemented")
-def test_route():
+def test_route_slice1():
     if directory:
         import matplotlib.pyplot as plt
     nodes, map_con, map_con_latlon, route, route_latlon = load_data()
     zoom_path = True
-    # zoom_path = slice(2645, 2665)
-
-    # if directory is not None:
-    #     logger.debug("Plotting pre map ...")
-    #     mm_viz.plot_map(map_con_latlon, path=route_latlon, use_osm=True,
-    #                     show_lattice=False, show_labels=False, show_graph=False, zoom_path=zoom_path,
-    #                     filename=str(directory / "test_newson_route.png"))
-    #     logger.debug("... done")
 
     matcher = DistanceMatcher(map_con, min_prob_norm=0.001,
                               max_dist=200,
                               dist_noise=6, dist_noise_ne=12,
                               obs_noise=30, obs_noise_ne=150,
                               non_emitting_states=True)
-    # matcher.match(route[2657:2662])  # First location where some observations are missing
-    # matcher.match(route[2770:2800])  # Observations are missing
-    # matcher.match(route[2910:2950])
-    # matcher.match(route[2910:2929])
-    matcher.match(route[6000:])
+    route_slice = route[2657:2662]
+    matcher.match(route_slice)
     path_pred = matcher.path_pred_onlynodes
-
-    if directory:
-        matcher.print_lattice_stats()
-        logger.debug("Plotting post map ...")
-        fig = plt.figure(figsize=(200, 200))
-        ax = fig.get_axes()
-        mm_viz.plot_map(map_con, matcher=matcher, use_osm=True, ax=ax,
-                        show_lattice=False, show_labels=False, zoom_path=zoom_path,
-                        show_matching=True, show_graph=False,
-                        coord_trans=map_con.yx2latlon)
-        plt.savefig(str(directory / "test_newson_route_matched.png"))
-        plt.close(fig)
-        logger.debug("... done")
-        logger.debug("Best path:")
-        for m in matcher.lattice_best:
-            logger.debug(m)
-
-    print(path_pred)
+    path_sol = [172815, 172816, 172817, 172818, 172819, 172820, 172821, 172822, 172823, 172824,
+                172825, 172826, 172827, 172828, 172829, 172830, 884148100261, 172835, 172836,
+                172837, 884148100254, 172806, 884148100255, 172807]  # Can change when building db
+    assert len(path_pred) == len(path_sol)
 
 
 def test_bug1():
@@ -271,10 +247,57 @@ def test_bug1():
     assert path_pred == path_sol, f"Edges not equal:\n{path_pred}\n{path_sol}"
 
 
+@pytest.mark.skip(reason="Takes a long time")
+def test_route():
+    if directory:
+        import matplotlib.pyplot as plt
+    nodes, map_con, map_con_latlon, route, route_latlon = load_data()
+    zoom_path = True
+    # zoom_path = slice(2645, 2665)
+
+    # if directory is not None:
+    #     logger.debug("Plotting pre map ...")
+    #     mm_viz.plot_map(map_con_latlon, path=route_latlon, use_osm=True,
+    #                     show_lattice=False, show_labels=False, show_graph=False, zoom_path=zoom_path,
+    #                     filename=str(directory / "test_newson_route.png"))
+    #     logger.debug("... done")
+
+    matcher = DistanceMatcher(map_con, min_prob_norm=0.001,
+                              max_dist=200,
+                              dist_noise=6, dist_noise_ne=12,
+                              obs_noise=30, obs_noise_ne=150,
+                              non_emitting_states=True)
+    matcher.match(route[2657:2662])  # First location where some observations are missing
+    # matcher.match(route[2770:2800])  # Observations are missing
+    # matcher.match(route[2910:2950])  # Interesting point
+    # matcher.match(route[2910:2929])  # Interesting point
+    # matcher.match(route[6000:])
+    path_pred = matcher.path_pred_onlynodes
+
+    if directory:
+        matcher.print_lattice_stats()
+        logger.debug("Plotting post map ...")
+        fig = plt.figure(figsize=(200, 200))
+        ax = fig.get_axes()
+        mm_viz.plot_map(map_con, matcher=matcher, use_osm=True, ax=ax,
+                        show_lattice=False, show_labels=False, zoom_path=zoom_path,
+                        show_matching=True, show_graph=False,
+                        coord_trans=map_con.yx2latlon)
+        plt.savefig(str(directory / "test_newson_route_matched.png"))
+        plt.close(fig)
+        logger.debug("... done")
+        logger.debug("Best path:")
+        for m in matcher.lattice_best:
+            logger.debug(m)
+
+    print(path_pred)
+
+
 if __name__ == "__main__":
     logger.setLevel(logging.DEBUG)
     logger.addHandler(logging.StreamHandler(sys.stdout))
     directory = Path(os.environ.get('TESTDIR', Path(__file__).parent))
     print(f"Saving files to {directory}")
     # test_route()
-    test_bug1()
+    test_route_slice1()
+    # test_bug1()

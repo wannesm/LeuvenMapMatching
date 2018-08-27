@@ -14,7 +14,6 @@ import logging
 import time
 from pathlib import Path
 import pickle
-import math
 try:
     import rtree
 except ImportError:
@@ -25,9 +24,7 @@ except ImportError:
     pyproj = None
 from functools import partial
 
-
 from .base import BaseMap
-from ..util import dist_latlon
 
 
 logger = logging.getLogger("be.kuleuven.cs.dtai.mapmatching")
@@ -47,6 +44,18 @@ class InMemMap(BaseMap):
         - Indexing using rtrees to allow for fast searching of points on the map.
         - Serializing to write and read from files.
         - Projecting points to a different frame (e.g. GPS to Lambert)
+
+        :param name: Map name (mandatory)
+        :param use_latlon: The locations represent latitude-longitude pairs, otherwise y-x coordinates
+            are assumed.
+        :param use_rtree: Build an rtree index to quickly search for locations.
+        :param index_edges: Build an index for the edges in the map instead of the vertices.
+        :param crs_lonlat: Coordinate reference system for the latitude-longitude coordinates.
+        :param crs_xy: Coordiante reference system for the y-x coordinates.
+        :param graph: Initial graph of form Dict[label, Tuple[Tuple[y,x], List[neighbor]]]]
+        :param dir: Directory where to serialize to. If given, the rtree index structure will be written
+            to a file immediately.
+        :param deserializing: Internal variable to indicate that the object is being build from a file.
         """
         super(InMemMap, self).__init__(name, use_latlon=use_latlon)
         self.dir = Path(".") if dir is None else Path(dir)
@@ -71,6 +80,7 @@ class InMemMap(BaseMap):
             self.xy2lonlat = pyproj_notfound
 
     def serialize(self):
+        """Create a serializable data structure."""
         data = {
             "name": self.name,
             "graph": self.graph,
@@ -86,6 +96,7 @@ class InMemMap(BaseMap):
 
     @classmethod
     def deserialize(cls, data):
+        """Create a new instance from a dictionary."""
         nmap = cls(data["name"], dir=data.get("dir", None),
                    use_latlon=data["use_latlon"], use_rtree=data["use_rtree"],
                    index_edges=data["index_edges"],
@@ -126,7 +137,7 @@ class InMemMap(BaseMap):
     def bb(self):
         """Bounding box.
 
-        :return: (lat_min, lon_min, lat_max, lon_max)
+        :return: (lat_min, lon_min, lat_max, lon_max) or (y_min, x_min, y_max, x_max)
         """
         if self.use_rtree:
             lat_min, lon_min, lat_max, lon_max = self.rtree.bounds
@@ -137,6 +148,7 @@ class InMemMap(BaseMap):
         return lat_min, lon_min, lat_max, lon_max
 
     def labels(self):
+        """All labels."""
         return self.graph.keys()
 
     def size(self):
@@ -151,7 +163,8 @@ class InMemMap(BaseMap):
         return self.graph[node_key][0]
 
     def add_node(self, node, loc):
-        """
+        """Add new node to the map.
+
         :param node: label
         :param loc: (lat, lon) or (y, x)
         """
@@ -173,6 +186,11 @@ class InMemMap(BaseMap):
         del self.graph[node]
 
     def add_edge(self, node_a, node_b):
+        """Add new edge to the map.
+
+        :param node_a: Label for the node that is the start of the edge
+        :param node_b: Label for the node that is the end of the edge
+        """
         if node_a not in self.graph:
             raise ValueError(f"Add {node_a} first as node")
         if node_b not in self.graph:
@@ -180,12 +198,28 @@ class InMemMap(BaseMap):
         if node_b not in self.graph[node_a][1]:
             self.graph[node_a][1].append(node_b)
 
+    def _items_in_bb(self, bb):
+        if self.rtree is not None:
+            node_idxs = self.rtree.intersection(bb)
+            for key in node_idxs:
+                yield (key, self.graph[key])
+        else:
+            lat_min, lon_min, lat_max, lon_max = bb
+            for key, value in self.graph.items():
+                ((lat, lon), nbrs) = value
+                if lat_min <= lat <= lat_max and lon_min <= lon <= lon_max:
+                    yield (key, value)
+
     def all_edges(self, bb=None):
-        if bb is None or self.rtree is None:
+        """Return all edges.
+
+        :param bb: Bounding box
+        :return:
+        """
+        if bb is None:
             keyvals = self.graph.items()
         else:
-            node_idxs = self.rtree.intersection(bb)
-            keyvals = ((idx, self.graph[idx]) for idx in node_idxs)
+            keyvals = self._items_in_bb(bb)
         for key_a, (loc_a, nbrs) in keyvals:
             if loc_a is not None:
                 for nbr in nbrs:
@@ -198,11 +232,15 @@ class InMemMap(BaseMap):
                         pass
 
     def all_nodes(self, bb=None):
-        if bb is None or self.rtree is None:
+        """Return all nodes.
+
+        :param bb: Bounding box
+        :return:
+        """
+        if bb is None:
             keyvals = self.graph.items()
         else:
-            node_idxs = self.rtree.intersection(bb)
-            keyvals = ((idx, self.graph[idx]) for idx in node_idxs)
+            keyvals = self._items_in_bb(bb)
         for key_a, (loc_a, nbrs) in keyvals:
             if loc_a is not None:
                 yield key_a, loc_a
@@ -252,6 +290,7 @@ class InMemMap(BaseMap):
         if self.graph and (not deserializing or rtree_fn is None or not rtree_fn.exists()):
             if self.index_edges:
                 logger.debug("Index edges")
+
                 def generator_function():
                     for label, data in self.graph.items():
                         lat_min, lon_min = data[0]
@@ -272,7 +311,7 @@ class InMemMap(BaseMap):
 
         t_start = time.time()
         if self.dir is not None:
-            props = rtree.index.Property()
+            # props = rtree.index.Property()
             # if force:
             #     props.overwrite = True
             logger.debug(f"Creating new file-based rtree index ({rtree_fn}) ...")
@@ -336,6 +375,12 @@ class InMemMap(BaseMap):
         pass
 
     def nodes_closeto(self, loc, max_dist=None, max_elmt=None):
+        """Return all nodes close to the given location.
+
+        :param loc: Location
+        :param max_dist: Maximal distance from the location
+        :param max_elmt: Return only the most nearby nodes
+        """
         t_start = time.time()
         lat, lon = loc[:2]
         if self.rtree is not None and max_dist is not None:
@@ -364,6 +409,12 @@ class InMemMap(BaseMap):
         return results
 
     def edges_closeto(self, loc, max_dist=None, max_elmt=None):
+        """Return all nodes that are on an edge that is close to the given location.
+
+        :param loc: Location
+        :param max_dist: Maximal distance from the location
+        :param max_elmt: Return only the most nearby nodes
+        """
         t_start = time.time()
         lat, lon = loc[:2]
         if self.rtree is not None and max_dist is not None and self.index_edges:

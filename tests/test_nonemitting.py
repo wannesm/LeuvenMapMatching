@@ -77,7 +77,7 @@ def test_path1():
     assert path_pred == path_sol, f"Nodes not equal:\n{path_pred}\n{path_sol}"
 
 
-def test_path1_newson():
+def test_path1_dist():
     mapdb, path1, path2, path_sol = setup_map()
 
     matcher = DistanceMatcher(mapdb, max_dist_init=1,
@@ -96,7 +96,7 @@ def test_path1_newson():
         with (directory / 'lattice_path1.gv').open('w') as ofile:
             matcher.lattice_dot(file=ofile)
         mmviz.plot_map(mapdb, matcher=matcher, show_labels=True, show_matching=True,
-                       filename=str(directory / "test_nonemitting_test_path1_newson.png"))
+                       filename=str(directory / "test_nonemitting_test_path1_dist.png"))
     assert path_pred == path_sol, f"Nodes not equal:\n{path_pred}\n{path_sol}"
 
 
@@ -115,6 +115,25 @@ def test_path2():
             matcher.lattice_dot(file=ofile)
         mmviz.plot_map(mapdb, matcher=matcher, show_labels=True, show_matching=True,
                        filename=str(directory / "test_nonemitting_test_path2.png"))
+    assert path_pred == path_sol, "Nodes not equal:\n{}\n{}".format(path_pred, path_sol)
+
+
+def test_path2_dist():
+    mapdb, path1, path2, path_sol = setup_map()
+
+    matcher = DistanceMatcher(mapdb, max_dist_init=1, min_prob_norm=0.5,
+                              obs_noise=0.5, dist_noise=0.5,
+                              non_emitting_states=True)
+    matcher.match(path2, unique=True)
+    path_pred = matcher.path_pred_onlynodes
+    if directory:
+        from leuvenmapmatching import visualization as mmviz
+        matcher.print_lattice_stats()
+        matcher.print_lattice()
+        # with (directory / 'lattice_path2.gv').open('w') as ofile:
+        #     matcher.lattice_dot(file=ofile)
+        mmviz.plot_map(mapdb, matcher=matcher, show_labels=True, show_matching=True,
+                       filename=str(directory / "test_nonemitting_test_path2_dist.png"))
     assert path_pred == path_sol, "Nodes not equal:\n{}\n{}".format(path_pred, path_sol)
 
 
@@ -259,6 +278,32 @@ def test_path3_few_obs_e():
     assert path_pred == path_sol, f"Nodes not equal:\n{path_pred}\n{path_sol}"
 
 
+def test_path3_dist():
+    path = [(0, 1), (0.65, 7.5), (1.9, 10.1)]
+    path_sol = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I']
+    mapdb = InMemMap("map", graph={
+        "A": ((0.00, 1), ["B"]),
+        "B": ((0.00, 3), ["A", "C"]),
+        "C": ((0.70, 3), ["B", "D"]),
+        "D": ((1.00, 5), ["C", "E"]),
+        "E": ((1.00, 6), ["D", "F"]),
+        "F": ((0.70, 7), ["E", "G"]),
+        "G": ((0.00, 8), ["F", "H"]),
+        "H": ((0.0, 10), ["G", "I"]),
+        "I": ((2.0, 10), ["H"])
+    }, use_latlon=False)
+    matcher = DistanceMatcher(mapdb, max_dist_init=0.2,
+                              obs_noise=0.5, obs_noise_ne=2, dist_noise=0.5,
+                              non_emitting_states=True)
+    matcher.match(path)
+    path_pred = matcher.path_pred_onlynodes
+    if directory:
+        from leuvenmapmatching import visualization as mmviz
+        mmviz.plot_map(mapdb, matcher=matcher, show_labels=True, show_matching=True, linewidth=2,
+                       filename=str(directory / "test_path_3_dist.png"))
+    assert path_pred == path_sol, f"Nodes not equal:\n{path_pred}\n{path_sol}"
+
+
 if __name__ == "__main__":
     # mm.matching.logger.setLevel(logging.INFO)
     logger.setLevel(logging.DEBUG)
@@ -269,8 +314,10 @@ if __name__ == "__main__":
     # test_path1()
     # test_path1_newson()
     # test_path2()
+    # test_path2_dist()
     # test_path2_incremental()
     # test_path_duplicate()
     # test_path3_many_obs()
-    test_path3_few_obs_en()
-    test_path3_few_obs_e()
+    # test_path3_few_obs_en()
+    # test_path3_few_obs_e()
+    test_path3_dist()
