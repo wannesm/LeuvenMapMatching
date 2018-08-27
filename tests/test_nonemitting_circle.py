@@ -84,11 +84,10 @@ def visualize_map():
 def visualize_path(matcher, mapdb, name="test"):
     import matplotlib.pyplot as plt
     from leuvenmapmatching import visualization as mmviz
-    with (directory / 'test_nonemitting_circle_lattice.gv').open('w') as ofile:
-        matcher.lattice_dot(file=ofile)
     fig, ax = plt.subplots(1, 1, figsize=(10, 10))
-    mmviz.plot_map(mapdb, matcher=matcher, ax=ax, show_labels=True, show_matching=True,
-                   linewidth=4)
+    mmviz.plot_map(mapdb, matcher=matcher, ax=ax,
+                   show_labels=True, show_matching=True, show_graph=True,
+                   linewidth=2)
     fn = directory / f"test_nonemitting_circle_{name}_map.png"
     fig.savefig(str(fn))
     plt.close(fig)
@@ -97,8 +96,8 @@ def visualize_path(matcher, mapdb, name="test"):
 
 def test_path1():
     mapdb, path1, path2, path_sol = setup_map()
-    matcher = SimpleMatcher(mapdb, max_dist_init=1, min_prob_norm=0.8, obs_noise=0.5,
-                                  non_emitting_states=True)
+    matcher = SimpleMatcher(mapdb, max_dist_init=1, min_prob_norm=0.5, obs_noise=0.5,
+                            non_emitting_states=True)
     matcher.match(path1, unique=True)
     path_pred = matcher.path_pred_onlynodes
     if directory:
@@ -156,7 +155,7 @@ if __name__ == "__main__":
     directory = Path(os.environ.get('TESTDIR', Path(__file__).parent))
     print(f"Saving files to {directory}")
     # visualize_map()
-    # test_path1()
+    test_path1()
     # test_path1_dist()
     # test_path2()
-    test_path2_dist()
+    # test_path2_dist()

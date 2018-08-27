@@ -123,8 +123,8 @@ class DistanceMatcher(BaseMatcher):
         self.exact_dt_s = True  # Newson and Krumm is 'True'
 
         self.avoid_goingback = kwargs.get('avoid_goingback', True)
-        self.gobackonedge_factor_log = -math.log(0.5)
-        self.gobacktoedge_factor_log = -math.log(0.5)
+        self.gobackonedge_factor_log = math.log(0.5)
+        self.gobacktoedge_factor_log = math.log(0.5)
 
     def logprob_trans(self, prev_m: DistanceMatching, edge_m, edge_o,
                       is_prev_ne=False, is_next_ne=False):
@@ -164,7 +164,7 @@ class DistanceMatcher(BaseMatcher):
             # Staying in same state
             if self.avoid_goingback and edge_m.key == prev_m.edge_m.key and edge_m.ti < prev_m.edge_m.ti:
                 # Going back on edge
-                logprob -= self.gobackonedge_factor_log  # Prefer not going back
+                logprob += self.gobackonedge_factor_log  # Prefer not going back
         else:
             # Moving states
             if self.avoid_goingback:
@@ -175,7 +175,7 @@ class DistanceMatcher(BaseMatcher):
                         going_back = True
                         break
                 if going_back:
-                    logprob -= self.gobacktoedge_factor_log  # prefer not going back
+                    logprob += self.gobacktoedge_factor_log  # prefer not going back
 
         props = {
             'd_o': d_z,

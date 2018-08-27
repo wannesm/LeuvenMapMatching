@@ -111,7 +111,7 @@ class BaseMatching(object):
         else:
             # "* e^(ne_length_factor_log)" or "- ne_length_factor_log" for every step to a non-emitting
             # state to prefer shorter paths
-            new_logprobe = self.logprobe - self.matcher.ne_length_factor_log
+            new_logprobe = self.logprobe + self.matcher.ne_length_factor_log
             new_logprobne = self.logprobne + new_logprob_delta
             # "+ 2" to punish non-emitting states a bit less. Otherwise it would be
             # similar to (Pr_tr*Pr_obs)**2, which punishes just one non-emitting state too much.
@@ -276,7 +276,7 @@ class BaseMatcher:
     def __init__(self, map_con, obs_noise=1, max_dist_init=None, max_dist=None, min_prob_norm=None,
                  non_emitting_states=True, max_lattice_width=None,
                  only_edges=True, obs_noise_ne=None, matching=BaseMatching,
-                 non_emitting_length_factor=1.0, **kwargs):
+                 non_emitting_length_factor=0.75, **kwargs):
         """Initialize a matcher for map matching.
 
         Distances are in meters when using latitude-longitude.

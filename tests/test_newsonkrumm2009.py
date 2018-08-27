@@ -229,7 +229,7 @@ def test_bug1():
     matcher = DistanceMatcher(map_con, min_prob_norm=0.001,
                               max_dist=200, obs_noise=4.07,
                               non_emitting_states=True)
-    matcher.match(path)
+    matcher.match(path, unique=True)
     path_pred = matcher.path_pred
     if directory:
         import matplotlib.pyplot as plt

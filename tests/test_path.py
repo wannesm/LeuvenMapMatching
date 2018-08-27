@@ -187,7 +187,7 @@ def test_path_outlier_dist():
             (1.1, 2.3), (1.3, 2.9), (1.2, 3.1), (1.5, 3.2), (1.8, 3.5), (2.0, 3.7),
             (2.1, 3.3), (2.4, 3.2), (2.6, 3.1), (2.9, 3.1), (3.0, 3.2), (3.1, 3.8),
             (3.0, 4.0), (3.1, 4.3), (3.1, 4.6), (3.0, 4.9)]
-    path_sol = ['X', 'A', 'B', 'D', 'C', 'E', 'F']
+    path_sol = ['A', 'B', 'D', 'C', 'E', 'F']
     path.insert(13, (2.3, 1.8))
     mapdb = InMemMap("map", graph={
         "A": ((1, 1), ["B", "C", "X"]),
@@ -209,7 +209,8 @@ def test_path_outlier_dist():
     path_pred = matcher.path_pred_onlynodes
     if directory:
         from leuvenmapmatching import visualization as mmviz
-        mmviz.plot_map(mapdb, matcher=matcher, show_labels=True, show_matching=True,
+        mmviz.plot_map(mapdb, matcher=matcher,
+                       show_labels=True, show_matching=True, show_graph=True,
                        filename=str(directory / "test_path_outlier_dist.png"))
     # TODO: Smoothing the observation distances could eliminate the outlier
     assert path_pred == path_sol, "Nodes not equal:\n{}\n{}".format(path_pred, path_sol)
