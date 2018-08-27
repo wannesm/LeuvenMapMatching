@@ -20,6 +20,7 @@ except ImportError:
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir)))
     import leuvenmapmatching as mm
 from leuvenmapmatching.matcher.simple import SimpleMatcher
+from leuvenmapmatching.matcher.distance import DistanceMatcher
 from leuvenmapmatching.map.inmem import InMemMap
 
 
@@ -105,6 +106,17 @@ def test_path1():
     assert path_pred == path_sol, f"Nodes not equal:\n{path_pred}\n{path_sol}"
 
 
+def test_path1_dist():
+    mapdb, path1, path2, path_sol = setup_map()
+    matcher = DistanceMatcher(mapdb, max_dist_init=1, min_prob_norm=0.8, obs_noise=0.5,
+                              non_emitting_states=True)
+    matcher.match(path1, unique=True)
+    path_pred = matcher.path_pred_onlynodes
+    if directory:
+        visualize_path(matcher, mapdb, name="test_path1_dist")
+    assert path_pred == path_sol, f"Nodes not equal:\n{path_pred}\n{path_sol}"
+
+
 def test_path2():
     mapdb, path1, path2, _ = setup_map()
     path_sol = [f"N{i}" for i in range(20)]
@@ -124,12 +136,27 @@ def test_path2():
     assert path_pred == path_sol, f"Nodes not equal:\n{path_pred}\n{path_sol}"
 
 
+def test_path2_dist():
+    mapdb, path1, path2, _ = setup_map()
+    path_sol = [f"N{i}" for i in range(20)]
+    matcher = DistanceMatcher(mapdb, max_dist_init=0.2, min_prob_norm=0.1,
+                              obs_noise=0.1, obs_noise_ne=1,
+                              non_emitting_states=True)
+    matcher.match(path2)
+    path_pred = matcher.path_pred_onlynodes
+    if directory:
+        visualize_path(matcher, mapdb, name="test_path2_dist")
+    assert path_pred == path_sol, f"Nodes not equal:\n{path_pred}\n{path_sol}"
+
+
 if __name__ == "__main__":
     # mm.matching.logger.setLevel(logging.INFO)
     mm.logger.setLevel(logging.DEBUG)
     mm.logger.addHandler(logging.StreamHandler(sys.stdout))
     directory = Path(os.environ.get('TESTDIR', Path(__file__).parent))
     print(f"Saving files to {directory}")
-    visualize_map()
+    # visualize_map()
     # test_path1()
-    test_path2()
+    # test_path1_dist()
+    # test_path2()
+    test_path2_dist()
