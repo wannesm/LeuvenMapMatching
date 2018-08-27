@@ -4,9 +4,14 @@ Map from OpenStreetMap
 You can download a graph for map-matching from the OpenStreetMap.org service.
 Multiple methods exists, we illustrate two.
 
+Using requests, osmread and gpx
+-------------------------------
+
+You can perform map matching on a OpenStreetMap database by combing ``leuvenmapmatching``
+with the packages ``requests``, ``osmread`` and ``gpx``.
 
 Download a map as XML
----------------------
+~~~~~~~~~~~~~~~~~~~~~
 
 You can use the overpass-api.de service:
 
@@ -23,45 +28,61 @@ You can use the overpass-api.de service:
                 ofile.write(chunk)
 
 
-Create graph using osmread and pyproj
--------------------------------------
+Create graph using osmread
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Once we have a file containing the region we are interested in, we can select the roads we want to use
 to create a graph from. In this case we focus on 'ways' with a 'highway' tag. Those represent a variety
 of roads. For a more detailed filtering look at the
 `possible values of the highway tag <https://wiki.openstreetmap.org/wiki/Key:highway>`_.
 
-It is also recommended to project the latitude-longitude coordinates to an Euclidean space.
-In the example below this is achieved using the projection available in the utils, which is based on the
-`pyproj <https://jswhit.github.io/pyproj/>`_ package.
-But any other projection can be used by using the pyproj package directly.
-
 .. code-block:: python
 
     from leuvenmapmatching.map.inmem import InMemMap
-    from leuvenmapmatching.util.projections import latlon2grs80
     import osmread
 
-    map_con = InMemMap("myosm", use_latlon=use_latlon)
+    map_con = InMemMap("myosm", use_latlon=True, use_rtree=True, index_edges=True)
     for entity in osmread.parse_file(str(xml_file)):
         if isinstance(entity, osmread.Way) and 'highway' in entity.tags:
             for node_a, node_b in zip(entity.nodes, entity.nodes[1:]):
-                map_con.add_edge(node_a, None, node_b, None)
+                map_con.add_edge(node_a, node_b)
                 # Some roads are one-way. We'll add both directions.
-                map_con.add_edge(node_b, None, node_a, None)
+                map_con.add_edge(node_b, node_a)
         if isinstance(entity, osmread.Node):
-            lat, lon = list(latlon2grs80([(entity.lat, entity.lon)]))[0]
-            map_con.add_node(entity.id, (lat, lon))
+            map_con.add_node(entity.id, (entity.lat, entity.lon))
     map_con.purge()
 
 
-Create graph using osmnx and geopandas
---------------------------------------
+Note that ``InMemMap`` is a simple container for a map. It is recommended to use
+your own optimized connecter to your map dataset.
+
+
+Perform map matching on an OpenStreetMap database
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+You can create a list of latitude-longitude coordinates manually. Or read a gpx file.
+
+.. code-block:: python
+
+    from leuvenmapmatching.util.gpx import gpx_to_path
+
+    track = gpx_to_path("mytrack.gpx")
+    matcher = DistanceMatcher(map_con,
+                             max_dist=100, max_dist_init=25,  # meter
+                             min_prob_norm=0.001,
+                             non_emitting_length_factor=0.75,
+                             obs_noise=50, obs_noise_ne=75,  # meter
+                             dist_noise=50,  # meter
+                             non_emitting_states=True)
+    states, lastidx = matcher.match(track)
+
+
+Using osmnx and geopandas
+-------------------------
 
 Another great library to interact with OpenStreetMap data is the `osmnx <https://github.com/gboeing/osmnx>`_ package.
 The osmnx package can retrieve relevant data automatically, for example when given a name of a region.
-This package is build on top of the `geopandas <http://geopandas.org>`_ package that also includes routines to
-perform projections.
+This package is build on top of the `geopandas <http://geopandas.org>`_ package.
 
 .. code-block:: python
 
@@ -76,7 +97,7 @@ perform projections.
         map_con.add_node(nid, (row['x'], row['y']))
 
 
-The projections can also be achieved directly on the GeoDataFrame:
+The geopandas package supports projections:
 
 .. code-block:: python
 

@@ -23,8 +23,8 @@ For example to read in an OpenStreetMap file directly to a :class:`InMemMap` obj
     for entity in osmread.parse_file(osm_fn):
         if isinstance(entity, osmread.Way) and 'highway' in entity.tags:
             for node_a, node_b in zip(entity.nodes, entity.nodes[1:]):
-                map_con.add_edge(node_a, None, node_b, None)
-                map_con.add_edge(node_b, None, node_a, None)
+                map_con.add_edge(node_a, node_b)
+                map_con.add_edge(node_b, node_a)
         if isinstance(entity, osmread.Node):
             map_con.add_node(entity.id, (entity.lat, entity.lon))
     map_con.purge()

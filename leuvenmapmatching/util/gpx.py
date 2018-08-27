@@ -3,6 +3,8 @@
 leuvenmapmatching.util.gpx
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+Some additional functions to interact with the gpx library.
+
 :author: Wannes Meert
 :copyright: Copyright 2015-2018 DTAI, KU Leuven and Sirris.
 :license: Apache License, Version 2.0, see LICENSE for details.
@@ -24,8 +26,8 @@ def gpx_to_path(gpx_file):
         if len(gpx.tracks) == 0:
             logger.error('No tracks found in GPX file (<trk> tag missing?): {}'.format(gpx_file))
             return None
-        logger.info("Read gpx file: {} points, {} tracks, {} segments".format(gpx.get_points_no(), len(gpx.tracks),
-                                                                               len(gpx.tracks[0].segments)))
+        logger.info("Read gpx file: {} points, {} tracks, {} segments".format(
+            gpx.get_points_no(), len(gpx.tracks), len(gpx.tracks[0].segments)))
         track = [(p.latitude, p.longitude, p.time) for p in gpx.tracks[0].segments[0].points]
     finally:
         gpx_fh.close()
