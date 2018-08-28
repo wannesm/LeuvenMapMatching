@@ -43,9 +43,9 @@ Reference:
 .. toctree::
    :caption: Classes
 
-   classes/Matching
-   classes/Matcher
-   classes/MatcherDistance
+   classes/BaseMatching
+   classes/BaseMatcher
+   classes/DistanceMatcher
 
 
 Indices and tables

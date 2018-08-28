@@ -130,9 +130,11 @@ class DistanceMatcher(BaseMatcher):
                       is_prev_ne=False, is_next_ne=False):
         """Transition probability.
 
-        P(dt) = e^(-d_t^2 / (2 * dist_noise^2))
+        :math:`P(dt) = exp(-d_t^2 / (2 * dist_{noise}^2))`
 
-        with d_t = |d_s - d_o|, d_s = |loc_prev_state - loc_cur_state|, d_o = |loc_prev_obs - loc_cur_obs|
+        with :math:`d_t = |d_s - d_o|,
+        d_s = |loc_{prev\_state} - loc_{cur\_state}|,
+        d_o = |loc_{prev\_obs} - loc_{cur\_obs}|`
 
         This function is more tolerant for low values. The intuition is that values under a certain
         distance should all be close to probability 1.0.
@@ -187,9 +189,9 @@ class DistanceMatcher(BaseMatcher):
     def logprob_obs(self, dist, prev_m, new_edge_m, new_edge_o, is_ne=False):
         """Emission probability for emitting states.
 
-        P(dt) = e^(-d_o^2 / (2 * obs_noise^2))
+        :math:`P(dt) = exp(-d_o^2 / (2 * obs_{noise}^2))`
 
-        with d_o = |loc_state - loc_obs|
+        with :math:`d_o = |loc_{state} - loc_{obs}|`
 
         """
         if is_ne:
