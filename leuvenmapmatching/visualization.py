@@ -55,6 +55,11 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
     if not bb:
         bb = map_con.bb()
     lat_min, lon_min, lat_max, lon_max = bb
+    if path:
+        plat, plon = islice(zip(*path), 2)
+        lat_min, lat_max = min(lat_min, min(plat)), max(lat_max, max(plat))
+        lon_min, lon_max = min(lon_min, min(plon)), max(lon_max, max(plon))
+        bb = [lat_min, lon_min, lat_max, lon_max]
     logger.debug("bb = [{}, {}, {}, {}]".format(*bb))
 
     if zoom_path and path:
@@ -62,25 +67,27 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
             plat, plon = islice(zip(*path[zoom_path]), 2)
             lat_min, lat_max = min(plat), max(plat)
             lon_min, lon_max = min(plon), max(plon)
-        elif zoom_path:
+        else:
             plat, plon = islice(zip(*path), 2)
             lat_min, lat_max = min(plat), max(plat)
             lon_min, lon_max = min(plon), max(plon)
-        else:
-            plat, plon = islice(zip(*path), 2)
-            lat_min, lat_max = min(lat_min, min(plat)), max(lat_max, max(plat))
-            lon_min, lon_max = min(lon_min, min(plon)), max(lon_max, max(plon))
+        lat_d = lat_max - lat_min
+        lon_d = lon_max - lon_min
+        latlon_d = max(lat_d, lon_d)
+        lat_max += max(latlon_d * 0.01, lat_d * 0.2)
+        lon_min -= max(latlon_d * 0.01, lon_d * 0.2)
+        lat_min -= max(latlon_d * 0.01, lat_d * 0.2)
+        lon_max += max(latlon_d * 0.01, lon_d * 0.2)
         logger.debug("Setting bounding box to path")
         bb = [lat_min, lon_min, lat_max, lon_max]
-        logger.debug("bb = [{}, {}, {}, {}]".format(*bb))
-    else:
-        plat, plon = None, None
+        logger.debug("bb(zoom-path) = [{}, {}, {}, {}]".format(*bb))
 
     bb_o = bb
     if coord_trans:
         logger.debug("Converting bounding box coordinates")
         if path:
             path = [coord_trans(lat, lon) for lat, lon in path]
+        lat_min, lon_min, lat_max, lon_max = bb
         lat_min, lon_min = coord_trans(lat_min, lon_min)
         lat_max, lon_max = coord_trans(lat_max, lon_max)
         bb = [lat_min, lon_min, lat_max, lon_max]
@@ -107,11 +114,6 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
     else:
         from .util import dist_euclidean
         project = dist_euclidean.project
-
-        lat_max += max(0.1, (lat_max - lat_min) * 0.1)
-        lon_min -= max(0.1, (lon_max - lon_min) * 0.1)
-        lat_min -= max(0.1, (lat_max - lat_min) * 0.1)
-        lon_max += max(0.1, (lon_max - lon_min) * 0.1)
 
         def to_pixels(lat, lon=None):
             if lon is None:

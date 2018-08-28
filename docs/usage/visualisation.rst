@@ -54,3 +54,10 @@ This will result in the following figure:
 
 .. figure:: https://people.cs.kuleuven.be/wannes.meert/leuvenmapmatching/plot2.png?v=1
    :alt: Plot2
+
+Or when some GPS points are missing in the track, the matching is more
+visible as the matched route deviates from the straight line between two
+GPS points:
+
+.. figure:: https://people.cs.kuleuven.be/wannes.meert/leuvenmapmatching/plot3.png?v=1
+   :alt: Plot3
