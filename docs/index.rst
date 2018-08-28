@@ -36,6 +36,7 @@ Reference:
    usage/openstreetmap
    usage/latitudelongitude
    usage/customdistributions
+   usage/incremental
 
 
 .. toctree::
