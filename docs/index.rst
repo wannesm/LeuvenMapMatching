@@ -32,16 +32,10 @@ Reference:
 
 
    usage/installation
-   usage/customdistributions
+   usage/introduction
+   usage/openstreetmap
    usage/latitudelongitude
-
-
-.. toctree::
-   :caption: Examples
-
-
-   examples/introduction
-   examples/openstreetmap
+   usage/customdistributions
 
 
 .. toctree::
