@@ -34,6 +34,7 @@ Reference:
    usage/installation
    usage/introduction
    usage/openstreetmap
+   usage/visualisation
    usage/latitudelongitude
    usage/customdistributions
    usage/incremental
