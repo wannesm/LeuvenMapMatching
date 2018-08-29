@@ -123,8 +123,9 @@ def test_path2_proj():
                         show_graph=True, show_matching=True, show_labels=5,
                         filename=str(directory / "test_path_latlon_path2_proj.png"))
     nodes_sol = [2634474831, 1096512242, 3051083902, 1096512239, 1096512241, 1096512240, 1096508366, 1096508372,
-                 16483861, 3051083900, 16483864, 16483865, 3060515058, 16526534, 16526532, 1274158119, 16526540,
-                 3060597377, 16526541, 16424220, 1233373340, 613125597, 1076057753]
+                 16483861, 1096508360, 159656075, 1096508382, 16483862, 3051083898, 16526535, 3060597381, 3060515059,
+                 16526534, 16526532, 1274158119, 16526540, 3060597377, 16526541, 16424220, 1233373340, 613125597,
+                 1076057753]
     assert nodes == nodes_sol, f"Nodes do not match: {nodes}"
 
 
@@ -132,10 +133,10 @@ def test_path2():
     prepare_files()
     map_con = create_map(osm2_fn)
     track = [(p[0], p[1]) for p in gpx_to_path(track2_fn)]
-    matcher = DistanceMatcher(map_con, max_dist=100, max_dist_init=25, min_prob_norm=0.001,
+    matcher = DistanceMatcher(map_con, max_dist=300, max_dist_init=25, min_prob_norm=0.0001,
                               non_emitting_length_factor=0.75,
                               obs_noise=50, obs_noise_ne=75,
-                              dist_noise=50,
+                              dist_noise=30,
                               max_lattice_width=5,
                               non_emitting_states=True)
     states, last_idx = matcher.match(track, unique=False)
@@ -145,8 +146,8 @@ def test_path2():
                         show_graph=True, show_matching=True,
                         filename=str(directory / "test_path_latlon_path2.png"))
     nodes_sol = [2634474831, 1096512242, 3051083902, 1096512239, 1096512241, 1096512240, 1096508366, 1096508372,
-                 16483861, 3051083900, 16483864, 16483865, 3060515058, 16526534, 16526532, 1274158119, 16526540,
-                 3060597377, 16526541, 16424220, 1233373340, 613125597, 1076057753]
+                 16483861, 3051083900, 16483864, 16483865, 16483866, 3060725817, 611867918, 16526532, 1274158119,
+                 16526540, 3060597377, 16526541, 16424220, 1233373340, 613125597, 1076057753]
     assert nodes == nodes_sol, f"Nodes do not match: {nodes}"
 
 
@@ -221,7 +222,7 @@ def test_path3():
                  19792169, 5236409056, 180241961, 180241975, 4506996259, 19792156, 5236409048, 180241625,
                  180241638, 231953030, 241928030, 241928031, 83796665, 231953028, 1125556965, 1380538625,
                  1824115892, 4909655515, 16571387, 16737662, 16571388, 179425214, 3705540990, 4567021046]
-    assert nodes == nodes_sol, f"Nodes do not match {nodes_sol}"
+    assert nodes == nodes_sol, f"Nodes do not match: {nodes}"
 
 
 if __name__ == "__main__":
@@ -231,5 +232,5 @@ if __name__ == "__main__":
     print(f"Saving files to {directory}")
     # test_path1()
     # test_path2_proj()
-    # test_path2()
-    test_path3()
+    test_path2()
+    # test_path3()

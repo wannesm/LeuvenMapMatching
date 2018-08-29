@@ -113,9 +113,9 @@ class BaseMatching(object):
             # state to prefer shorter paths
             new_logprobe = self.logprobe + self.matcher.ne_length_factor_log
             new_logprobne = self.logprobne + new_logprob_delta
-            # "+ 2" to punish non-emitting states a bit less. Otherwise it would be
+            # "+ 1" to punish non-emitting states a bit less. Otherwise it would be
             # similar to (Pr_tr*Pr_obs)**2, which punishes just one non-emitting state too much.
-            new_logprob = new_logprobe + new_logprobne / (obs_ne + 2)
+            new_logprob = new_logprobe + new_logprobne / (obs_ne + 1)
             new_length = self.length
         new_logprobema = ema_const.cur * new_logprob_delta + ema_const.prev * self.logprobema
         new_stop |= self.matcher.do_stop(new_logprob / new_length, dist, logprob_trans, logprob_obs)
