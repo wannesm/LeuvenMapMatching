@@ -56,6 +56,10 @@ of roads. For a more detailed filtering look at the
 Note that ``InMemMap`` is a simple container for a map. It is recommended to use
 your own optimized connecter to your map dataset.
 
+If you want to allow transitions that are not following the exact road segments you can inherit from the ``Map``
+class and define a new class with your own transitions.
+The transitions are defined using the ``nodes_nbrto`` and ``edges_nbrt`` methods.
+
 
 Perform map matching on an OpenStreetMap database
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

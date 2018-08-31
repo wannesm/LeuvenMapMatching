@@ -144,9 +144,6 @@ class InMemMap(BaseMap):
         nmap = cls.deserialize(data)
         return nmap
 
-    def get_graph(self):
-        return self.graph
-
     def bb(self):
         """Bounding box.
 
@@ -389,9 +386,6 @@ class InMemMap(BaseMap):
     def yx2latlon(self, y, x):
         lon, lat = self.xy2lonlat(x, y)
         return lat, lon
-
-    def preload_nodes(self, path, dist):
-        pass
 
     def nodes_closeto(self, loc, max_dist=None, max_elmt=None):
         """Return all nodes close to the given location.

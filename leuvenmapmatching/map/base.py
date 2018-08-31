@@ -5,11 +5,12 @@ leuvenmapmatching.map.base
 
 Base Map class.
 
-To be used in Matcher, the following functions need to be defined:
+To be used in a Matcher object, the following functions need to be defined:
 
 - ``edges_closeto``
 - ``nodes_closeto``
 - ``nodes_nbrto``
+- ``edges_nbrto``
 
 For visualiation purposes the following methods need to be implemented:
 
@@ -69,13 +70,6 @@ class BaseMap(object):
         self.lines_parallel = dist_lib.lines_parallel
 
     @abstractmethod
-    def get_graph(self):
-        """Return the full (or cached part of the) graph.
-
-        :return: dict[label, ((lat, lon), list[label_nbr_out], list[label_nbr_in)]
-        """
-
-    @abstractmethod
     def bb(self):
         """Bounding box.
 
@@ -93,14 +87,6 @@ class BaseMap(object):
     @abstractmethod
     def node_coordinates(self, node_key):
         """Coordinates for given node key."""
-
-    @abstractmethod
-    def preload_nodes(self, path, dist):
-        """Preload all nodes that are within a certain range from a given path.
-
-        This avoids the repeated querying of the database.
-        """
-        return None
 
     @abstractmethod
     def edges_closeto(self, loc, max_dist=None, max_elmt=None):

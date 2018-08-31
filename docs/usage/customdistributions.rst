@@ -16,8 +16,11 @@ For example, if you want to use a uniform distribution over the possible road se
 
 .. code-block:: python
 
-   def logprob_trans(self, prev_m, next_label=None, next_pos=None):
+   def logprob_trans(self, prev_m, edge_m, edge_o, is_prev_ne, is_next_ne):
        return -math.log(len(self.matcher.map.nodes_nbrto(self.edge_m.last_point())))
+
+Note that ``prev_m.edge_m`` and ``edge_m`` are not necessarily connected. For example if the ``Map`` object
+returns a neighbor state that is not connected in the roadmap. This functionality is used to allow switching lanes.
 
 
 Emission probability distribution
@@ -33,16 +36,14 @@ For example, a simple step function with more tolerance for non-emitting nodes:
 
 .. code-block:: python
 
-   def logprob_obs(self, dist, prev_m, new_edge_m, new_edge_o, is_prev_ne, is_next_ne):
-       if dist < 10:
-           return -math.log(10)
-       return -np.inf
-
    def logprob_obs(self, dist, prev_m, new_edge_m, new_edge_o, is_ne):
-       if dist < 50:
-           return -math.log(50)
+       if is_ne:
+           if dist < 50:
+               return -math.log(50)
+       else:
+           if dist < 10:
+               return -math.log(10)
        return -np.inf
-
 
 Note that an emission probability can be given for a non-emitting node. This allows you to rank non-emitting nodes
 even when no observations are available. It will then insert pseudo-observations on the line between the previous
