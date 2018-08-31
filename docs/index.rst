@@ -18,7 +18,7 @@ Reference:
    European Conference on Data Analysis (ECDA), Paderborn, Germany, 2018.
 
 
-.. figure:: https://people.cs.kuleuven.be/wannes.meert/leuvenmapmatching/example1.png?v=1
+.. figure:: https://people.cs.kuleuven.be/wannes.meert/leuvenmapmatching/example1.png?v=2
    :alt: example
 
 
