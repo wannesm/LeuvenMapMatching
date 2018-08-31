@@ -113,9 +113,9 @@ class BaseMatching(object):
             # state to prefer shorter paths
             new_logprobe = self.logprobe + self.matcher.ne_length_factor_log
             new_logprobne = self.logprobne + new_logprob_delta
-            # "+ 2" to punish non-emitting states a bit less. Otherwise it would be
+            # "+ 1" to punish non-emitting states a bit less. Otherwise it would be
             # similar to (Pr_tr*Pr_obs)**2, which punishes just one non-emitting state too much.
-            new_logprob = new_logprobe + new_logprobne / (obs_ne + 2)
+            new_logprob = new_logprobe + new_logprobne / (obs_ne + 1)
             new_length = self.length
         new_logprobema = ema_const.cur * new_logprob_delta + ema_const.prev * self.logprobema
         new_stop |= self.matcher.do_stop(new_logprob / new_length, dist, logprob_trans, logprob_obs)
@@ -662,14 +662,14 @@ class BaseMatcher:
 
                 else:
                     # === Move from edge to next edge ===
-                    nbrs = self.map.nodes_nbrto(m.edge_m.l2)
-                    if nbrs is None:
+                    nbrs = self.map.edges_nbrto((m.edge_m.l1, m.edge_m.l2))
+                    if nbrs is None or len(nbrs) == 0:
                         if __debug__:
-                            logger.debug(f"No neighbours found for node {m.edge_m.l2}")
+                            logger.debug(f"No neighbours found for edge {m.edge_m.label}")
                         continue
-                    for nbr_label, nbr_loc in nbrs:
-                        if m.edge_m.l2 != nbr_label and m.edge_m.l1 != nbr_label:
-                            edge_m = Segment(m.edge_m.l2, m.edge_m.p2, nbr_label, nbr_loc)
+                    for nbr_label1, nbr_loc1, nbr_label2, nbr_loc2 in nbrs:
+                        if m.edge_m.l2 != nbr_label2 and m.edge_m.l1 != nbr_label2:  # same edge is different action
+                            edge_m = Segment(nbr_label1, nbr_loc1, nbr_label2, nbr_loc2)
                             edge_o = Segment(f"O{obs_idx}", self.path[obs_idx])
                             m_next = m.next(edge_m, edge_o, obs=obs_idx)
                             if m_next is not None:
@@ -767,23 +767,24 @@ class BaseMatcher:
                 continue
             # == Move to neighbour edge from edge ==
             if m.edge_m.l2 is not None and self.only_edges:
-                nbrs = self.map.nodes_nbrto(m.edge_m.l2)
+                nbrs = self.map.edges_nbrto((m.edge_m.l1, m.edge_m.l2))
                 # print("Neighbours for {}: {}".format(m, nbrs))
-                if nbrs is None:
+                if nbrs is None or len(nbrs) == 0:
                     if __debug__:
-                        logger.debug(f"No neighbours found for node {m.edge_m.l2} ({m.label}, non-emitting)")
+                        logger.debug(f"No neighbours found for edge {m.edge_m.label} ({m.label}, non-emitting)")
                     continue
                 if __debug__:
-                    logger.debug(f"   Move to {len(nbrs)} neighbours from edge {m.edge_m.l2} ({m.label}, non-emitting)")
+                    logger.debug(f"   Move to {len(nbrs)} neighbours from edge {m.edge_m.label} "
+                                 f"({m.label}, non-emitting)")
                     logger.debug(m.repr_header())
-                for nbr_label, nbr_loc in nbrs:
-                    if self._node_in_prev_ne(m, nbr_label):
+                for nbr_label1, nbr_loc1, nbr_label2, nbr_loc2 in nbrs:
+                    if self._node_in_prev_ne(m, nbr_label2):
                         if __debug__:
-                            logger.debug(self.matching.repr_static(('x', '{} <'.format(nbr_label))))
+                            logger.debug(self.matching.repr_static(('x', '{} <'.format(nbr_label2))))
                         continue
                     # === Move to next edge ===
-                    if m.edge_m.l2 != nbr_label and m.edge_m.l1 != nbr_label:
-                        edge_m = Segment(m.edge_m.l2, m.edge_m.p2, nbr_label, nbr_loc)
+                    if m.edge_m.l2 != nbr_label2 and m.edge_m.l1 != nbr_label2:
+                        edge_m = Segment(nbr_label1, nbr_loc1, nbr_label2, nbr_loc2)
                         edge_o = Segment(f"O{obs_idx}", obs, f"O{obs_idx+1}", obs_next)
                         m_next = m.next(edge_m, edge_o, obs=obs_idx, obs_ne=nb_ne)
                         if m_next is not None:
@@ -818,7 +819,7 @@ class BaseMatcher:
                                 logger.debug(str(m_next))
                     else:
                         if __debug__:
-                            logger.debug(self.matching.repr_static(('x', f'{m.edge_m.l2}-{nbr_label} <')))
+                            logger.debug(self.matching.repr_static(('x', f'{nbr_label1}-{nbr_label2} <')))
             # == Move to neighbour node from node==
             if m.edge_m.l2 is None and not self.only_edges:
                 cur_node = m.edge_m.l1
@@ -876,24 +877,24 @@ class BaseMatcher:
                 continue
             if m.edge_m.l2 is not None:
                 # Move to neighbour edge from edge
-                nbrs = self.map.nodes_nbrto(m.edge_m.l2)
+                nbrs = self.map.edges_nbrto((m.edge_m.l1, m.edge_m.l2))
                 # print("Neighbours for {}: {}".format(m, nbrs))
-                if nbrs is None:
+                if nbrs is None or len(nbrs) == 0:
                     if __debug__:
-                        logger.debug("No neighbours found for node {}".format(m.edge_m.l2, m.label))
+                        logger.debug("No neighbours found for edge {} ({})".format(m.edge_m.label, m.label))
                     continue
                 if __debug__:
-                    logger.debug(f"   Move to {len(nbrs)} neighbours from node {m.edge_m.l2} "
+                    logger.debug(f"   Move to {len(nbrs)} neighbours from edge {m.edge_m.label} "
                                  f"({m.label}, non-emitting->emitting)")
                     logger.debug(m.repr_header())
-                for nbr_label, nbr_loc in nbrs:
-                    if self._node_in_prev_ne(m, nbr_label):
+                for nbr_label1, nbr_loc1, nbr_label2, nbr_loc2 in nbrs:
+                    if self._node_in_prev_ne(m, nbr_label2):
                         if __debug__:
-                            logger.debug(self.matching.repr_static(('x', '{} <'.format(nbr_label))))
+                            logger.debug(self.matching.repr_static(('x', '{} <'.format(nbr_label2))))
                         continue
                     # Move to next edge
-                    if m.edge_m.l1 != nbr_label and m.edge_m.l2 != nbr_label:
-                        edge_m = Segment(m.edge_m.l2, m.edge_m.p2, nbr_label, nbr_loc)
+                    if m.edge_m.l1 != nbr_label2 and m.edge_m.l2 != nbr_label2:
+                        edge_m = Segment(nbr_label1, nbr_loc1, nbr_label2, nbr_loc2)
                         edge_o = Segment(f"O{obs_idx+1}", obs_next)
                         m_next = m.next(edge_m, edge_o, obs=obs_idx)
                         if m_next is not None:
@@ -912,7 +913,7 @@ class BaseMatcher:
                                 logger.debug(str(m_next))
                     else:
                         if __debug__:
-                            logger.debug(self.matching.repr_static(('x', '{} <'.format(nbr_label))))
+                            logger.debug(self.matching.repr_static(('x', '{} <'.format(nbr_label2))))
             else:  # m.edge_m.l2 is None:
                 # Move to neighbour node from node
                 cur_node = m.edge_m.l1

@@ -37,7 +37,7 @@ def distance_segment_to_segment(f1, f2, t1, t2):
     :param f2:
     :param t1: To
     :param t2:
-    :return: (distance, proj on f, proj on t, rel pos on t)
+    :return: (distance, proj on f, proj on t, rel pos on f, rel pos on t)
     """
     x1, y1 = f1
     x2, y2 = f2
@@ -139,3 +139,31 @@ def box_around_point(p, dist):
     lat_t, lon_r = lat + dist, lon + dist
     lat_b, lon_l = lat - dist, lon - dist
     return lat_b, lon_l, lat_t, lon_r
+
+
+def lines_parallel(la, lb, lc, ld, d=None):
+    x1 = la[0] - lb[0]
+    y1 = la[1] - lb[1]
+    if x1 == 0:
+        if y1 == 0:
+            return False
+        s1 = 0
+    else:
+        s1 = math.atan(abs(y1 / x1))
+    x2 = lc[0] - ld[0]
+    y2 = lc[1] - ld[1]
+    if x2 == 0:
+        s2 = 0
+        if y2 == 0:
+            return False
+    else:
+        s2 = math.atan(abs(y2 / x2))
+    thr = math.pi / 180
+    if abs(s1 - s2) > thr:
+        return False
+    if d is not None:
+        dist, _, _, _, _ = distance_segment_to_segment(la, lb, lc, ld)
+        if dist > d:
+            return False
+    return True
+

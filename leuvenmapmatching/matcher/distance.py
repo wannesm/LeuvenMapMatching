@@ -126,13 +126,17 @@ class DistanceMatcher(BaseMatcher):
         self.gobackonedge_factor_log = math.log(0.5)
         self.gobacktoedge_factor_log = math.log(0.5)
 
+        self.notconnectededges_factor_log = math.log(0.5)
+
     def logprob_trans(self, prev_m: DistanceMatching, edge_m, edge_o,
                       is_prev_ne=False, is_next_ne=False):
         """Transition probability.
 
-        P(dt) = e^(-d_t^2 / (2 * dist_noise^2))
+        :math:`P(dt) = exp(-d_t^2 / (2 * dist_{noise}^2))`
 
-        with d_t = |d_s - d_o|, d_s = |loc_prev_state - loc_cur_state|, d_o = |loc_prev_obs - loc_cur_obs|
+        with :math:`d_t = |d_s - d_o|,
+        d_s = |loc_{prev\_state} - loc_{cur\_state}|,
+        d_o = |loc_{prev\_obs} - loc_{cur\_obs}|`
 
         This function is more tolerant for low values. The intuition is that values under a certain
         distance should all be close to probability 1.0.
@@ -147,7 +151,9 @@ class DistanceMatcher(BaseMatcher):
         :return:
         """
         d_z = self.map.distance(prev_m.edge_o.pi, edge_o.pi)
-        if not self.exact_dt_s or prev_m.edge_m.label == edge_m.label:
+        if ((not self.exact_dt_s) or
+            prev_m.edge_m.label == edge_m.label or  # On same edge
+            prev_m.edge_m.l2 != edge_m.l1):  # Edges are not connected
             d_x = self.map.distance(prev_m.edge_m.pi, edge_m.pi)
         else:
             d_x = self.map.distance(prev_m.edge_m.pi, prev_m.edge_m.p2) + self.map.distance(prev_m.edge_m.p2, edge_m.pi)
@@ -167,7 +173,10 @@ class DistanceMatcher(BaseMatcher):
                 logprob += self.gobackonedge_factor_log  # Prefer not going back
         else:
             # Moving states
-            if self.avoid_goingback:
+            if prev_m.edge_m.l2 != edge_m.l1:
+                # We are moving between states that represent edges that are not connected through a node
+                logprob += self.notconnectededges_factor_log
+            elif self.avoid_goingback:
                 # Goin back on state
                 going_back = False
                 for m in prev_m.prev:
@@ -187,9 +196,9 @@ class DistanceMatcher(BaseMatcher):
     def logprob_obs(self, dist, prev_m, new_edge_m, new_edge_o, is_ne=False):
         """Emission probability for emitting states.
 
-        P(dt) = e^(-d_o^2 / (2 * obs_noise^2))
+        :math:`P(dt) = exp(-d_o^2 / (2 * obs_{noise}^2))`
 
-        with d_o = |loc_state - loc_obs|
+        with :math:`d_o = |loc_{state} - loc_{obs}|`
 
         """
         if is_ne:

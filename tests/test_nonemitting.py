@@ -18,9 +18,13 @@ try:
 except ImportError:
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir)))
     import leuvenmapmatching as mm
-from leuvenmapmatching.matcher.distance import DistanceMatcher
+from leuvenmapmatching.matcher.distance import DistanceMatcher, DistanceMatching
 from leuvenmapmatching.matcher.simple import SimpleMatcher
 from leuvenmapmatching.map.inmem import InMemMap
+
+MYPY = False
+if MYPY:
+    from typing import Tuple
 
 
 logger = mm.logger
@@ -295,13 +299,20 @@ def test_path3_dist():
     matcher = DistanceMatcher(mapdb, max_dist_init=0.2,
                               obs_noise=0.5, obs_noise_ne=2, dist_noise=0.5,
                               non_emitting_states=True)
-    matcher.match(path)
+    states, lastidx = matcher.match(path)
     path_pred = matcher.path_pred_onlynodes
     if directory:
         from leuvenmapmatching import visualization as mmviz
         mmviz.plot_map(mapdb, matcher=matcher, show_labels=True, show_matching=True, linewidth=2,
                        filename=str(directory / "test_path_3_dist.png"))
     assert path_pred == path_sol, f"Nodes not equal:\n{path_pred}\n{path_sol}"
+
+    for obs_idx, m in enumerate(matcher.lattice_best):  # type: Tuple[int, DistanceMatching]
+        state = m.shortkey  # tuple indicating edge
+        ne_str = "e" if m.is_emitting() else "ne"  # state is emitting or not
+        p1_str = "{:>5.2f}-{:<5.2f}".format(*m.edge_m.pi)  # best matching location on graph
+        p2_str = "{:>5.2f}-{:<5.2f}".format(*m.edge_o.pi)  # best matching location on track
+        print(f"{obs_idx:<2} | {state} | {ne_str:<2} | {p1_str} | {p2_str}")
 
 
 if __name__ == "__main__":

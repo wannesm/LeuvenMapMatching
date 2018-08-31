@@ -189,3 +189,33 @@ def destination_radians(lat1, lon1, bearing, dist):
     lat2 = asin(sin(lat1) * cos(d) + cos(lat1) * sin(d) * cos(bearing))
     lon2 = lon1 + atan2(sin(bearing) * sin(d) * cos(lat1), cos(d) - sin(lat1) * sin(lat2))
     return lat2, lon2
+
+
+def lines_parallel(f1, f2, t1, t2, d=None):
+    latf1, lonf1 = f1
+    latf1, lonf1 = radians(latf1), radians(lonf1)
+    f1 = 0, 0  # Origin
+
+    latf2, lonf2 = f2
+    latf2, lonf2 = radians(latf2), radians(lonf2)
+    df1f2 = distance_haversine_radians(latf1, lonf1, latf2, lonf2)
+    bf1f2 = bearing_radians(latf1, lonf1, latf2, lonf2)
+    # print(f"bf1f2 = {bf1f2} = {degrees(bf1f2)} degrees")
+    f2 = (df1f2 * cos(bf1f2), df1f2 * sin(bf1f2))
+
+    latt1, lont1 = t1
+    latt1, lont1 = radians(latt1), radians(lont1)
+    df1t1 = distance_haversine_radians(latf1, lonf1, latt1, lont1)
+    bf1t1 = bearing_radians(latf1, lonf1, latt1, lont1)
+    # print(f"bf1t1 = {bf1t1} = {degrees(bf1t1)} degrees")
+    t1 = (df1t1 * cos(bf1t1), df1t1 * sin(bf1t1))
+
+    latt2, lont2 = t2
+    latt2, lont2 = radians(latt2), radians(lont2)
+    dt1t2 = distance_haversine_radians(latt1, lont1, latt2, lont2)
+    # print(f"dt1t2 = {dt1t2}")
+    bt1t2 = bearing_radians(latt1, lont1, latt2, lont2)
+    # print(f"bt1t2 = {bt1t2} = {degrees(bt1t2)} degrees")
+    t2 = (t1[0] + dt1t2 * cos(bt1t2), t1[1] + dt1t2 * sin(bt1t2))
+
+    return diste.lines_parallel(f1, f2, t1, t2, d=d)

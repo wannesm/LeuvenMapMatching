@@ -47,7 +47,7 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
     if matcher is not None:
         path = matcher.path
         counts = matcher.node_counts()
-        nodes = matcher.path_pred_onlynodes
+        nodes = None
         lat_nodes = matcher.lattice_best
     else:
         lat_nodes = None
@@ -191,14 +191,22 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
                 ann = ax.annotate(f"O{path_startidx + li}", xy=(lx, ly), color=path_color, fontsize=fontsize)
                 ann.set_rotation(45)
 
-    if nodes:
+    if nodes or matcher:
         logger.debug('Plot nodes ...')
         xs, ys, ls = [], [], []
         prev = None
-        for node in nodes:
-            if type(node) == tuple:
-                node = node[0]
-            lat, lon = map_con.node_coordinates(node)
+        node_locs = []
+        if nodes:
+            for node in nodes:
+                if type(node) == tuple:
+                    node = node[0]
+                lat, lon = map_con.node_coordinates(node)
+                node_locs.append((lat, lon, node))
+        else:
+            for m in matcher.lattice_best:
+                lat, lon = m.edge_m.pi
+                node_locs.append((lat, lon, m.edge_m.label))
+        for lat, lon, label in node_locs:
             if coord_trans:
                 lat, lon = coord_trans(lat, lon)
             if bb[0] <= lat <= bb[2] and bb[1] <= lon <= bb[3]:
@@ -206,18 +214,18 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
                     x, y = to_pixels(*prev)
                     xs.append(x)
                     ys.append(y)
-                    ls.append(node)
+                    ls.append(label)
                     prev = None
                 x, y = to_pixels(lat, lon)
                 xs.append(x)
                 ys.append(y)
-                ls.append(node)
+                ls.append(label)
             else:
                 if prev is None:
                     x, y = to_pixels(lat, lon)
                     xs.append(x)
                     ys.append(y)
-                    ls.append(node)
+                    ls.append(label)
                 prev = lat, lon
         ax.plot(xs, ys, 'o-', linewidth=linewidth * 3, markersize=linewidth * 3, alpha=0.75,
                 color=nodes_color)
