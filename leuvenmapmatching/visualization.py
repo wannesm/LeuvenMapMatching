@@ -203,9 +203,14 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
                 lat, lon = map_con.node_coordinates(node)
                 node_locs.append((lat, lon, node))
         else:
+            prev_m = None
             for m in matcher.lattice_best:
+                if prev_m is not None and prev_m.edge_m.l2 == m.edge_m.l1:
+                    lat, lon = m.edge_m.p1
+                    node_locs.append((lat, lon, m.edge_m.l1))
                 lat, lon = m.edge_m.pi
                 node_locs.append((lat, lon, m.edge_m.label))
+                prev_m = m
         for lat, lon, label in node_locs:
             if coord_trans:
                 lat, lon = coord_trans(lat, lon)
