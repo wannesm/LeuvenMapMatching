@@ -28,6 +28,11 @@ For visualiation purposes the following methods need to be implemented:
 
 from abc import abstractmethod
 import logging
+MYPY = False
+if MYPY:
+    from typing import Tuple, Union, List
+    LabelType = Union[int, str]
+    LocType = Tuple[float, float]
 
 
 logger = logging.getLogger("be.kuleuven.cs.dtai.mapmatching")
@@ -61,6 +66,7 @@ class BaseMap(object):
         self.distance_point_to_segment = dist_lib.distance_point_to_segment
         self.distance_segment_to_segment = dist_lib.distance_segment_to_segment
         self.box_around_point = dist_lib.box_around_point
+        self.lines_parallel = dist_lib.lines_parallel
 
     @abstractmethod
     def get_graph(self):
@@ -120,12 +126,29 @@ class BaseMap(object):
 
     @abstractmethod
     def nodes_nbrto(self, node):
-        """Return all nodes that are linked to `node` and are closer than `max_dist` to `loc_obs`
+        # type: (BaseMap, LabelType) -> List[Tuple[LabelType, LocType]]
+        """Return all nodes that are linked to ``node``.
 
         :param node: Node identifier
         :return: list[tuple[label, loc]]
         """
-        return None
+        return []
+
+    def edges_nbrto(self, edge):
+        # type: (BaseMap, Tuple[LabelType, LabelType]) -> List[Tuple[LabelType, LocType, LabelType, LocType]]
+        """Return all edges that are linked to ``edge``.
+
+        Defaults to ``nodes_nbrto``.
+
+        :param edge: Edge identifier
+        :return: list[tuple[label1, label2, loc1, loc2]]
+        """
+        results = []
+        l1, l2 = edge
+        p2 = self.node_coordinates(l2)
+        for l3, p3 in self.nodes_nbrto(l2):
+            results.append((l2, p2, l3, p3))
+        return results
 
     @abstractmethod
     def all_nodes(self, bb=None):

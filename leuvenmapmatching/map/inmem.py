@@ -14,6 +14,7 @@ import logging
 import time
 from pathlib import Path
 import pickle
+from functools import partial
 try:
     import rtree
 except ImportError:
@@ -22,7 +23,17 @@ try:
     import pyproj
 except ImportError:
     pyproj = None
-from functools import partial
+try:
+    import tqdm
+except ImportError:
+    tqdm = None
+MYPY = False
+if MYPY:
+    from typing import Optional, Set, Tuple, Dict, Union
+    LabelType = Union[int, str]
+    LocType = Tuple[float, float]
+    EdgeType = Tuple[LabelType, LabelType]
+
 
 from .base import BaseMap
 
@@ -33,8 +44,7 @@ logger = logging.getLogger("be.kuleuven.cs.dtai.mapmatching")
 class InMemMap(BaseMap):
     def __init__(self, name, use_latlon=True, use_rtree=False, index_edges=False,
                  crs_lonlat=None, crs_xy=None, graph=None, dir=None, deserializing=False):
-        """
-        In-memory representation of a map.
+        """In-memory representation of a map.
 
         This is a simple database-like object to perform experiments with map matching.
         For production purposes it is recommended to use your own derived
@@ -42,6 +52,7 @@ class InMemMap(BaseMap):
 
         This class supports:
         - Indexing using rtrees to allow for fast searching of points on the map.
+          When using the rtree index, only integer numbers are allowed as node labels.
         - Serializing to write and read from files.
         - Projecting points to a different frame (e.g. GPS to Lambert)
 
@@ -58,7 +69,7 @@ class InMemMap(BaseMap):
         :param deserializing: Internal variable to indicate that the object is being build from a file.
         """
         super(InMemMap, self).__init__(name, use_latlon=use_latlon)
-        self.dir = Path(".") if dir is None else Path(dir)
+        self.dir = None if dir is None else Path(dir)
         self.index_edges = index_edges
         self.graph = dict() if graph is None else graph
         self.rtree = None
@@ -78,6 +89,8 @@ class InMemMap(BaseMap):
                 raise Exception("pyproj package not found")
             self.lonlat2xy = pyproj_notfound
             self.xy2lonlat = pyproj_notfound
+
+        self.linked_edges = None  # type: Optional[Dict[EdgeType, Set[Tuple[EdgeType]]]]
 
     def serialize(self):
         """Create a serializable data structure."""
@@ -174,6 +187,8 @@ class InMemMap(BaseMap):
         else:
             self.graph[node] = (loc, [])
         if self.use_rtree and self.rtree:
+            if type(node) is not int:
+                raise Exception(f"Rtree index only supports integer keys for vertices")
             self.rtree.insert(node, (loc[0], loc[1], loc[0], loc[1]))
 
     def del_node(self, node):
@@ -214,7 +229,7 @@ class InMemMap(BaseMap):
         """Return all edges.
 
         :param bb: Bounding box
-        :return:
+        :return: (key_a, loc_a, nbr, loc_b)
         """
         if bb is None:
             keyvals = self.graph.items()
@@ -287,9 +302,9 @@ class InMemMap(BaseMap):
         rtree_fn = self.rtree_fn()
         args = []
 
-        if self.graph and (not deserializing or rtree_fn is None or not rtree_fn.exists()):
+        if self.graph and len(self.graph) > 0 and (not deserializing or rtree_fn is None or not rtree_fn.exists()):
             if self.index_edges:
-                logger.debug("Index edges")
+                logger.debug("Generator to index edges")
 
                 def generator_function():
                     for label, data in self.graph.items():
@@ -301,8 +316,12 @@ class InMemMap(BaseMap):
                             lat_max = max(lat_max, olat)
                             lon_min = min(lon_min, olon)
                             lon_max = max(lon_max, olon)
+                        if type(label) is not int:
+                            raise Exception(f"Rtree index only supports integer keys for vertices")
                         yield (label, (lat_min, lon_min, lat_max, lon_max), None)
             else:
+                logger.debug("Generator to index nodes")
+
                 def generator_function():
                     for label, data in self.graph.items():
                         lat, lon = data[0]
@@ -319,7 +338,7 @@ class InMemMap(BaseMap):
         elif deserializing:
             raise Exception("Cannot deserialize, no directory given")
         else:
-            logger.debug("Creating new in-memory rtree index ...")
+            logger.debug(f"Creating new in-memory rtree index (args={args}) ...")
         self.rtree = rtree.index.Index(*args)
         t_delta = time.time() - t_start
         logger.debug(f"... done: rtree size = {self.rtree_size()}, time = {t_delta} sec")
@@ -468,6 +487,22 @@ class InMemMap(BaseMap):
                 pass
         return results
 
+    def edges_nbrto(self, edge):
+        results = []
+        l1, l2 = edge
+        p1 = self.node_coordinates(l1)
+        p2 = self.node_coordinates(l2)
+        # Edges that connect at end of this edge
+        for l3, p3 in self.nodes_nbrto(l2):
+            results.append((l2, p2, l3, p3))
+        # Edges that are in parallel and close
+        if self.linked_edges:
+            for (l3, l4) in self.linked_edges.get(edge, []):
+                p3 = self.node_coordinates(l3)
+                p4 = self.node_coordinates(l4)
+                results.append((l3, p3, l4, p4))
+        return results
+
     def find_duplicates(self, func=None):
         """Find entries with identical locations."""
         cnt = 0
@@ -480,6 +515,31 @@ class InMemMap(BaseMap):
                 if func:
                     func(label, idxs)
         logger.info(f"Found {cnt} doubles")
+
+    def connect_parallelroads(self, dist=0.5, bb=None):
+        if self.rtree is None or not self.index_edges:
+            logger.error("Finding parallel roads requires and edge-based index")
+            return
+        self.linked_edges = {}
+        it = self.all_edges(bb=bb)
+        if tqdm:
+            it = tqdm.tqdm(list(it))
+        for key_a, loc_a, key_b, loc_b in it:
+            bb2 = [min(loc_a[0], loc_b[0]), min(loc_a[1], loc_b[1]),
+                   max(loc_a[0], loc_b[0]), max(loc_a[1], loc_b[1])]
+            for key_c, loc_c, key_d, loc_d in self.all_edges(bb=bb2):
+                if key_a == key_c or key_a == key_d or key_b == key_c or key_b == key_d:
+                    continue
+                # print(f"Test: ({key_a},{key_b}) - ({key_c},{key_d})")
+                if self.lines_parallel(loc_a, loc_b, loc_c, loc_d, d=dist):
+                    # print(f"Parallel: ({key_a},{key_b}) - ({key_c},{key_d})")
+                    key = (key_a, key_b)
+                    if key in self.linked_edges:
+                        self.linked_edges[key].add((key_c, key_d))
+                    else:
+                        self.linked_edges[key] = {(key_c, key_d)}
+        logger.debug(f"Linked {len(self.linked_edges)} edges")
+
 
     def print_stats(self):
         print("Graph\n-----")

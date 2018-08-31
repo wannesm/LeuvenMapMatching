@@ -126,6 +126,8 @@ class DistanceMatcher(BaseMatcher):
         self.gobackonedge_factor_log = math.log(0.5)
         self.gobacktoedge_factor_log = math.log(0.5)
 
+        self.notconnectededges_factor_log = math.log(0.5)
+
     def logprob_trans(self, prev_m: DistanceMatching, edge_m, edge_o,
                       is_prev_ne=False, is_next_ne=False):
         """Transition probability.
@@ -149,7 +151,9 @@ class DistanceMatcher(BaseMatcher):
         :return:
         """
         d_z = self.map.distance(prev_m.edge_o.pi, edge_o.pi)
-        if not self.exact_dt_s or prev_m.edge_m.label == edge_m.label:
+        if ((not self.exact_dt_s) or
+            prev_m.edge_m.label == edge_m.label or  # On same edge
+            prev_m.edge_m.l2 != edge_m.l1):  # Edges are not connected
             d_x = self.map.distance(prev_m.edge_m.pi, edge_m.pi)
         else:
             d_x = self.map.distance(prev_m.edge_m.pi, prev_m.edge_m.p2) + self.map.distance(prev_m.edge_m.p2, edge_m.pi)
@@ -169,7 +173,10 @@ class DistanceMatcher(BaseMatcher):
                 logprob += self.gobackonedge_factor_log  # Prefer not going back
         else:
             # Moving states
-            if self.avoid_goingback:
+            if prev_m.edge_m.l2 != edge_m.l1:
+                # We are moving between states that represent edges that are not connected through a node
+                logprob += self.notconnectededges_factor_log
+            elif self.avoid_goingback:
                 # Goin back on state
                 going_back = False
                 for m in prev_m.prev:
