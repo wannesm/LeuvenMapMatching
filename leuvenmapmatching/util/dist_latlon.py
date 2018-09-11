@@ -56,6 +56,11 @@ def distance_point_to_segment(p, s1, s2, delta=0.0):
     lat2, lon2 = radians(lat2), radians(lon2)
     lat3, lon3 = radians(lat3), radians(lon3)
 
+    dist_hs = distance_haversine_radians(lat1, lon1, lat2, lon2)
+    if dist_hs == 0:
+        dist_ct, pi, ti = distance(p, s1), s1, 0
+        return dist_ct, pi, ti
+
     d13 = distance_haversine_radians(lat1, lon1, lat3, lon3, radius=1)
     b13 = bearing_radians(lat1, lon1, lat3, lon3)
     b12 = bearing_radians(lat1, lon1, lat2, lon2)
@@ -63,7 +68,6 @@ def distance_point_to_segment(p, s1, s2, delta=0.0):
     dxt = asin(sin(d13) * sin(b13 - b12))
     dist_ct = fabs(dxt) * earth_radius
     dat = acos(cos(d13) / cos(dxt)) * earth_radius
-    dist_hs = distance_haversine_radians(lat1, lon1, lat2, lon2)
     ti = dat / dist_hs
     if ti > 1.0:
         ti = 1.0

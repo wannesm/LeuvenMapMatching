@@ -27,6 +27,11 @@ try:
     import tqdm
 except ImportError:
     tqdm = None
+
+
+from .base import BaseMap
+
+
 MYPY = False
 if MYPY:
     from typing import Optional, Set, Tuple, Dict, Union
@@ -35,15 +40,12 @@ if MYPY:
     EdgeType = Tuple[LabelType, LabelType]
 
 
-from .base import BaseMap
-
-
 logger = logging.getLogger("be.kuleuven.cs.dtai.mapmatching")
 
 
 class InMemMap(BaseMap):
     def __init__(self, name, use_latlon=True, use_rtree=False, index_edges=False,
-                 crs_lonlat=None, crs_xy=None, graph=None, dir=None, deserializing=False):
+                 crs_lonlat=None, crs_xy=None, graph=None, linked_edges=None, dir=None, deserializing=False):
         """In-memory representation of a map.
 
         This is a simple database-like object to perform experiments with map matching.
@@ -90,7 +92,7 @@ class InMemMap(BaseMap):
             self.lonlat2xy = pyproj_notfound
             self.xy2lonlat = pyproj_notfound
 
-        self.linked_edges = None  # type: Optional[Dict[EdgeType, Set[Tuple[EdgeType]]]]
+        self.linked_edges = linked_edges  # type: Optional[Dict[EdgeType, Set[Tuple[EdgeType]]]]
 
     def serialize(self):
         """Create a serializable data structure."""
@@ -101,7 +103,8 @@ class InMemMap(BaseMap):
             "use_rtree": self.use_rtree,
             "index_edges": self.index_edges,
             "crs_lonlat": self.crs_lonlat,
-            "crs_xy": self.crs_xy
+            "crs_xy": self.crs_xy,
+            "linked_edges": self.linked_edges
         }
         if self.dir is not None:
             data["dir"] = self.dir
@@ -113,8 +116,9 @@ class InMemMap(BaseMap):
         nmap = cls(data["name"], dir=data.get("dir", None),
                    use_latlon=data["use_latlon"], use_rtree=data["use_rtree"],
                    index_edges=data["index_edges"],
-                   crs_lonlat=data["crs_lonlat"], crs_xy=data["crs_xy"],
-                   graph=data["graph"], deserializing=True)
+                   crs_lonlat=data.get("crs_lonlat", None), crs_xy=data.get("crs_xy", None),
+                   graph=data.get("graph", None), linked_edges=data.get("linked_edges", None),
+                   deserializing=True)
         return nmap
 
     def dump(self):
@@ -298,8 +302,10 @@ class InMemMap(BaseMap):
 
         rtree_fn = self.rtree_fn()
         args = []
+        if deserializing and (rtree_fn is None or not rtree_fn.exists()):
+            deserializing = False
 
-        if self.graph and len(self.graph) > 0 and (not deserializing or rtree_fn is None or not rtree_fn.exists()):
+        if self.graph and len(self.graph) > 0 and not deserializing:
             if self.index_edges:
                 logger.debug("Generator to index edges")
 
@@ -454,6 +460,8 @@ class InMemMap(BaseMap):
         for label in nodes:
             oloc, nbrs = self.graph[label]
             for nbr in nbrs:
+                if label == nbr:
+                    continue
                 nbr_data = self.graph[nbr]
                 dist, pi, ti = self.distance_point_to_segment(loc, oloc, nbr_data[0])
                 # print(f"label={label}/{oloc}, nbr={nbr}/{nbr_data[0]}   -- loc={loc}  -> {dist}, {pi}, {ti}")
@@ -533,7 +541,6 @@ class InMemMap(BaseMap):
                     else:
                         self.linked_edges[key] = {(key_c, key_d)}
         logger.debug(f"Linked {len(self.linked_edges)} edges")
-
 
     def print_stats(self):
         print("Graph\n-----")

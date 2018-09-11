@@ -11,6 +11,12 @@ import logging
 import math
 
 from .base import BaseMatching, BaseMatcher
+from ..util.segment import Segment
+
+MYPY = False
+if MYPY:
+    from typing import Tuple, Any, Dict
+
 
 logger = logging.getLogger("be.kuleuven.cs.dtai.mapmatching")
 
@@ -60,17 +66,26 @@ class DistanceMatching(BaseMatching):
 
 class DistanceMatcher(BaseMatcher):
     """
-    Take distance between observations vs states into account. Inspired on the
-    method presented in:
+    Map Matching that takes into account the distance on the map wrt distance between the
+    observations.
+
+    Inspired on the method presented in:
 
         P. Newson and J. Krumm. Hidden markov map matching through noise and sparseness.
         In Proceedings of the 17th ACM SIGSPATIAL international conference on advances
         in geographic information systems, pages 336–343. ACM, 2009.
+
+    The options available in :class:``BaseMatcher`` are inherited. Additionally, this class
+    offers:
+
+    - Transition probability is lower if the distance between observations and states is different
+    - Transition probability is lower if the the next match is going back on an edge or to a previous edge
+    - Transition probability is lower if two neighboring states represent not connected edges
+    - Skip non-emitting states if distance between states and observations is close to each other
     """
 
     def __init__(self, *args, **kwargs):
-        """Map Matching that takes into account the distance on the map wrt distance between the
-        observations.
+        """Create a new object.
 
         :param map_con: Map object to connect to map database
         :param obs_noise: Standard deviation of noise
@@ -112,10 +127,10 @@ class DistanceMatcher(BaseMatcher):
         # beta = np.sqrt(np.power(x_half, 2) / (np.log(2)*2))
         self.dist_noise = kwargs.get('dist_noise', self.obs_noise)
         self.dist_noise_ne = kwargs.get('dist_noise_ne', self.dist_noise)
-        self.beta = 2 * self.dist_noise**2
+        self.beta = 2 * self.dist_noise ** 2
         self.beta_ne = 2 * self.dist_noise_ne ** 2
 
-        self.sigma = 2 * self.obs_noise**2
+        self.sigma = 2 * self.obs_noise ** 2
         self.sigma_ne = 2 * self.obs_noise_ne ** 2
 
         self.restrained_ne = kwargs.get('restrained_ne', True)
@@ -128,10 +143,12 @@ class DistanceMatcher(BaseMatcher):
 
         self.notconnectededges_factor_log = math.log(0.5)
 
-    def logprob_trans(self, prev_m: DistanceMatching, edge_m, edge_o,
+    def logprob_trans(self, prev_m, edge_m, edge_o,
                       is_prev_ne=False, is_next_ne=False):
+        # type: (DistanceMatcher, DistanceMatching, Segment, Segment, bool, bool) -> Tuple[float, Dict[str, Any]]
         """Transition probability.
 
+        The probability is defined with a formula from the exponential family.
         :math:`P(dt) = exp(-d_t^2 / (2 * dist_{noise}^2))`
 
         with :math:`d_t = |d_s - d_o|,
@@ -152,8 +169,8 @@ class DistanceMatcher(BaseMatcher):
         """
         d_z = self.map.distance(prev_m.edge_o.pi, edge_o.pi)
         if ((not self.exact_dt_s) or
-            prev_m.edge_m.label == edge_m.label or  # On same edge
-            prev_m.edge_m.l2 != edge_m.l1):  # Edges are not connected
+                prev_m.edge_m.label == edge_m.label or  # On same edge
+                prev_m.edge_m.l2 != edge_m.l1):  # Edges are not connected
             d_x = self.map.distance(prev_m.edge_m.pi, edge_m.pi)
         else:
             d_x = self.map.distance(prev_m.edge_m.pi, prev_m.edge_m.p2) + self.map.distance(prev_m.edge_m.p2, edge_m.pi)
@@ -163,13 +180,13 @@ class DistanceMatcher(BaseMatcher):
             beta = self.beta_ne
         else:
             beta = self.beta
-        logprob = -d_t**2 / beta
+        logprob = -d_t ** 2 / beta
 
         # Penalties
         if prev_m.edge_m.label == edge_m.label:
             # Staying in same state
             if self.avoid_goingback and edge_m.key == prev_m.edge_m.key and edge_m.ti < prev_m.edge_m.ti:
-                # Going back on edge
+                # Going back on edge (direction is from p1 to p2 of the segment)
                 logprob += self.gobackonedge_factor_log  # Prefer not going back
         else:
             # Moving states
@@ -193,9 +210,11 @@ class DistanceMatcher(BaseMatcher):
         }
         return logprob, props
 
-    def logprob_obs(self, dist, prev_m, new_edge_m, new_edge_o, is_ne=False):
+    def logprob_obs(self, dist, prev_m=None, new_edge_m=None, new_edge_o=None, is_ne=False):
+        # type: (DistanceMatcher, float, DistanceMatching, Segment, Segment, bool) -> Tuple[float, Dict[str, Any]]
         """Emission probability for emitting states.
 
+        Exponential family:
         :math:`P(dt) = exp(-d_o^2 / (2 * obs_{noise}^2))`
 
         with :math:`d_o = |loc_{state} - loc_{obs}|`
@@ -205,7 +224,7 @@ class DistanceMatcher(BaseMatcher):
             sigma = self.sigma_ne
         else:
             sigma = self.sigma
-        result = -dist**2 / sigma
+        result = -dist ** 2 / sigma
         props = {
             'lpe': result
         }

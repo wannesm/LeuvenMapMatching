@@ -633,7 +633,7 @@ class BaseMatcher:
                                 logger.debug(str(m_next))
                     else:
                         if __debug__:
-                            logger.debug(self.matching.repr_static(('x', f'{nbr_label}-{nbr_label} <')))
+                            logger.debug(self.matching.repr_static(('x', f'{nbr_label}-{nbr_label} < self-loop')))
 
             else:
                 # == Move to neighbour from edge ==
@@ -668,7 +668,8 @@ class BaseMatcher:
                             logger.debug(f"No neighbours found for edge {m.edge_m.label}")
                         continue
                     for nbr_label1, nbr_loc1, nbr_label2, nbr_loc2 in nbrs:
-                        if m.edge_m.l2 != nbr_label2 and m.edge_m.l1 != nbr_label2:  # same edge is different action
+                        # same edge is different action, opposite edge should be allowed to return in a one-way street
+                        if m.edge_m.l2 != nbr_label2 and m.edge_m.l1 != nbr_label1:
                             edge_m = Segment(nbr_label1, nbr_loc1, nbr_label2, nbr_loc2)
                             edge_o = Segment(f"O{obs_idx}", self.path[obs_idx])
                             m_next = m.next(edge_m, edge_o, obs=obs_idx)
@@ -780,7 +781,7 @@ class BaseMatcher:
                 for nbr_label1, nbr_loc1, nbr_label2, nbr_loc2 in nbrs:
                     if self._node_in_prev_ne(m, nbr_label2):
                         if __debug__:
-                            logger.debug(self.matching.repr_static(('x', '{} <'.format(nbr_label2))))
+                            logger.debug(self.matching.repr_static(('x', '{} < node in prev ne'.format(nbr_label2))))
                         continue
                     # === Move to next edge ===
                     if m.edge_m.l2 != nbr_label2 and m.edge_m.l1 != nbr_label2:
@@ -819,7 +820,7 @@ class BaseMatcher:
                                 logger.debug(str(m_next))
                     else:
                         if __debug__:
-                            logger.debug(self.matching.repr_static(('x', f'{nbr_label1}-{nbr_label2} <')))
+                            logger.debug(self.matching.repr_static(('x', f'{nbr_label1}-{nbr_label2} < goes back (ne)')))
             # == Move to neighbour node from node==
             if m.edge_m.l2 is None and not self.only_edges:
                 cur_node = m.edge_m.l1
@@ -837,7 +838,7 @@ class BaseMatcher:
                     # print(f"self._node_in_prev_ne({m.label}, {nbr_label}) = {self._node_in_prev_ne(m, nbr_label)}")
                     if self._node_in_prev_ne(m, nbr_label):
                         if __debug__:
-                            logger.debug(self.matching.repr_static(('x', '{} <'.format(nbr_label))))
+                            logger.debug(self.matching.repr_static(('x', '{} < node in prev ne'.format(nbr_label))))
                         continue
                     # === Move to next node ===
                     if m.edge_m.l1 != nbr_label:
@@ -890,7 +891,7 @@ class BaseMatcher:
                 for nbr_label1, nbr_loc1, nbr_label2, nbr_loc2 in nbrs:
                     if self._node_in_prev_ne(m, nbr_label2):
                         if __debug__:
-                            logger.debug(self.matching.repr_static(('x', '{} <'.format(nbr_label2))))
+                            logger.debug(self.matching.repr_static(('x', '{} < node in prev ne'.format(nbr_label2))))
                         continue
                     # Move to next edge
                     if m.edge_m.l1 != nbr_label2 and m.edge_m.l2 != nbr_label2:
@@ -913,7 +914,7 @@ class BaseMatcher:
                                 logger.debug(str(m_next))
                     else:
                         if __debug__:
-                            logger.debug(self.matching.repr_static(('x', '{} <'.format(nbr_label2))))
+                            logger.debug(self.matching.repr_static(('x', '{} < going back'.format(nbr_label2))))
             else:  # m.edge_m.l2 is None:
                 # Move to neighbour node from node
                 cur_node = m.edge_m.l1
@@ -930,7 +931,7 @@ class BaseMatcher:
                 for nbr_label, nbr_loc in nbrs:
                     if self._node_in_prev_ne(m, nbr_label):
                         if __debug__:
-                            logger.debug(self.matching.repr_static(('x', '{} <'.format(nbr_label))))
+                            logger.debug(self.matching.repr_static(('x', '{} < node in prev ne'.format(nbr_label))))
                         continue
                     # Move to next node
                     if m.edge_m.l1 != nbr_label:
@@ -954,7 +955,7 @@ class BaseMatcher:
                                 logger.debug(str(m_next))
                     else:
                         if __debug__:
-                            logger.debug(self.matching.repr_static(('x', '{} <'.format(nbr_label))))
+                            logger.debug(self.matching.repr_static(('x', '{} < self-loop'.format(nbr_label))))
 
     def _prune_lattice(self, obs_idx):
         logger.debug('Prune lattice[{}] from {} to {}'

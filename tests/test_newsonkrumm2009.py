@@ -132,6 +132,8 @@ def read_map(map_fn):
             mmap.add_edge(prev_node, nt)
             mmap.add_edge(nt, prev_node)
     logger.debug(f"Read map with {node_cnt} nodes and {edge_cnt} edges")
+    mmap.use_rtree = True
+    mmap.setup_index()
     assert(new_node_id < 100000000000)
     return mmap
 
@@ -157,17 +159,18 @@ def load_data():
     # Map
     if road_network_pkl.exists() and road_network_xy_pkl.exists():
         map_con_latlon = InMemMap.from_pickle(road_network_pkl)
-        logger.debug(f"Read latlon road network from file ({map_con_latlon.size()} nodes)")
+        logger.debug(f"Read latlon road network from pkl file ({map_con_latlon.size()} nodes)")
         map_con = InMemMap.from_pickle(road_network_xy_pkl)
-        logger.debug(f"Read xy road network from file ({map_con.size()} nodes)")
+        logger.debug(f"Read xy road network from pkl file ({map_con.size()} nodes)")
+
     else:
         map_con_latlon = read_map(road_network)
+        correct_map(map_con_latlon)
         map_con_latlon.dump()
-        logger.debug(f"Saved latlon road network to file ({map_con_latlon.size()} nodes)")
+        logger.debug(f"Saved latlon road network to pkl file ({map_con_latlon.size()} nodes)")
         map_con = map_con_latlon.to_xy(name="road_network_xy", use_rtree=True)
-        correct_map(map_con)
         map_con.dump()
-        logger.debug(f"Saved xy road network to file ({map_con.size()} nodes)")
+        logger.debug(f"Saved xy road network to pkl file ({map_con.size()} nodes)")
 
     # Route
     if gps_data_pkl.exists() and gps_data_xy_pkl.exists():
@@ -251,9 +254,18 @@ def test_bug1():
 def test_route():
     if directory:
         import matplotlib.pyplot as plt
+    else:
+        plt = None
     nodes, map_con, map_con_latlon, route, route_latlon = load_data()
+    route_latlon = [(lat, lon) for lat, lon, _ in route_latlon]
     zoom_path = True
     # zoom_path = slice(2645, 2665)
+    slice_route = None
+    # slice_route = slice(2657, 2662)  # First location where some observations are missing
+    # slice_route = slice(2770, 2800)  # Observations are missing
+    # slice_route = slice(2910, 2950)  # Interesting point
+    # slice_route = slice(2910, 2929)  # Interesting point
+
 
     # if directory is not None:
     #     logger.debug("Plotting pre map ...")
@@ -262,12 +274,34 @@ def test_route():
     #                     filename=str(directory / "test_newson_route.png"))
     #     logger.debug("... done")
 
-    matcher = DistanceMatcher(map_con, min_prob_norm=0.001,
+    matcher = DistanceMatcher(map_con_latlon, min_prob_norm=0.0001,
                               max_dist=200,
                               dist_noise=6, dist_noise_ne=12,
                               obs_noise=30, obs_noise_ne=150,
                               non_emitting_states=True)
-    matcher.match(route[2657:2662])  # First location where some observations are missing
+
+    if not slice_route:
+        pkl_fn = this_path / "nodes_pred.pkl"
+        if pkl_fn.exists():
+            with pkl_fn.open("rb") as pkl_file:
+                logger.debug(f"Reading predicted nodes from pkl file")
+                route_nodes = pickle.load(pkl_file)
+        else:
+            matcher.match(route_latlon)
+            route_nodes = matcher.path_pred_onlynodes
+            with pkl_fn.open("wb") as pkl_file:
+                pickle.dump(route_nodes, pkl_file)
+        from leuvenmapmatching.util.evaluation import route_mismatch_factor
+        grnd_nodes, _ = zip(*nodes)
+        print(route_nodes[:10])
+        print(grnd_nodes[:10])
+        # TODO: route_nodes are acutally edge id s
+        factor = route_mismatch_factor(map_con_latlon, route_nodes, grnd_nodes, window=None)
+        print(f"factor = {factor}")
+    else:
+        matcher.match(route_latlon[slice_route])
+
+    # matcher.match(route[2657:2662])  # First location where some observations are missing
     # matcher.match(route[2770:2800])  # Observations are missing
     # matcher.match(route[2910:2950])  # Interesting point
     # matcher.match(route[2910:2929])  # Interesting point
@@ -279,10 +313,10 @@ def test_route():
         logger.debug("Plotting post map ...")
         fig = plt.figure(figsize=(200, 200))
         ax = fig.get_axes()
-        mm_viz.plot_map(map_con, matcher=matcher, use_osm=True, ax=ax,
+        mm_viz.plot_map(map_con_latlon, matcher=matcher, use_osm=True, ax=ax,
                         show_lattice=False, show_labels=False, zoom_path=zoom_path,
-                        show_matching=True, show_graph=False,
-                        coord_trans=map_con.yx2latlon)
+                        show_matching=True, show_graph=False)
+                        # coord_trans=map_con.yx2latlon)
         plt.savefig(str(directory / "test_newson_route_matched.png"))
         plt.close(fig)
         logger.debug("... done")
@@ -298,6 +332,6 @@ if __name__ == "__main__":
     logger.addHandler(logging.StreamHandler(sys.stdout))
     directory = Path(os.environ.get('TESTDIR', Path(__file__).parent))
     print(f"Saving files to {directory}")
-    # test_route()
-    test_route_slice1()
+    test_route()
+    # test_route_slice1()
     # test_bug1()

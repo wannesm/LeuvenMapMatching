@@ -25,7 +25,7 @@ match_ne_color = mcolors.CSS4_COLORS['olive']
 lattice_color = mcolors.CSS4_COLORS['magenta']
 nodes_color = mcolors.CSS4_COLORS['cyan']
 path_color = mcolors.CSS4_COLORS['blue']
-fontsize = 8
+fontsize = 11
 
 
 def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False, z=None, bb=None,
@@ -326,16 +326,18 @@ def plot_lattice(ax, to_pixels, matcher):
                     ax.plot((x1, x2), (y1, y2), '.-', color=lattice_color, linewidth=linewidth, alpha=alpha)
 
 
-def plot_obs_noise_dist(matcher):
+def plot_obs_noise_dist(obs_fn, obs_noise, min_dist=0, max_dist=10):
     """Plot the expected noise of an observation distribution.
 
     :param matcher: Matcher
     :return:
     """
-    x = np.linspace(matcher.obs_noise_dist.ppf(0.01), matcher.obs_noise_dist.ppf(0.999), 100)
-    y = matcher.obs_noise_dist.pdf(x) * math.exp(matcher.obs_noise_logint)
+    x = np.linspace(min_dist, max_dist, 100)
+    y = [obs_fn(xi) for xi in x]
     plt.plot(x, y)
     plt.xlabel("Distance")
     plt.ylabel("Probability")
-    plt.axvline(x=matcher.obs_noise, color='red', alpha=0.7)
-    plt.annotate("Observation noise stddev", xy=(matcher.obs_noise, 0))
+    plt.xlim((min_dist, max_dist))
+    plt.ylim((0, 1))
+    plt.axvline(x=obs_noise, color='red', alpha=0.7)
+    plt.annotate("Observation noise stddev", xy=(obs_noise, 0))
