@@ -159,7 +159,9 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
 
         logger.debug('Plot lines ...')
         cnt = 0
-        for _, loc_a, _, loc_b in map_con.all_edges(bb=bb_o):
+        for row in map_con.all_edges(bb=bb_o):
+            loc_a = row[1]
+            loc_b = row[3]
             if coord_trans:
                 loc_a = coord_trans(*loc_a)
                 loc_b = coord_trans(*loc_b)
