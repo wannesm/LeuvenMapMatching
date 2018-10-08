@@ -12,7 +12,8 @@ https://www.movable-type.co.uk/scripts/latlong-vectors.html
 :license: Apache License, Version 2.0, see LICENSE for details.
 """
 import logging
-from math import radians, cos, sin, asin, acos, sqrt, atan2, fabs, degrees, ceil
+import math
+from math import radians, cos, sin, asin, acos, sqrt, atan2, fabs, degrees, ceil, copysign
 
 from . import dist_euclidean as diste
 
@@ -36,7 +37,7 @@ def distance(p1, p2):
     return dist
 
 
-def distance_point_to_segment(p, s1, s2, delta=0.0):
+def distance_point_to_segment(p, s1, s2, delta=0.0, constrain=True):
     """Distance between point and segment.
 
     Cross-track distance.
@@ -49,8 +50,8 @@ def distance_point_to_segment(p, s1, s2, delta=0.0):
     :param delta: Stay away from the endpoints with this factor
     :return: (Distance in meters, projected location on segment, relative location on segment)
     """
-    lat1, lon1 = s1
-    lat2, lon2 = s2
+    lat1, lon1 = s1  # Start point
+    lat2, lon2 = s2  # End point
     lat3, lon3 = p
     lat1, lon1 = radians(lat1), radians(lon1)
     lat2, lon2 = radians(lat2), radians(lon2)
@@ -61,15 +62,24 @@ def distance_point_to_segment(p, s1, s2, delta=0.0):
         dist_ct, pi, ti = distance(p, s1), s1, 0
         return dist_ct, pi, ti
 
-    d13 = distance_haversine_radians(lat1, lon1, lat3, lon3, radius=1)
+    d13 = distance_haversine_radians(lat1, lon1, lat3, lon3)
+    delta13 = d13 / earth_radius
     b13 = bearing_radians(lat1, lon1, lat3, lon3)
     b12 = bearing_radians(lat1, lon1, lat2, lon2)
 
-    dxt = asin(sin(d13) * sin(b13 - b12))
+    dxt = asin(sin(delta13) * sin(b13 - b12))
+    b13d12 = (b13 - b12) % (2 * math.pi)
+    if b13d12 > math.pi:
+        b13d12 = 2 * math.pi - b13d12
     dist_ct = fabs(dxt) * earth_radius
-    dat = acos(cos(d13) / cos(dxt)) * earth_radius
+    # Correct to negative value if point is before segment
+    sgn = -1 if b13d12 > (math.pi / 2) else 1
+    dat = sgn * acos(cos(delta13) / cos(dxt)) * earth_radius
     ti = dat / dist_hs
-    if ti > 1.0:
+
+    if not constrain:
+        lati, loni = destination_radians(lat1, lon1, b12, dat)
+    elif ti > 1.0:
         ti = 1.0
         lati, loni = lat2, lon2
         dist_ct = distance_haversine_radians(lat3, lon3, lati, loni)
@@ -180,6 +190,7 @@ def bearing_radians(lat1, lon1, lat2, lon2):
 
 
 def distance_haversine_radians(lat1, lon1, lat2, lon2, radius=earth_radius):
+    # type: (float, float, float, float, float) -> float
     lat = lat2 - lat1
     lon = lon2 - lon1
     a = sin(lat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(lon / 2) ** 2

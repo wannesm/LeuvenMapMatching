@@ -11,7 +11,6 @@ Map representation based on a sqlite database. Not optimized for production purp
 """
 import sqlite3
 import tempfile
-import shutil
 import logging
 import time
 from pathlib import Path
@@ -115,6 +114,7 @@ class SqliteMap(BaseMap):
         self.db.commit()
 
     def create_db(self):
+        logger.debug("Cleaning database file and creating new tables")
         c = self.db.cursor()
         c.execute("DROP INDEX IF EXISTS edges_from_index")
         c.execute("DROP INDEX IF EXISTS close_edges_index")
@@ -171,8 +171,8 @@ class SqliteMap(BaseMap):
     @classmethod
     def from_file(cls, filename):
         """Read from an existing file."""
-        filename = Path(filename)
-        nmap = cls(filename.name, dir=filename.parent)
+        filename = Path(filename).with_suffix('')
+        nmap = cls(filename.name, dir=filename.parent, deserializing=True)
         return nmap
 
     def bb(self):
@@ -207,23 +207,53 @@ class SqliteMap(BaseMap):
         c = self.db.cursor()
         c.execute('SELECT y, x FROM nodes WHERE id = ?', (node_key, ))
         result = c.fetchone()
+        if result is None:
+            raise Exception(f"No coordinates found for node {node_key}")
         return result
 
-    def add_node(self, node, loc):
+    def add_node(self, node, loc, ignore_doubles=False, no_index=False, no_commit=False):
         """Add new node to the map.
 
         :param node: label
         :param loc: (lat, lon) or (y, x)
+        :param ignore_doubles: When trying to add the same node, ignore it
+        :param no_commit: Do not commit to database (remember to commit later)
         """
         c = self.db.cursor()
         lat, lon = loc
-        q = "INSERT INTO nodes_index VALUES(?, ?, ?, ?, ?)"
-        c.execute(q, (node, lon, lon, lat, lat))
-        c.execute("SELECT last_insert_rowid()")
-        rowid = c.fetchone()[0]
+        # Nodes
         q = "INSERT INTO nodes VALUES(?, ?, ?)"
-        c.execute(q, (rowid, lon, lat))
+        try:
+            c.execute(q, (node, lon, lat))
+        except sqlite3.IntegrityError as exc:
+            if ignore_doubles and "UNIQUE constraint failed: nodes.id" in str(exc):
+                return
+            logger.error(f"Problem with adding node {node} {loc}")
+            raise exc
+        # Nodes index
+        if not no_index:
+            q = "INSERT INTO nodes_index VALUES(?, ?, ?, ?, ?)"
+            try:
+                c.execute(q, (node, lon, lon, lat, lat))
+            except sqlite3.IntegrityError as exc:
+                logger.error(f"Problem with adding node to index {node} {loc}")
+                raise exc
+        if not no_commit:
+            self.db.commit()
+
+    def reindex_nodes(self):
+        logger.debug("Reindexing nodes ...")
+        t_start = time.time()
+        c = self.db.cursor()
+        c.execute('DELETE FROM nodes_index')
+        q = ("INSERT INTO nodes_index "
+             "SELECT id, x, x, y, y FROM nodes")
+        c.execute(q)
         self.db.commit()
+        c.execute('SELECT count(*) FROM nodes_index')
+        cnt = c.fetchone()[0]
+        t_delta = time.time() - t_start
+        logger.debug(f"... done, #rows = {cnt}, time = {t_delta} sec")
 
     def add_nodes(self, nodes):
         """Add list of nodes to database.
@@ -250,15 +280,16 @@ class SqliteMap(BaseMap):
     def del_node(self, node):
         raise Exception("TODO")
 
-    def add_edge(self, node_a, node_b, loc_a=None, loc_b=None, path=None, no_index=False):
+    def add_edge(self, node_a, node_b, loc_a=None, loc_b=None, path=None, no_index=False, no_commit=False):
         """Add new edge to the map.
 
         :param node_a: Label for the node that is the start of the edge
         :param node_b: Label for the node that is the end of the edge
+        :param no_commit: Do not commit to database (remember to commit later)
         """
         c = self.db.cursor()
         eid = (node_a, node_b).__hash__()
-        c.execute('INSERT INTO edges(id, path, id1, id2) VALUES (?, ?, ?, ?)', (eid, path, node_a, node_b))
+        c.execute('INSERT OR IGNORE INTO edges(id, path, id1, id2) VALUES (?, ?, ?, ?)', (eid, path, node_a, node_b))
         # c.execute('SELECT last_insert_rowid();')
         # eid = c.fetchone()[0]
 
@@ -275,10 +306,10 @@ class SqliteMap(BaseMap):
                 lat1, lat2 = lat2, lat1
             if lon1 > lon2:
                 lon1, lon2 = lon2, lon1
-            c.execute('INSERT INTO edges_index(id, minX, maxX, minY, maxY) VALUES (?, ?, ?, ?, ?)',
+            c.execute('INSERT OR IGNORE INTO edges_index(id, minX, maxX, minY, maxY) VALUES (?, ?, ?, ?, ?)',
                       (eid, lon1, lon2, lat1, lat2))
-
-        self.db.commit()
+        if not no_commit:
+            self.db.commit()
 
     def add_edges(self, edges, no_index=False):
         """Add list of nodes to database.
@@ -308,19 +339,23 @@ class SqliteMap(BaseMap):
         logger.debug("Reindexing edges ...")
         t_start = time.time()
         c = self.db.cursor()
-        c2 = self.db.cursor()
-        c.execute('DELETE FROM edges_index;')
-        q = ('SELECT e.id, MIN(n1.x,n2.x) AS minX, MAX(n1.x,n2.x) AS x, '
-             'MIN(n1.y,n2.y) AS y, MAX(n1.y,n2.y) AS maxY '
+        # c2 = self.db.cursor()
+        c.execute('DELETE FROM edges_index')
+        q = ('INSERT INTO edges_index '
+             'SELECT e.id, MIN(n1.x,n2.x), MAX(n1.x,n2.x), '
+             '             MIN(n1.y,n2.y), MAX(n1.y,n2.y) '
              'FROM edges e '
-             'LEFT JOIN nodes n1 ON n1.id = e.id1 '
-             'LEFT JOIN nodes n2 ON n2.id = e.id2')
-        cnt = 0
-        for row in c.execute(q):
-            # Contained in query
-            c2.execute('INSERT INTO edges_index(id, minX, maxX, minY, maxY) VALUES (?, ?, ?, ?, ?)', row)
-            cnt += 1
+             'INNER JOIN nodes n1 ON n1.id = e.id1 '
+             'INNER JOIN nodes n2 ON n2.id = e.id2')
+        c.execute(q)
+        # cnt = 0
+        # for row in c.execute(q):
+        #     # Contained in query
+        #     c2.execute('INSERT INTO edges_index(id, minX, maxX, minY, maxY) VALUES (?, ?, ?, ?, ?)', row)
+        #     cnt += 1
         self.db.commit()
+        c.execute('SELECT count(*) FROM edges_index')
+        cnt = c.fetchone()[0]
         t_delta = time.time() - t_start
         logger.debug(f"... done, #rows = {cnt}, time = {t_delta} sec")
 
@@ -444,19 +479,22 @@ class SqliteMap(BaseMap):
         :param max_dist: Maximal distance from the location
         :param max_elmt: Return only the most nearby nodes
         """
+        print(f"edges_closeto({loc})")
         t_start = time.time()
         lat, lon = loc[:2]
         lat_b, lon_l, lat_t, lon_r = self.box_around_point((lat, lon), max_dist)
         bb = (lat_b, lon_l,  # y_min, x_min
               lat_t, lon_r)  # y_max, x_max
+        logger.debug(f"Search in bounding box {bb}")
         nodes = self.all_edges(bb=bb)
         t_delta_search = time.time() - t_start
         t_start = time.time()
         results = []
-        for key_a, loc_a, key_b, loc_b, key_p in nodes:
+        for key_a, loc_a, key_b, loc_b in nodes:
             dist, pi, ti = self.distance_point_to_segment(loc, loc_a, loc_b)
+            print(f"{dist} = dist_point_to_seg({loc}, {loc_a}, {loc_b}) <- {key_a} , {key_b}")
             if dist < max_dist:
-                results.append((dist, key_a, loc_a, key_b, loc_b, pi, ti, key_p))
+                results.append((dist, key_a, loc_a, key_b, loc_b, pi, ti))
         results.sort()
         t_delta_dist = time.time() - t_start
         logger.debug(f"Found {len(results)} closeby edges "
@@ -506,7 +544,7 @@ class SqliteMap(BaseMap):
              'group by y, x '
              'having qty > 1 ')
         for ncnt, idxs in c.execute(q):
-            func(idxs)
+            func(int(idx) for idx in idxs.split(","))
         t_delta = time.time() - t_start
         logger.info(f"Found {cnt} doubles, time: {t_delta} seconds")
 

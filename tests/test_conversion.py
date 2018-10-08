@@ -9,8 +9,6 @@ import os
 from pathlib import Path
 
 import leuvenmapmatching as mm
-from leuvenmapmatching.util.gpx import path_to_gpx
-from leuvenmapmatching.util.projections import latlon2grs80
 from leuvenmapmatching.util import dist_euclidean as de
 from leuvenmapmatching.util import dist_latlon as dll
 
@@ -19,6 +17,7 @@ directory = None
 
 
 def test_path_to_gpx():
+    from leuvenmapmatching.util.gpx import path_to_gpx
     path = [(i, i, datetime.fromtimestamp(i)) for i in range(0, 10)]
     gpx = path_to_gpx(path)
 
@@ -29,6 +28,7 @@ def test_path_to_gpx():
 
 
 def test_grs80():
+    from leuvenmapmatching.util.projections import latlon2grs80
     coordinates = [(4.67878, 50.864), (4.68054, 50.86381), (4.68098, 50.86332), (4.68129, 50.86303), (4.6817, 50.86284),
                    (4.68277, 50.86371), (4.68894, 50.86895), (4.69344, 50.86987), (4.69354, 50.86992),
                    (4.69427, 50.87157), (4.69643, 50.87315), (4.69768, 50.87552), (4.6997, 50.87828)]
@@ -104,6 +104,51 @@ def test_distance_segment_to_segment2():
     assert u_t == pytest.approx(0.2470133466162735)
 
 
+def test_distance_point_to_segment1():
+    locs = [
+        (47.6373, -122.0950167),
+        (47.6369, -122.0950167),
+        (47.6369, -122.0959167),
+        (47.6369, -122.09422),
+        (47.6369, -122.09400),
+        (47.6375, -122.09505)
+    ]
+    loc_a = (47.6372498273849, -122.094900012016)
+    loc_b = (47.6368394494057, -122.094280421734)
+    for constrain in [False, True]:
+        for loc_idx, loc in enumerate(locs):
+            dist1, pi1, ti1 = dll.distance_point_to_segment(loc, loc_a, loc_b, constrain=constrain)
+            dist2, pi2, ti2 = dll.distance_point_to_segment(loc, loc_b, loc_a, constrain=constrain)
+            if directory:
+                plot_distance_point_to_segment_latlon(loc, loc_a, loc_b, pi1, f"point_to_segment_{loc_idx}.png")
+            assert dist1 == pytest.approx(dist2), \
+                f"Locs[{loc_idx},{constrain}]: Distances different, {dist1} != {dist2}"
+            assert pi1[0] == pytest.approx(pi2[0]), \
+                f"Locs[{loc_idx},{constrain}]: y coord different, {pi1[0]} != {pi2[0]}"
+            assert pi1[1] == pytest.approx(pi2[1]), \
+                f"Locs[{loc_idx},{constrain}]: y coord different, {pi1[1]} != {pi2[1]}"
+
+
+def plot_distance_point_to_segment_latlon(f, t1, t2, pt, fn):
+    import smopy
+    import matplotlib.pyplot as plt
+    lat_min = min(f[0], t1[0], t2[0])
+    lat_max = max(f[0], t1[0], t2[0])
+    lon_min = min(f[1], t1[1], t2[1])
+    lon_max = max(f[1], t1[1], t2[1])
+    bb = [lat_min, lon_min, lat_max, lon_max]
+    m = smopy.Map(bb)
+    ax = m.show_mpl(figsize=(10, 10))
+    p1 = m.to_pixels(t1)
+    p2 = m.to_pixels(t2)
+    p3 = m.to_pixels(f)
+    p4 = m.to_pixels(pt)
+    ax.plot([p1[0], p2[0]], [p1[1], p2[1]], 'o-', color="black")
+    ax.plot([p3[0]], [p3[1]], 'o-', color="black")
+    ax.plot([p3[0], p4[0]], [p3[1], p4[1]], '--', color="red")
+    plt.savefig(str(directory / fn))
+
+
 def plot_distance_segment_to_segment_latlon(f1, f2, t1, t2, pf, pt, fn):
     import smopy
     import matplotlib.pyplot as plt
@@ -148,5 +193,6 @@ if __name__ == "__main__":
     # test_distance1()
     # test_bearing1()
     # test_destination1()
-    test_distance_segment_to_segment1()
+    # test_distance_segment_to_segment1()
     # test_distance_segment_to_segment2()
+    test_distance_point_to_segment1()

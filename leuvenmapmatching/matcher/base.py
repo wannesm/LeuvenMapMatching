@@ -548,7 +548,7 @@ class BaseMatcher:
         if __debug__:
             logger.debug("--- obs {} --- {} ---".format(0, self.path[0]))
         t_delta = time.time() - t_start
-        logger.info("Initialized map with {} starting points in {} seconds".format(len(nodes), t_delta))
+        logger.info("Initialized lattice with {} starting points in {} seconds".format(len(nodes), t_delta))
         if len(nodes) == 0:
             logger.info(f'Stopped early at observation 0'
                         f', no starting points/edges x found for which '
