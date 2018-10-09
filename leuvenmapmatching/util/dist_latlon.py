@@ -194,8 +194,8 @@ def distance_haversine_radians(lat1, lon1, lat2, lon2, radius=earth_radius):
     lat = lat2 - lat1
     lon = lon2 - lon1
     a = sin(lat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(lon / 2) ** 2
-    dist = 2 * radius * asin(sqrt(a))
-    # dist = 2 * radius * atan2(sqrt(a), sqrt(1 - a))
+    # dist = 2 * radius * asin(sqrt(a))
+    dist = 2 * radius * atan2(sqrt(a), sqrt(1 - a))
     return dist
 
 

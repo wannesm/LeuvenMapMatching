@@ -72,18 +72,18 @@ def read_gps(route_fn):
     return route
 
 
-def read_nodes(nodes_fn):
-    nodes = []
-    with nodes_fn.open("r") as nodes_f:
-        reader = csv.reader(nodes_f, delimiter='\t')
+def read_paths(paths_fn):
+    paths = []
+    with paths_fn.open("r") as paths_f:
+        reader = csv.reader(paths_f, delimiter='\t')
         next(reader)
         for row in reader:
-            nodeid, trav = row[:2]
-            nodeid = int(nodeid)
+            pathid, trav = row[:2]
+            pathid = int(pathid)
             trav = int(trav)
-            nodes.append((nodeid, trav))
-    logger.debug(f"Read correct trace of {len(nodes)} nodes")
-    return nodes
+            paths.append((pathid, trav))
+    logger.debug(f"Read correct trace of {len(paths)} nodes")
+    return paths
 
 
 def parse_linestring(line):
@@ -153,8 +153,8 @@ def correct_map(mmap):
 def load_data():
     max_route_length = None  # 200
 
-    # Nodes
-    nodes = read_nodes(ground_truth_route)
+    # Paths
+    paths = read_paths(ground_truth_route)
 
     # Map
     if road_network_db.exists():
@@ -177,7 +177,7 @@ def load_data():
         with gps_data_pkl.open("wb") as ofile:
             pickle.dump(route, ofile)
 
-    return nodes, map_con, route
+    return paths, map_con, route
 
 
 def test_route_slice1():
@@ -246,7 +246,7 @@ def test_route():
         import matplotlib.pyplot as plt
     else:
         plt = None
-    nodes, map_con, route = load_data()
+    paths, map_con, route = load_data()
     route = [(lat, lon) for lat, lon, _ in route]
     zoom_path = True
     # zoom_path = slice(2645, 2665)
@@ -282,9 +282,14 @@ def test_route():
             with pkl_fn.open("wb") as pkl_file:
                 pickle.dump(route_nodes, pkl_file)
         from leuvenmapmatching.util.evaluation import route_mismatch_factor
-        grnd_nodes, _ = zip(*nodes)
         print(route_nodes[:10])
-        print(grnd_nodes[:10])
+        # route_edges = map_con.nodes_to_paths(route_nodes)
+        # print(route_edges[:10])
+        grnd_paths, _ = zip(*paths)
+        print(grnd_paths[:10])
+        grnd_nodes = map_con.paths_to_nodes(grnd_paths)
+        print(grnd_nodes)
+
         # TODO: route_nodes are acutally edge id s
         factor = route_mismatch_factor(map_con, route_nodes, grnd_nodes, window=None)
         print(f"factor = {factor}")

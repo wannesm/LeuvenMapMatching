@@ -1098,7 +1098,7 @@ class BaseMatcher:
         print("Stats lattice", file=file)
         print("-------------", file=file)
         stats = OrderedDict()
-        stats["nbr levels"] = len(self.lattice)
+        stats["nbr levels"] = len(self.lattice) if self.lattice else "?"
         total_nodes = 0
         max_nodes = 0
         min_nodes = 9999999

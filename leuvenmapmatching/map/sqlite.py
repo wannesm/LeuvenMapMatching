@@ -571,6 +571,33 @@ class SqliteMap(BaseMap):
         logger.debug(f"Linked {cnt} edges")
         self.db.commit()
 
+    def nodes_to_paths(self, nodes):
+        c = self.db.cursor()
+        prev_path = None
+        paths = []
+        for begin, end in zip(nodes[:-1], nodes[1:]):
+            c.execute("SELECT path FROM edges WHERE id1=? AND id2=?", (begin, end))
+            path = c.fetchone()[0]
+            if path != prev_path:
+                paths.append(path)
+                prev_path = path
+        return paths
+
+    def paths_to_nodes(self, paths):
+        c = self.db.cursor()
+        prev_node = None
+        nodes = []
+        for path in paths:
+            c.execute("SELECT id1, id2 FROM edges WHERE path=?", (path,))
+            begin, end = c.fetchone()
+            if begin != prev_node:
+                nodes.append(begin)
+                prev_node = begin
+            if end != prev_node:
+                nodes.append(end)
+                prev_node = end
+        return nodes
+
     def print_stats(self):
         print("Graph\n-----")
         print("Nodes: {}".format(len(self.graph)))

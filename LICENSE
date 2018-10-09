@@ -21,6 +21,16 @@ limitations under the License.
 This package/repository contains code from the dtaimapmatching project as well
 as some open-source works:
 
+
+Latitude/longitude spherical geodesy tools
+------------------------------------------
+
+Latitude/longitude spherical geodesy tools
+(c) Chris Veness 2002-2017, MIT Licence
+www.movable-type.co.uk/scripts/latlong.html
+www.movable-type.co.uk/scripts/geodesy/docs/module-latlon-spherical.html
+
+
 Nvector
 -------
 

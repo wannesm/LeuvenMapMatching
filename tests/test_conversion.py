@@ -7,6 +7,7 @@ import pytest
 import math
 import os
 from pathlib import Path
+import itertools
 
 import leuvenmapmatching as mm
 from leuvenmapmatching.util import dist_euclidean as de
@@ -115,18 +116,26 @@ def test_distance_point_to_segment1():
     ]
     loc_a = (47.6372498273849, -122.094900012016)
     loc_b = (47.6368394494057, -122.094280421734)
-    for constrain in [False, True]:
+    segments = []
+    for lat_a, lat_b in itertools.product((loc_a[0], loc_b[0]), repeat=2):
+        for lon_a, lon_b in itertools.product((loc_a[1], loc_b[1]), repeat=2):
+            segments.append(((lat_a, lon_a), (lat_b, lon_b)))
+    # segments = [(loc_a, loc_b)]
+
+    for constrain in [True, False]:
         for loc_idx, loc in enumerate(locs):
-            dist1, pi1, ti1 = dll.distance_point_to_segment(loc, loc_a, loc_b, constrain=constrain)
-            dist2, pi2, ti2 = dll.distance_point_to_segment(loc, loc_b, loc_a, constrain=constrain)
-            if directory:
-                plot_distance_point_to_segment_latlon(loc, loc_a, loc_b, pi1, f"point_to_segment_{loc_idx}.png")
-            assert dist1 == pytest.approx(dist2), \
-                f"Locs[{loc_idx},{constrain}]: Distances different, {dist1} != {dist2}"
-            assert pi1[0] == pytest.approx(pi2[0]), \
-                f"Locs[{loc_idx},{constrain}]: y coord different, {pi1[0]} != {pi2[0]}"
-            assert pi1[1] == pytest.approx(pi2[1]), \
-                f"Locs[{loc_idx},{constrain}]: y coord different, {pi1[1]} != {pi2[1]}"
+            for seg_idx, (loc_a, loc_b) in enumerate(segments):
+                dist1, pi1, ti1 = dll.distance_point_to_segment(loc, loc_a, loc_b, constrain=constrain)
+                dist2, pi2, ti2 = dll.distance_point_to_segment(loc, loc_b, loc_a, constrain=constrain)
+                if directory:
+                    plot_distance_point_to_segment_latlon(loc, loc_a, loc_b, pi1,
+                                                          f"point_to_segment_{loc_idx}_{seg_idx}_{constrain}.png")
+                assert dist1 == pytest.approx(dist2), \
+                    f"Locs[{loc_idx},{seg_idx},{constrain}]: Distances different, {dist1} != {dist2}"
+                assert pi1[0] == pytest.approx(pi2[0]), \
+                    f"Locs[{loc_idx},{seg_idx},{constrain}]: y coord different, {pi1[0]} != {pi2[0]}"
+                assert pi1[1] == pytest.approx(pi2[1]), \
+                    f"Locs[{loc_idx},{seg_idx},{constrain}]: y coord different, {pi1[1]} != {pi2[1]}"
 
 
 def plot_distance_point_to_segment_latlon(f, t1, t2, pt, fn):
@@ -147,6 +156,7 @@ def plot_distance_point_to_segment_latlon(f, t1, t2, pt, fn):
     ax.plot([p3[0]], [p3[1]], 'o-', color="black")
     ax.plot([p3[0], p4[0]], [p3[1], p4[1]], '--', color="red")
     plt.savefig(str(directory / fn))
+    plt.close(plt.gcf())
 
 
 def plot_distance_segment_to_segment_latlon(f1, f2, t1, t2, pf, pt, fn):
@@ -169,6 +179,7 @@ def plot_distance_segment_to_segment_latlon(f1, f2, t1, t2, pf, pt, fn):
     ax.plot([p3[0], p4[0]], [p3[1], p4[1]], 'o-')
     ax.plot([p5[0], p6[0]], [p5[1], p6[1]], 'o-')
     plt.savefig(str(directory / fn))
+    plt.close(plt.gcf())
 
 
 def plot_distance_segment_to_segment_euc(f1, f2, t1, t2, pf, pt, fn):
@@ -180,6 +191,7 @@ def plot_distance_segment_to_segment_euc(f1, f2, t1, t2, pf, pt, fn):
     ax.axis('equal')
     ax.set_aspect('equal')
     plt.savefig(str(directory / fn))
+    plt.close(plt.gcf())
 
 
 if __name__ == "__main__":
