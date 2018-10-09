@@ -68,13 +68,14 @@ def distance_point_to_segment(p, s1, s2, delta=0.0, constrain=True):
     b12 = bearing_radians(lat1, lon1, lat2, lon2)
 
     dxt = asin(sin(delta13) * sin(b13 - b12))
-    b13d12 = (b13 - b12) % (2 * math.pi)
-    if b13d12 > math.pi:
-        b13d12 = 2 * math.pi - b13d12
+    # b13d12 = (b13 - b12) % (2 * math.pi)
+    # if b13d12 > math.pi:
+    #     b13d12 = 2 * math.pi - b13d12
     dist_ct = fabs(dxt) * earth_radius
     # Correct to negative value if point is before segment
-    sgn = -1 if b13d12 > (math.pi / 2) else 1
-    dat = sgn * acos(cos(delta13) / cos(dxt)) * earth_radius
+    # sgn = -1 if b13d12 > (math.pi / 2) else 1
+    sgn = copysign(1, cos(b12 - b13))
+    dat = sgn * acos(cos(delta13) / abs(cos(dxt))) * earth_radius
     ti = dat / dist_hs
 
     if not constrain:
