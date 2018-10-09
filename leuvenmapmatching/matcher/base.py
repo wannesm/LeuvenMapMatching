@@ -1102,23 +1102,24 @@ class BaseMatcher:
         total_nodes = 0
         max_nodes = 0
         min_nodes = 9999999
-        sizes = []
-        for idx in range(len(self.lattice)):
-            level = self.lattice[idx]
-            # stats["#nodes[{}]".format(idx)] = len(level)
-            sizes.append(len(level))
-            total_nodes += len(level)
-            if len(level) < min_nodes:
-                min_nodes = len(level)
-            if len(level) > max_nodes:
-                max_nodes = len(level)
-        stats["nbr lattice"] = total_nodes
-        if verbose:
-            stats["nbr lattice[level]"] = ", ".join([str(s) for s in sizes])
-        stats["avg lattice[level]"] = total_nodes/len(self.lattice)
-        stats["min lattice[level]"] = min_nodes
-        stats["max lattice[level]"] = max_nodes
-        if len(self.lattice_best) > 0:
+        if self.lattice:
+            sizes = []
+            for idx in range(len(self.lattice)):
+                level = self.lattice[idx]
+                # stats["#nodes[{}]".format(idx)] = len(level)
+                sizes.append(len(level))
+                total_nodes += len(level)
+                if len(level) < min_nodes:
+                    min_nodes = len(level)
+                if len(level) > max_nodes:
+                    max_nodes = len(level)
+            stats["nbr lattice"] = total_nodes
+            if verbose:
+                stats["nbr lattice[level]"] = ", ".join([str(s) for s in sizes])
+            stats["avg lattice[level]"] = total_nodes/len(self.lattice)
+            stats["min lattice[level]"] = min_nodes
+            stats["max lattice[level]"] = max_nodes
+        if self.lattice_best and len(self.lattice_best) > 0:
             stats["avg obs distance"] = np.mean([m.dist_obs for m in self.lattice_best])
             stats["last logprob"] = self.lattice_best[-1].logprob
             stats["last length"] = self.lattice_best[-1].length

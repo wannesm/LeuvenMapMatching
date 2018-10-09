@@ -148,6 +148,7 @@ class SqliteMap(BaseMap):
         q = ("CREATE TABLE edges(\n"
              "id INTEGER PRIMARY KEY,\n"
              "path INTEGER,\n"  # Not necessarily unique, a pathway id can consist of multiple edges
+             "pathnum INTEGER,\n"
              "id1 INTEGER,\n"  # node 1
              "id2 INTEGER\n"  # node 2
              ")")
@@ -280,7 +281,8 @@ class SqliteMap(BaseMap):
     def del_node(self, node):
         raise Exception("TODO")
 
-    def add_edge(self, node_a, node_b, loc_a=None, loc_b=None, path=None, no_index=False, no_commit=False):
+    def add_edge(self, node_a, node_b, loc_a=None, loc_b=None, path=None, pathnum=None,
+                 no_index=False, no_commit=False):
         """Add new edge to the map.
 
         :param node_a: Label for the node that is the start of the edge
@@ -289,7 +291,8 @@ class SqliteMap(BaseMap):
         """
         c = self.db.cursor()
         eid = (node_a, node_b).__hash__()
-        c.execute('INSERT OR IGNORE INTO edges(id, path, id1, id2) VALUES (?, ?, ?, ?)', (eid, path, node_a, node_b))
+        c.execute('INSERT OR IGNORE INTO edges(id, path, pathnum, id1, id2) VALUES (?, ?, ?, ?, ?)',
+                  (eid, path, pathnum, node_a, node_b))
         # c.execute('SELECT last_insert_rowid();')
         # eid = c.fetchone()[0]
 
@@ -314,7 +317,8 @@ class SqliteMap(BaseMap):
     def add_edges(self, edges, no_index=False):
         """Add list of nodes to database.
 
-        :param edges: List[Tuple[node_key, node_key]]
+        :param edges: List[Tuple[node_key, node_key]] or
+            List[Tuple[node_key, node_key, path_key, int]]
         """
         c = self.db.cursor()
 
@@ -323,12 +327,13 @@ class SqliteMap(BaseMap):
                 if len(row) == 2:
                     key_a, key_b = row
                     path = None
+                    pathnum = None
                 else:
-                    key_a, key_b, path = row
+                    key_a, key_b, path, pathnum = row
                 eid = (key_a, key_b).__hash__()
-                yield eid, path, key_a, key_b
+                yield eid, path, pathnum, key_a, key_b
 
-        q = "INSERT INTO edges(id, path, id1, id2) VALUES(?, ?, ?, ?);"
+        q = "INSERT INTO edges(id, path, pathnum, id1, id2) VALUES(?, ?, ?, ?, ?);"
         c.executemany(q, get_edge())
         self.db.commit()
 
@@ -571,32 +576,30 @@ class SqliteMap(BaseMap):
         logger.debug(f"Linked {cnt} edges")
         self.db.commit()
 
-    def nodes_to_paths(self, nodes):
+    def nodes_to_paths(self, nodes, ignore_nopath=True):
         c = self.db.cursor()
         prev_path = None
         paths = []
         for begin, end in zip(nodes[:-1], nodes[1:]):
             c.execute("SELECT path FROM edges WHERE id1=? AND id2=?", (begin, end))
             path = c.fetchone()[0]
+            if path is None and ignore_nopath:
+                continue
             if path != prev_path:
                 paths.append(path)
                 prev_path = path
         return paths
 
-    def paths_to_nodes(self, paths):
+    def path_dist(self, path):
         c = self.db.cursor()
-        prev_node = None
-        nodes = []
-        for path in paths:
-            c.execute("SELECT id1, id2 FROM edges WHERE path=?", (path,))
-            begin, end = c.fetchone()
-            if begin != prev_node:
-                nodes.append(begin)
-                prev_node = begin
-            if end != prev_node:
-                nodes.append(end)
-                prev_node = end
-        return nodes
+        dist = 0
+        q = ('SELECT n1.y, n1.x, n2.y, n2.x FROM edges e '
+             'INNER JOIN nodes n1 ON n1.id = e.id1 '
+             'INNER JOIN nodes n2 ON n2.id = e.id2 '
+             'WHERE e.pathnum>0 AND e.path=?')
+        for lat1, lon1, lat2, lon2 in c.execute(q, (path,)):
+            dist += self.distance((lat1, lon1), (lat2, lon2))
+        return dist
 
     def print_stats(self):
         print("Graph\n-----")

@@ -129,8 +129,8 @@ def read_map(map_fn):
                 mmap.add_edge(innernode_id, prev_node, path=eid, no_index=True, no_commit=True)
                 edge_cnt += 2
                 prev_node = innernode_id
-            mmap.add_edge(prev_node, nt, path=eid, no_index=True, no_commit=True)
-            mmap.add_edge(nt, prev_node, path=eid, no_index=True, no_commit=True)
+            mmap.add_edge(prev_node, nt, path=eid, pathnum=(idx + 1), no_index=True, no_commit=True)
+            mmap.add_edge(nt, prev_node, path=eid, pathnum=-(idx + 1), no_index=True, no_commit=True)
             if node_cnt % 100000 == 0:
                 mmap.db.commit()
     logger.debug(f"... done: {node_cnt} nodes and {edge_cnt} edges")
@@ -287,15 +287,18 @@ def test_route():
         # print(route_edges[:10])
         grnd_paths, _ = zip(*paths)
         print(grnd_paths[:10])
-        grnd_nodes = map_con.paths_to_nodes(grnd_paths)
-        print(grnd_nodes)
+        route_paths = map_con.nodes_to_paths(route_nodes)
+        print(route_paths[:10])
 
-        # TODO: route_nodes are acutally edge id s
-        factor = route_mismatch_factor(map_con, route_nodes, grnd_nodes, window=None)
-        print(f"factor = {factor}")
+        logger.debug(f"Compute route mismatch factor")
+        factor, cnt_matches, cnt_mismatches, total_length = route_mismatch_factor(map_con, route_paths, grnd_paths,
+                                                                                  window=None)
+        logger.debug(f"factor = {factor}, "
+                     f"cnt_matches = {cnt_matches}/{cnt_mismatches} of {len(grnd_paths)}/{len(route_paths)}, "
+                     f"total_length = {total_length}")
     else:
         _, last_idx = matcher.match(route[slice_route])
-        print(f"Last index = {last_idx}")
+        logger.debug(f"Last index = {last_idx}")
 
     # matcher.match(route[2657:2662])  # First location where some observations are missing
     # matcher.match(route[2770:2800])  # Observations are missing
