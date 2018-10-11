@@ -86,11 +86,11 @@ setup(
     tests_require=['pytest'],
     python_requires='>=3.6',
     license='Apache 2.0',
-    classifiers=(
+    classifiers=[
         'Intended Audience :: Developers',
         'License :: OSI Approved :: Apache Software License',
         'Programming Language :: Python :: 3'
-    ),
+    ],
     keywords='map matching',
     cmdclass={
         'readme': PrepReadme,
