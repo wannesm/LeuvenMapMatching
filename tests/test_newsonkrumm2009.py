@@ -119,18 +119,20 @@ def read_map(map_fn):
             node_cnt += 2
             prev_node = nf
             assert(length < 1000)
-            for idx, innernode in enumerate(innernodes[1:-1]):
+            idx = 1
+            for innernode in innernodes[1:-1]:
                 # innernode_id = nf * 1000 + idx
                 innernode_id = new_node_id
                 new_node_id += 1
                 mmap.add_node(innernode_id, innernode, no_index=True, no_commit=True)  # Should not be double
                 node_cnt += 1
-                mmap.add_edge(prev_node, innernode_id, path=eid, no_index=True, no_commit=True)
-                mmap.add_edge(innernode_id, prev_node, path=eid, no_index=True, no_commit=True)
+                mmap.add_edge(prev_node, innernode_id, path=eid, pathnum=idx, no_index=True, no_commit=True)
+                mmap.add_edge(innernode_id, prev_node, path=eid, pathnum=-idx, no_index=True, no_commit=True)
                 edge_cnt += 2
                 prev_node = innernode_id
-            mmap.add_edge(prev_node, nt, path=eid, pathnum=(idx + 1), no_index=True, no_commit=True)
-            mmap.add_edge(nt, prev_node, path=eid, pathnum=-(idx + 1), no_index=True, no_commit=True)
+                idx += 1
+            mmap.add_edge(prev_node, nt, path=eid, pathnum=idx, no_index=True, no_commit=True)
+            mmap.add_edge(nt, prev_node, path=eid, pathnum=-idx, no_index=True, no_commit=True)
             if node_cnt % 100000 == 0:
                 mmap.db.commit()
     logger.debug(f"... done: {node_cnt} nodes and {edge_cnt} edges")
@@ -291,11 +293,12 @@ def test_route():
         print(route_paths[:10])
 
         logger.debug(f"Compute route mismatch factor")
-        factor, cnt_matches, cnt_mismatches, total_length = route_mismatch_factor(map_con, route_paths, grnd_paths,
-                                                                                  window=None)
+        factor, cnt_matches, cnt_mismatches, total_length, mismatches = \
+            route_mismatch_factor(map_con, route_paths, grnd_paths,window=None, keep_mismatches=True)
         logger.debug(f"factor = {factor}, "
                      f"cnt_matches = {cnt_matches}/{cnt_mismatches} of {len(grnd_paths)}/{len(route_paths)}, "
-                     f"total_length = {total_length}")
+                     f"total_length = {total_length}\n"
+                     f"mismatches = " + " | ".join(str(v) for v in mismatches))
     else:
         _, last_idx = matcher.match(route[slice_route])
         logger.debug(f"Last index = {last_idx}")

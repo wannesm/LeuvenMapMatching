@@ -22,8 +22,8 @@ if MYPY:
 logger = logging.getLogger("be.kuleuven.cs.dtai.mapmatching")
 
 
-def route_mismatch_factor(map_con, path_pred, path_grnd, window=None, dist_fn=None):
-    # type: (BaseMap, List[int], List[int], Optional[int], Optional[Callable]) -> Tuple[float, float, float, float]
+def route_mismatch_factor(map_con, path_pred, path_grnd, window=None, dist_fn=None, keep_mismatches=False):
+    # type: (BaseMap, List[int], List[int], Optional[int], Optional[Callable], bool) -> Tuple[float, float, float, float, List[Tuple[int, int]]]
     """Evaluation method from Newson and Krumm (2009).
 
     :math:`f = \frac{d_{-} + d_{+}}{d_0}`
@@ -46,6 +46,7 @@ def route_mismatch_factor(map_con, path_pred, path_grnd, window=None, dist_fn=No
     d_zero = 0  # length of correct route
     cnt_matches = 0  # number of perfect matches
     cnt_mismatches = 0
+    mismatches = [] if keep_mismatches else None
 
     for pred_pi, grnd_pi in algn:
         pred_p = path_pred[pred_pi]
@@ -60,6 +61,8 @@ def route_mismatch_factor(map_con, path_pred, path_grnd, window=None, dist_fn=No
             pred_d = map_con.path_dist(pred_p)
             d_plus += pred_d
             d_min += grnd_d
+            if keep_mismatches:
+                mismatches.append((pred_p, grnd_p))
 
     factor = (d_min + d_plus) / d_zero
-    return factor, cnt_matches, cnt_mismatches, d_zero
+    return factor, cnt_matches, cnt_mismatches, d_zero, mismatches
