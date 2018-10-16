@@ -25,7 +25,7 @@ def test_path_to_gpx():
     assert len(path) == len(gpx.tracks[0].segments[0].points)
     assert path[0][0] == pytest.approx(gpx.tracks[0].segments[0].points[0].latitude)
     assert path[0][1] == pytest.approx(gpx.tracks[0].segments[0].points[0].longitude)
-    assert path[0][2] == pytest.approx(gpx.tracks[0].segments[0].points[0].time)
+    assert path[0][2] == gpx.tracks[0].segments[0].points[0].time
 
 
 def test_grs80():

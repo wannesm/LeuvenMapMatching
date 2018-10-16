@@ -168,8 +168,9 @@ def test_path2():
                         show_graph=True, show_matching=True,
                         filename=str(directory / "test_path_latlon_path2.png"))
     nodes_sol = [2634474831, 1096512242, 3051083902, 1096512239, 1096512241, 1096512240, 1096508366, 1096508372,
-                 16483861, 3051083900, 16483864, 16483865, 16483866, 3060725817, 611867918, 16526532, 1274158119,
-                 16526540, 3060597377, 16526541, 16424220, 1233373340, 613125597, 1076057753]
+                 16483861, 3051083900, 16483864, 16483865, 3060515058, 16526534, 16526532, 1274158119, 16526540,
+                 3060597377, 16526541, 16424220, 1233373340, 613125597, 1076057753]
+
     assert nodes == nodes_sol, f"Nodes do not match: {nodes}"
 
 
@@ -253,7 +254,7 @@ if __name__ == "__main__":
     directory = Path(os.environ.get('TESTDIR', Path(__file__).parent))
     print(f"Saving files to {directory}")
     # test_path1()
-    test_path1_full()
+    # test_path1_full()
     # test_path2_proj()
-    # test_path2()
+    test_path2()
     # test_path3()

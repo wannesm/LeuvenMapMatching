@@ -327,7 +327,7 @@ class SqliteMap(BaseMap):
 
         def get_edge():
             for row in edges:
-                row = row + ([None] * (6 - len(row)))
+                row = list(row) + ([None] * (6 - len(row)))
                 key_a, key_b, path, pathnum, edge_type, speed = row
                 eid = (key_a, key_b).__hash__()
                 yield eid, path, pathnum, key_a, key_b, edge_type, speed

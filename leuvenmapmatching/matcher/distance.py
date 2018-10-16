@@ -158,7 +158,7 @@ class DistanceMatcher(BaseMatcher):
         This function is more tolerant for low values. The intuition is that values under a certain
         distance should all be close to probability 1.0.
 
-        Note: We could also smooth the distance between observations to handle outliers better.
+        Note: We should also smooth the distance between observations to handle outliers better.
 
         :param prev_m:
         :param edge_m:

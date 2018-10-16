@@ -198,6 +198,7 @@ def load_data():
             route = route[:max_route_length]
         with gps_data_pkl.open("wb") as ofile:
             pickle.dump(route, ofile)
+    route = [(lat, lon) for lat, lon, _ in route]
 
     return paths, map_con, route
 

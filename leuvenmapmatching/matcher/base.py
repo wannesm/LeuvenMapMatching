@@ -16,10 +16,7 @@ import sys
 import logging
 import time
 from collections import OrderedDict, defaultdict, namedtuple
-MYPY = False
-if MYPY:
-    from typing import List, Tuple, Dict, Any
-from typing import Optional, Set
+from typing import List, Tuple, Dict, Any, Optional, Set
 
 import numpy as np
 
@@ -66,12 +63,12 @@ class BaseMatching(object):
         if edge_m.is_point() and edge_o.is_point():
             # node to node
             dist = self.matcher.map.distance(edge_m.p1, edge_o.p1)
-            proj_m = edge_m.p1
-            proj_o = edge_o.pi
+            # proj_m = edge_m.p1
+            # proj_o = edge_o.pi
         elif edge_m.is_point() and not edge_o.is_point():
             # node to edge
             dist, proj_o, t_o = self.matcher.map.distance_point_to_segment(edge_m.p1, edge_o.p1, edge_o.p2)
-            proj_m = edge_m.p1
+            # proj_m = edge_m.p1
             edge_o.pi = proj_o
             edge_o.ti = t_o
         elif not edge_m.is_point() and edge_o.is_point():
@@ -85,7 +82,7 @@ class BaseMatching(object):
                     return None
             edge_m.pi = proj_m
             edge_m.ti = t_m
-            proj_o = edge_o.pi
+            # proj_o = edge_o.pi
         elif not edge_m.is_point() and not edge_o.is_point():
             # edge to edge
             dist, proj_m, proj_o, t_m, t_o = self.matcher.map.distance_segment_to_segment(edge_m.p1, edge_m.p2,
@@ -102,9 +99,9 @@ class BaseMatching(object):
                                                                 is_next_ne=(obs_ne != 0))
         logprob_obs, props_obs = self.matcher.logprob_obs(dist, self, edge_m, edge_o,
                                                           is_ne=(obs_ne != 0))
-        if logprob_trans > 0:
+        if __debug__ and logprob_trans > 0:
             raise Exception(f"logprob_trans = {logprob_trans} > 0")
-        if logprob_obs > 0:
+        if __debug__ and logprob_obs > 0:
             raise Exception(f"logprob_obs = {logprob_obs} > 0")
         new_logprob_delta = logprob_trans + logprob_obs
         if obs_ne == 0:
@@ -116,18 +113,20 @@ class BaseMatching(object):
             # "* e^(ne_length_factor_log)" or "- ne_length_factor_log" for every step to a non-emitting
             # state to prefer shorter paths
             new_logprobe = self.logprobe + self.matcher.ne_length_factor_log
-            # new_logprobne = self.logprobne + new_logprob_delta
+            # We use min() as it is a monotonic function, in contrast with an average
             new_logprobne = min(self.logprobne, new_logprob_delta)
+            new_logprob = new_logprobe + new_logprobne
+            # Alternative approach with an average
+            # new_logprobne = self.logprobne + new_logprob_delta
             # "+ 1" to punish non-emitting states a bit less. Otherwise it would be
             # similar to (Pr_tr*Pr_obs)**2, which punishes just one non-emitting state too much.
             # new_logprob = new_logprobe + new_logprobne / (obs_ne + 1)
-            new_logprob = new_logprobe + new_logprobne
             new_length = self.length
         new_logprobema = ema_const.cur * new_logprob_delta + ema_const.prev * self.logprobema
         new_stop |= self.matcher.do_stop(new_logprob / new_length, dist, logprob_trans, logprob_obs)
-        if new_logprob > self.logprob:
-            print("xx")
-            raise Exception(f"new_logprob = {new_logprob} > logprob = {self.logprob}")
+        if __debug__ and new_logprob > self.logprob:
+            raise Exception(f"Expecting a monotonic probability, "
+                            f"new_logprob = {new_logprob} > logprob = {self.logprob}")
         if not new_stop or (__debug__ and logger.isEnabledFor(logging.DEBUG)):
             m_next = self.__class__(self.matcher, edge_m, edge_o,
                                     logprob=new_logprob, logprobne=new_logprobne,
