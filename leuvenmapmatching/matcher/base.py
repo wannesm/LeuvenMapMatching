@@ -102,6 +102,10 @@ class BaseMatching(object):
                                                                 is_next_ne=(obs_ne != 0))
         logprob_obs, props_obs = self.matcher.logprob_obs(dist, self, edge_m, edge_o,
                                                           is_ne=(obs_ne != 0))
+        if logprob_trans > 0:
+            raise Exception(f"logprob_trans = {logprob_trans} > 0")
+        if logprob_obs > 0:
+            raise Exception(f"logprob_obs = {logprob_obs} > 0")
         new_logprob_delta = logprob_trans + logprob_obs
         if obs_ne == 0:
             new_logprobe = self.logprob + new_logprob_delta
@@ -112,13 +116,18 @@ class BaseMatching(object):
             # "* e^(ne_length_factor_log)" or "- ne_length_factor_log" for every step to a non-emitting
             # state to prefer shorter paths
             new_logprobe = self.logprobe + self.matcher.ne_length_factor_log
-            new_logprobne = self.logprobne + new_logprob_delta
+            # new_logprobne = self.logprobne + new_logprob_delta
+            new_logprobne = min(self.logprobne, new_logprob_delta)
             # "+ 1" to punish non-emitting states a bit less. Otherwise it would be
             # similar to (Pr_tr*Pr_obs)**2, which punishes just one non-emitting state too much.
-            new_logprob = new_logprobe + new_logprobne / (obs_ne + 1)
+            # new_logprob = new_logprobe + new_logprobne / (obs_ne + 1)
+            new_logprob = new_logprobe + new_logprobne
             new_length = self.length
         new_logprobema = ema_const.cur * new_logprob_delta + ema_const.prev * self.logprobema
         new_stop |= self.matcher.do_stop(new_logprob / new_length, dist, logprob_trans, logprob_obs)
+        if new_logprob > self.logprob:
+            print("xx")
+            raise Exception(f"new_logprob = {new_logprob} > logprob = {self.logprob}")
         if not new_stop or (__debug__ and logger.isEnabledFor(logging.DEBUG)):
             m_next = self.__class__(self.matcher, edge_m, edge_o,
                                     logprob=new_logprob, logprobne=new_logprobne,
@@ -1135,6 +1144,8 @@ class BaseMatcher:
             print("{:<24} : {}".format(key, val), file=file)
 
     def node_counts(self):
+        if self.lattice is None:
+            return None
         counts = defaultdict(lambda: 0)
         for level in self.lattice.values():
             for m in level.values():
@@ -1149,6 +1160,10 @@ class BaseMatcher:
 
         You need to run :meth:`match_incremental` on this object to continue from the existing
         (partial) lattice. Otherwise, if you use :meth:`match`, it will be overwritten.
+
+        Open question, if there is no need to keep track of older lattices, it will probably
+        be more efficient to clear the older parts of the interface instead of copying the newer
+        parts.
 
         :param nb_interfaces: Nb of interfaces (columns in lattice) to keep. Default is 1, the last one.
         :return: new Matcher object

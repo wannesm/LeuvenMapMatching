@@ -107,11 +107,19 @@ def read_map(map_fn):
         reader = csv.reader(map_f, delimiter='\t')
         next(reader)
         for row in reader:
-            eid, nf, nt, twoway, speed, length,  innernodes = row
+            eid, nf, nt, twoway, speed, length, innernodes = row
             eid = int(eid)
             nf = int(nf)
             nt = int(nt)
             length = int(length)
+            twoway = int(twoway)
+            speed = float(speed)
+            if twoway == 0:
+                twoway = False
+            elif twoway == 1:
+                twoway = True
+            else:
+                raise Exception(f"Unknown value for twoway: {twoway}")
             innernodes = parse_linestring(innernodes)
             # Add nodes to map
             mmap.add_node(nf, innernodes[0], ignore_doubles=True, no_index=True, no_commit=True)
@@ -126,13 +134,22 @@ def read_map(map_fn):
                 new_node_id += 1
                 mmap.add_node(innernode_id, innernode, no_index=True, no_commit=True)  # Should not be double
                 node_cnt += 1
-                mmap.add_edge(prev_node, innernode_id, path=eid, pathnum=idx, no_index=True, no_commit=True)
-                mmap.add_edge(innernode_id, prev_node, path=eid, pathnum=-idx, no_index=True, no_commit=True)
-                edge_cnt += 2
+                mmap.add_edge(prev_node, innernode_id, speed=speed, edge_type=0,
+                              path=eid, pathnum=idx, no_index=True, no_commit=True)
+                edge_cnt += 1
+                if twoway:
+                    mmap.add_edge(innernode_id, prev_node, speed=speed, edge_type=0,
+                                  path=eid, pathnum=-idx, no_index=True, no_commit=True)
+                    edge_cnt += 1
                 prev_node = innernode_id
                 idx += 1
-            mmap.add_edge(prev_node, nt, path=eid, pathnum=idx, no_index=True, no_commit=True)
-            mmap.add_edge(nt, prev_node, path=eid, pathnum=-idx, no_index=True, no_commit=True)
+            mmap.add_edge(prev_node, nt, speed=speed, edge_type=0,
+                          path=eid, pathnum=idx, no_index=True, no_commit=True)
+            edge_cnt += 1
+            if twoway:
+                mmap.add_edge(nt, prev_node, speed=speed, edge_type=0,
+                              path=eid, pathnum=-idx, no_index=True, no_commit=True)
+                edge_cnt += 1
             if node_cnt % 100000 == 0:
                 mmap.db.commit()
     logger.debug(f"... done: {node_cnt} nodes and {edge_cnt} edges")
@@ -143,12 +160,15 @@ def read_map(map_fn):
 
 
 def correct_map(mmap):
-    """Add edges between nodes with degree > 2 that are on the exact same location."""
+    """Add edges between nodes with degree > 2 that are on the exact same location.
+    This ignore that with bridges, the roads might not be connected. But we need a correct
+    because the dataset has a number of interrupted paths.
+    """
     def correct_edge(labels):
         labels = [label for label in labels if label > 100000000000]
         logger.info(f"Add connections between {labels}")
         for l1, l2 in product(labels, repeat=2):
-            mmap.add_edge(l1, l2)
+            mmap.add_edge(l1, l2, edge_type=1)
     mmap.find_duplicates(func=correct_edge)
 
 
@@ -258,6 +278,7 @@ def test_route():
     # slice_route = slice(2770, 2800)  # Observations are missing
     # slice_route = slice(2910, 2950)  # Interesting point
     # slice_route = slice(2910, 2929)  # Interesting point
+    # slice_route = slice(6825, 6833)  # Outlier observation
 
     # if directory is not None:
     #     logger.debug("Plotting pre map ...")
@@ -268,7 +289,7 @@ def test_route():
 
     matcher = DistanceMatcher(map_con, min_prob_norm=0.0001,
                               max_dist=200,
-                              dist_noise=6, dist_noise_ne=12,
+                              dist_noise=15, dist_noise_ne=30,
                               obs_noise=30, obs_noise_ne=150,
                               non_emitting_states=True)
 
@@ -316,7 +337,7 @@ def test_route():
         fig = plt.figure(figsize=(200, 200))
         ax = fig.get_axes()
         mm_viz.plot_map(map_con, matcher=matcher, use_osm=True, ax=ax,
-                        show_lattice=False, show_labels=False, zoom_path=zoom_path,
+                        show_lattice=False, show_labels=True, zoom_path=zoom_path,
                         show_matching=True, show_graph=False)
         plt.savefig(str(directory / "test_newson_route_matched.png"))
         plt.close(fig)

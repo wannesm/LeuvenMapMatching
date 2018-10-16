@@ -150,7 +150,9 @@ class SqliteMap(BaseMap):
              "path INTEGER,\n"  # Not necessarily unique, a pathway id can consist of multiple edges
              "pathnum INTEGER,\n"
              "id1 INTEGER,\n"  # node 1
-             "id2 INTEGER\n"  # node 2
+             "id2 INTEGER,\n"  # node 2
+             "speed REAL,\n"  # speed m/s
+             "type INTEGER\n"  # extra field
              ")")
         c.execute(q)
         q = ("CREATE TABLE close_edges(\n"
@@ -281,7 +283,8 @@ class SqliteMap(BaseMap):
     def del_node(self, node):
         raise Exception("TODO")
 
-    def add_edge(self, node_a, node_b, loc_a=None, loc_b=None, path=None, pathnum=None,
+    def add_edge(self, node_a, node_b, loc_a=None, loc_b=None, speed=None, edge_type=None,
+                 path=None, pathnum=None,
                  no_index=False, no_commit=False):
         """Add new edge to the map.
 
@@ -291,8 +294,8 @@ class SqliteMap(BaseMap):
         """
         c = self.db.cursor()
         eid = (node_a, node_b).__hash__()
-        c.execute('INSERT OR IGNORE INTO edges(id, path, pathnum, id1, id2) VALUES (?, ?, ?, ?, ?)',
-                  (eid, path, pathnum, node_a, node_b))
+        c.execute('INSERT OR IGNORE INTO edges(id, path, pathnum, id1, id2, type, speed) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                  (eid, path, pathnum, node_a, node_b, edge_type, speed))
         # c.execute('SELECT last_insert_rowid();')
         # eid = c.fetchone()[0]
 
@@ -324,16 +327,12 @@ class SqliteMap(BaseMap):
 
         def get_edge():
             for row in edges:
-                if len(row) == 2:
-                    key_a, key_b = row
-                    path = None
-                    pathnum = None
-                else:
-                    key_a, key_b, path, pathnum = row
+                row = row + ([None] * (6 - len(row)))
+                key_a, key_b, path, pathnum, edge_type, speed = row
                 eid = (key_a, key_b).__hash__()
-                yield eid, path, pathnum, key_a, key_b
+                yield eid, path, pathnum, key_a, key_b, edge_type, speed
 
-        q = "INSERT INTO edges(id, path, pathnum, id1, id2) VALUES(?, ?, ?, ?, ?);"
+        q = "INSERT INTO edges(id, path, pathnum, id1, id2, type, speed) VALUES(?, ?, ?, ?, ?, ?, ?);"
         c.executemany(q, get_edge())
         self.db.commit()
 
@@ -497,7 +496,6 @@ class SqliteMap(BaseMap):
         results = []
         for key_a, loc_a, key_b, loc_b in nodes:
             dist, pi, ti = self.distance_point_to_segment(loc, loc_a, loc_b)
-            print(f"{dist} = dist_point_to_seg({loc}, {loc_a}, {loc_b}) <- {key_a} , {key_b}")
             if dist < max_dist:
                 results.append((dist, key_a, loc_a, key_b, loc_b, pi, ti))
         results.sort()
