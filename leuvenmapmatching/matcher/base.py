@@ -996,13 +996,31 @@ class BaseMatcher:
         # for label in to_del:
         #     del lattice_col[label]
 
-    def _build_node_path(self, start_idx, unique=True, max_depth=None):
+    def _build_node_path(self, start_idx, unique=True, max_depth=None, last_is_e=False):
+        """Build the path from the lattice.
+
+        :param start_idx:
+        :param unique:
+        :param max_depth:
+        :param last_is_e: Last matched lattice node should be an emitting state.
+            In case the matching stops early, the longest path can be in between two observations
+            and thus be a nonemitting state (which by definition has a lower probability than the
+            last emitting state). If this argument is set to true, the longer match is preferred.
+        :return:
+        """
         self.lattice_best = []
         node_max = None
+        node_max_ne = 0
         cur_depth = 0
-        for m in self.lattice[start_idx].values():
-            if node_max is None or m.logprob > node_max.logprob:
-                node_max = m
+        if last_is_e:
+            for m in self.lattice[start_idx].values():  # type:BaseMatching
+                if node_max is None or m.logprob > node_max.logprob:
+                    node_max = m
+        else:
+            for m in self.lattice[start_idx].values():  # type:BaseMatching
+                if node_max is None or m.obs_ne > node_max_ne or m.logprob > node_max.logprob:
+                    node_max_ne = m.obs_ne
+                    node_max = m
         if node_max is None:
             raise Exception("Did not find a matching node for path point at index {}".format(start_idx))
         if __debug__ and logger.isEnabledFor(logging.DEBUG):
