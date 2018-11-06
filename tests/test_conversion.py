@@ -105,6 +105,36 @@ def test_distance_segment_to_segment2():
     assert u_t == pytest.approx(0.2470133466162735)
 
 
+def test_distance_segment_to_segment3():
+    f1 = (50.87205, 4.66089)
+    f2 = (50.874550000000006, 4.672980000000001)
+    t1 = (50.8740376, 4.6705204)
+    t2 = (50.8741866999999, 4.67119980000001)
+    d, pf, pt, u_f, u_t = dll.distance_segment_to_segment(f1, f2, t1, t2)
+    if directory:
+        plot_distance_segment_to_segment_latlon(f1, f2, t1, t2, pf, pt, "test_distance_segment_to_segment3")
+    assert d == pytest.approx(0)
+    assert pf == pytest.approx((50.87410572908839, 4.670830969750696))
+    assert pt == pytest.approx((50.87410575464133, 4.670830955670548))
+    assert u_f == pytest.approx(0.8222551304652699)
+    assert u_t == pytest.approx(0.4571036354431931)
+
+
+def test_distance_segment_to_segment4():
+    f1 = (0, 0)
+    f2 = (278.05674689789083, 848.3102386968303)
+    t1 = (221.055090540802, 675.7367042826397)
+    t2 = (237.6344733521503, 723.4080418578025)
+    d, pf, pt, u_f, u_t = de.distance_segment_to_segment(f1, f2, t1, t2)
+    if directory:
+        plot_distance_segment_to_segment_euc(f1, f2, t1, t2, pf, pt, "test_distance_segment_to_segment4")
+    assert d == pytest.approx(0)
+    assert pf == pytest.approx((228.63358669727376, 697.5274459946864))
+    assert pt == pytest.approx((228.63358669727376, 697.5274459946864))
+    assert u_f == pytest.approx(0.8222551304652699)
+    assert u_t == pytest.approx(0.4571036354431931)
+
+
 def test_distance_point_to_segment1():
     locs = [
         (47.6373, -122.0950167),
@@ -177,7 +207,7 @@ def plot_distance_segment_to_segment_latlon(f1, f2, t1, t2, pf, pt, fn):
     p6 = m.to_pixels(pt)
     ax.plot([p1[0], p2[0]], [p1[1], p2[1]], 'o-')
     ax.plot([p3[0], p4[0]], [p3[1], p4[1]], 'o-')
-    ax.plot([p5[0], p6[0]], [p5[1], p6[1]], 'o-')
+    ax.plot([p5[0], p6[0]], [p5[1], p6[1]], 'x-')
     plt.savefig(str(directory / fn))
     plt.close(plt.gcf())
 
@@ -187,7 +217,7 @@ def plot_distance_segment_to_segment_euc(f1, f2, t1, t2, pf, pt, fn):
     fig, ax = plt.subplots(1, 1, figsize=(10, 10))
     ax.plot([f1[1], f2[1]], [f1[0], f2[0]], 'o-')
     ax.plot([t1[1], t2[1]], [t1[0], t2[0]], 'o-')
-    ax.plot([pf[1], pt[1]], [pf[0], pt[0]], 'o-')
+    ax.plot([pf[1], pt[1]], [pf[0], pt[0]], 'x-')
     ax.axis('equal')
     ax.set_aspect('equal')
     plt.savefig(str(directory / fn))
@@ -207,4 +237,6 @@ if __name__ == "__main__":
     # test_destination1()
     # test_distance_segment_to_segment1()
     # test_distance_segment_to_segment2()
-    test_distance_point_to_segment1()
+    test_distance_segment_to_segment3()
+    # test_distance_segment_to_segment4()
+    # test_distance_point_to_segment1()

@@ -25,7 +25,7 @@ match_ne_color = mcolors.CSS4_COLORS['olive']
 lattice_color = mcolors.CSS4_COLORS['magenta']
 nodes_color = mcolors.CSS4_COLORS['cyan']
 path_color = mcolors.CSS4_COLORS['blue']
-fontsize = 11
+fontsize = 7  # 11
 
 
 def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False, z=None, bb=None,
@@ -149,6 +149,7 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
                 xytext = ax.transLimits.transform(coord)
                 xytext = (xytext[0]+0.001, xytext[1]+0.0)
                 xytext = ax.transLimits.inverted().transform(xytext)
+                # key = str(key)[-3:]
                 ann = ax.annotate(key, xy=coord, xytext=xytext,
                             # textcoords=('axes fraction', 'axes fraction'),
                             # arrowprops=dict(arrowstyle='->'),
@@ -251,12 +252,16 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
             x, y = to_pixels(lat, lon)
             x2, y2 = to_pixels(lat2, lon2)
             if m.edge_o.is_point():
+                plt.plot(x, y, marker='x', markersize=2 * linewidth, color=match_color, alpha=0.75)
+                plt.plot(x2, y2, marker='+', markersize=2 * linewidth, color=match_color, alpha=0.75)
                 ax.plot((x, x2), (y, y2), '-', color=match_color, linewidth=linewidth, alpha=0.75)
             else:
+                plt.plot(x, y, marker='x', markersize=2 * linewidth, color=match_ne_color, alpha=0.75)
+                plt.plot(x2, y2, marker='+', markersize=2 * linewidth, color=match_ne_color, alpha=0.75)
                 ax.plot((x, x2), (y, y2), '-', color=match_ne_color, linewidth=linewidth, alpha=0.75)
             # ax.plot((x, x2), (y, y2), '-', color=match_color, linewidth=10, alpha=0.1)
             # if show_labels:
-            #     ax.annotate(str(m.obs), xy=(x, y))
+            #     ax.annotate(f"{m.obs}.{m.obs_ne}", xy=(x, y))
     elif path and nodes and len(path) == len(nodes) and show_matching:
         logger.debug('Plot matching path-nodes (using sequence of nodes) ...')
         for idx, (loc, node) in enumerate(zip(path, nodes)):

@@ -69,7 +69,7 @@ def distance_segment_to_segment(f1, f2, t1, t2):
         u_f = 0
         changed_f = True
     if not changed_t and not changed_f:
-        return 0, (xi, yi), (xi, yi), u_t, u_f
+        return 0, (xi, yi), (xi, yi), u_f, u_t
     xf = x1 + u_f * (x2 - x1)
     yf = y1 + u_f * (y2 - y1)
     xt = x3 + u_t * (x4 - x3)

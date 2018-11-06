@@ -174,6 +174,11 @@ class DistanceMatcher(BaseMatcher):
             d_x = self.map.distance(prev_m.edge_m.pi, edge_m.pi)
         else:
             d_x = self.map.distance(prev_m.edge_m.pi, prev_m.edge_m.p2) + self.map.distance(prev_m.edge_m.p2, edge_m.pi)
+        # print(f"Prev-o: {prev_m.edge_o} / {prev_m.edge_o.loc_to_str()}")
+        # print(f"Cur-o:  {edge_o} / {edge_o.loc_to_str()}")
+        # print(f"Prev-m: {prev_m.edge_m} / {prev_m.edge_m.loc_to_str()}")
+        # print(f"Cur-m:  {edge_m} / {edge_m.loc_to_str()}")
+        # print(f"Dist: {d_z} -- {d_x}")
         d_t = abs(d_z - d_x)
         # p_dt = 1 / beta * math.exp(-d_t / beta)
         if is_prev_ne or is_next_ne:

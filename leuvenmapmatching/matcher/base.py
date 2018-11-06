@@ -447,11 +447,19 @@ class BaseMatcher:
         logger.info("Build lattice in {} seconds".format(t_delta))
 
         # Backtrack to find best path
-        if early_stop_idx:
-            if early_stop_idx <= 1:
+        if not early_stop_idx:
+            one_no_stop = False
+            for m in self.lattice[len(path) - 1].values():
+                if not m.stop:
+                    one_no_stop = True
+                    break
+            if not one_no_stop:
+                early_stop_idx = len(path) - 1
+        if early_stop_idx is not None:
+            if early_stop_idx == 0:
                 self.lattice_best = []
                 return [], 0
-            start_idx = early_stop_idx - 2
+            start_idx = early_stop_idx - 1
         else:
             start_idx = len(self.path) - 1
         node_path = self._build_node_path(start_idx, unique)
@@ -1014,11 +1022,11 @@ class BaseMatcher:
         cur_depth = 0
         if last_is_e:
             for m in self.lattice[start_idx].values():  # type:BaseMatching
-                if node_max is None or m.logprob > node_max.logprob:
+                if not m.stop and (node_max is None or m.logprob > node_max.logprob):
                     node_max = m
         else:
             for m in self.lattice[start_idx].values():  # type:BaseMatching
-                if node_max is None or m.obs_ne > node_max_ne or m.logprob > node_max.logprob:
+                if not m.stop and (node_max is None or m.obs_ne > node_max_ne or m.logprob > node_max.logprob):
                     node_max_ne = m.obs_ne
                     node_max = m
         if node_max is None:
