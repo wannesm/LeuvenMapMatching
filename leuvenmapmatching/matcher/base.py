@@ -431,7 +431,7 @@ class BaseMatcher:
             if not cnt_lat_size_not_zero:
                 if __debug__:
                     logger.debug("No solutions found anymore")
-                early_stop_idx = obs_idx
+                early_stop_idx = obs_idx - 1
                 logger.info(f'Stopped early at observation {early_stop_idx}')
                 break
             self._match_states(obs_idx)

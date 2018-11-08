@@ -169,7 +169,7 @@ def test_path_outlier():
     matcher = SimpleMatcher(mapdb, max_dist=None, min_prob_norm=0.0001,
                             max_dist_init=1, obs_noise=0.5, obs_noise_ne=10,
                             non_emitting_states=True)
-    matcher.match(path, unique=True)
+    _, last_idx = matcher.match(path, unique=True)
     path_pred = matcher.path_pred_onlynodes
     if directory:
         matcher.print_lattice_stats()
@@ -180,7 +180,42 @@ def test_path_outlier():
         mmviz.plot_map(mapdb, matcher=matcher, show_labels=True, show_matching=True,
                        filename=str(directory / "test_path_outlier.png"))
         print("Path through lattice:\n" + "\n".join(m.label for m in matcher.lattice_best))
+    assert last_idx == len(path) - 1
     assert path_pred == path_sol, "Nodes not equal:\n{}\n{}".format(path_pred, path_sol)
+
+
+def test_path_outlier2():
+    path = [(0.8, 0.7), (0.9, 0.7), (1.1, 1.0), (1.2, 1.5), (1.2, 1.6), (1.1, 2.0),
+            (1.1, 2.3), (1.3, 2.9), (1.2, 3.1), (1.5, 3.2), (1.8, 3.5), (2.0, 3.7),
+            (2.1, 3.3), (2.4, 3.2), (2.6, 3.1), (2.9, 3.1), (3.0, 3.2), (3.1, 3.8),
+            (3.0, 4.0), (3.1, 4.3), (3.1, 4.6), (3.0, 4.9)]
+    path.insert(13, (2.3, -3.0))
+    mapdb = InMemMap("map", graph={
+        "A": ((1, 1), ["B", "C", "X"]),
+        "B": ((1, 3), ["A", "C", "D", "K"]),
+        "C": ((2, 2), ["A", "B", "D", "E", "X", "Y"]),
+        "D": ((2, 4), ["B", "C", "F", "E", "K", "L"]),
+        "E": ((3, 3), ["C", "D", "F", "Y"]),
+        "F": ((3, 5), ["D", "E", "L"]),
+        "X": ((2, 0), ["A", "C", "Y"]),
+        "Y": ((3, 1), ["X", "C", "E"]),
+        "K": ((1, 5), ["B", "D", "L"]),
+        "L": ((2, 6), ["K", "D", "F"])
+    }, use_latlon=False)
+
+    matcher = DistanceMatcher(mapdb, max_dist=None, min_prob_norm=0.1,
+                            max_dist_init=1, obs_noise=0.25, obs_noise_ne=1,
+                            non_emitting_states=True)
+    _, last_idx = matcher.match(path, unique=True)
+    if directory:
+        # matcher.print_lattice_stats()
+        # matcher.print_lattice()
+        from leuvenmapmatching import visualization as mmviz
+        # with (directory / 'lattice.gv').open('w') as ofile:
+        #     matcher.lattice_dot(file=ofile)
+        mmviz.plot_map(mapdb, matcher=matcher, show_labels=True, show_matching=True,
+                       filename=str(directory / "test_path_outlier2.png"))
+    assert last_idx == 12
 
 
 def test_path_outlier_dist():
@@ -272,7 +307,8 @@ if __name__ == "__main__":
     # test_path1_dist()
     # test_path2()
     # test_path2_dist()
-    test_path_outlier()
+    # test_path_outlier()
+    test_path_outlier2()
     # test_path_outlier_dist()
     # test_path3()
     # test_path3_dist()
