@@ -8,10 +8,16 @@ transition and emission probability distributions.
 
 ![example](http://people.cs.kuleuven.be/wannes.meert/leuvenmapmatching/example1.png?v=2)
 
-Reference:
+Main reference:
 
 > Meert Wannes, Mathias Verbeke, "HMM with Non-Emitting States for Map Matching",
 > European Conference on Data Analysis (ECDA), Paderborn, Germany, 2018.
+
+Other references:
+
+> Devos Laurens, Vandebril Raf (supervisor), Meert Wannes (supervisor),
+> "Trafﬁc patterns revealed through matrix functions and map matching",
+> Master thesis, Faculty of Engineering Science, KU Leuven, 2018
 
 ## Installation and usage
 
