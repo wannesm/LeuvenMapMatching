@@ -38,6 +38,7 @@ Reference:
    usage/latitudelongitude
    usage/customdistributions
    usage/incremental
+   usage/debug
 
 
 .. toctree::
