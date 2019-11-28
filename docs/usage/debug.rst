@@ -1,4 +1,4 @@
-Deubg
+Debug
 =====
 
 Increasing the verbosity level
