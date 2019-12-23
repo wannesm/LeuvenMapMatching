@@ -23,7 +23,7 @@ logger = logging.getLogger("be.kuleuven.cs.dtai.mapmatching")
 
 
 def route_mismatch_factor(map_con, path_pred, path_grnd, window=None, dist_fn=None, keep_mismatches=False):
-    # type: (BaseMap, List[int], List[int], Optional[int], Optional[Callable], bool) -> Tuple[float, float, float, float, List[Tuple[int, int]]]
+    # type: (BaseMap, List[int], List[int], Optional[int], Optional[Callable], bool) -> Tuple[float, float, float, float, List[Tuple[int, int]], float, float]
     """Evaluation method from Newson and Krumm (2009).
 
     :math:`f = \frac{d_{-} + d_{+}}{d_0}`
@@ -34,6 +34,9 @@ def route_mismatch_factor(map_con, path_pred, path_grnd, window=None, dist_fn=No
 
     This function only supports connected states (thus not switching between states
     that are not connected (e.g. parallel roads).
+
+    Also computes the Accuracy by Number (AN) and Accuracy by Length (AL) metrics from
+    Zheng et al. (2009).
     """
     if dist_fn is None:
         dist_fn = dist_latlon.distance
@@ -48,6 +51,7 @@ def route_mismatch_factor(map_con, path_pred, path_grnd, window=None, dist_fn=No
     cnt_mismatches = 0
     mismatches = [] if keep_mismatches else None
 
+    prev_grnd_pi = None
     for pred_pi, grnd_pi in algn:
         pred_p = path_pred[pred_pi]
         grnd_p = path_grnd[grnd_pi]
@@ -63,6 +67,9 @@ def route_mismatch_factor(map_con, path_pred, path_grnd, window=None, dist_fn=No
             d_min += grnd_d
             if keep_mismatches:
                 mismatches.append((pred_p, grnd_p))
+        prev_grnd_pi = grnd_pi
 
     factor = (d_min + d_plus) / d_zero
-    return factor, cnt_matches, cnt_mismatches, d_zero, mismatches
+    an = cnt_matches / len(path_grnd)
+    al = (d_zero - d_min) / d_zero
+    return factor, cnt_matches, cnt_mismatches, d_zero, mismatches, an, al
