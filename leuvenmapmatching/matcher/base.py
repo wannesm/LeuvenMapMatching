@@ -16,6 +16,7 @@ import sys
 import logging
 import time
 from collections import OrderedDict, defaultdict, namedtuple
+from itertools import islice
 from typing import List, Tuple, Dict, Any, Optional, Set
 
 import numpy as np
@@ -1066,6 +1067,15 @@ class BaseMatcher:
         else:
             self.node_path = list(reversed(node_path_rev))
         return self.node_path
+
+    def path_bb(self):
+        """Get boundig box of matched path (if it exists, otherwise return None)."""
+        path = self.path
+        plat, plon = islice(zip(*path), 2)
+        lat_min, lat_max = min(plat), max(plat)
+        lon_min, lon_max = min(plon), max(plon)
+        bb = lat_min, lon_min, lat_max, lon_max
+        return bb
 
     def print_lattice(self, file=None, obs_idx=None, label_width=None):
         if file is None:
