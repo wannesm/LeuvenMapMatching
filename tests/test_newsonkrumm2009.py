@@ -10,7 +10,7 @@ https://www.microsoft.com/en-us/research/publication/hidden-markov-map-matching-
 Notes:
 
 * There is a 'bug' in the map available from the website.
-  Multiple segments (streets) in the map are not connected but have overlappen, but
+  Multiple segments (streets) in the map are not connected but have overlapping, but
   disconnected, nodes.
   For example, the following nodes are on the same location and
   should be connected because the given path runs over this road:
