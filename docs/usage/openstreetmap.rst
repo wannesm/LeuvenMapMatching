@@ -95,10 +95,10 @@ This package is build on top of the `geopandas <http://geopandas.org>`_ package.
     graph_proj = ox.project_graph(graph)
     # Create GeoDataFrames
     nodes_proj, edges_proj = ox.graph_to_gdfs(graph_proj, nodes=True, edges=True)
-    for nid, row in edges_proj[['u', 'v']].iterrows():
-        map_cont.add_edge(row['u'], None, row['v'], None)
-    for nid, row in nodes_proj[['x', 'y']].iterrows()
+    for nid, row in nodes_proj[['x', 'y']].iterrows():
         map_con.add_node(nid, (row['x'], row['y']))
+    for nid, row in edges_proj[['u', 'v']].iterrows():
+        map_con.add_edge(row['u'], row['v'])
 
 
 The geopandas package supports projections:
