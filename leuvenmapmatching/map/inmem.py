@@ -79,8 +79,8 @@ class InMemMap(BaseMap):
         if self.use_rtree:
             self.setup_index(deserializing=deserializing)
 
-        self.crs_lonlat = {'init': 'epsg:4326'} if crs_lonlat is None else crs_lonlat  # GPS
-        self.crs_xy = {'init': 'epsg:3395'} if crs_xy is None else crs_xy  # Mercator projection
+        self.crs_lonlat = 'EPSG:4326' if crs_lonlat is None else crs_lonlat  # GPS
+        self.crs_xy = 'EPSG:3395' if crs_xy is None else crs_xy  # Mercator projection
         if pyproj:
             proj_lonlat = pyproj.Proj(self.crs_lonlat, preserve_units=True)
             proj_xy = pyproj.Proj(self.crs_xy, preserve_units=True)
