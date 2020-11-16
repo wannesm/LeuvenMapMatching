@@ -80,9 +80,9 @@ class SqliteMap(BaseMap):
             self.create_db()
 
         if self.crs_lonlat is None:
-            self.crs_lonlat = {'init': 'epsg:4326'}  # GPS
+            self.crs_lonlat = 'EPSG:4326'  # GPS
         if self.crs_xy is None:
-            self.crs_xy = {'init': 'epsg:3395'}  # Mercator projection
+            self.crs_xy = 'EPSG:3395'  # Mercator projection
 
         self.save_properties()
 
