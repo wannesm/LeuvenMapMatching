@@ -93,22 +93,26 @@ This package is build on top of the `geopandas <http://geopandas.org>`_ package.
     import osmnx
     graph = ox.graph_from_place('Leuven, Belgium', network_type='drive')
     graph_proj = ox.project_graph(graph)
+    
     # Create GeoDataFrames
+    # Approach 1
     nodes_proj, edges_proj = ox.graph_to_gdfs(graph_proj, nodes=True, edges=True)
-    for nid, row in edges_proj[['u', 'v']].iterrows():
-        map_cont.add_edge(row['u'], None, row['v'], None)
-    for nid, row in nodes_proj[['x', 'y']].iterrows()
+    for nid, row in nodes_proj[['x', 'y']].iterrows():
         map_con.add_node(nid, (row['x'], row['y']))
+    for nid, row in edges_proj[['u', 'v']].iterrows():
+        map_con.add_edge(row['u'], row['v'])
+    
+    # Approach 2
+    nodes, edges = ox.graph_to_gdfs(graph_proj, nodes=True, edges=True)
+    
+    nodes_proj = nodes.to_crs("EPSG:3395")
+    edges_proj = edges.to_crs("EPSG:3395")
+    
+    for nid, row in nodes_proj.iterrows():
+        map_con.add_node(nid, (row['lat'], row['lon']))
+    
+    # adding edges using networkx graph
+    for nid1, nid2, _ in graph.edges:
+        map_con.add_edge(nid1, nid2)
 
 
-The geopandas package supports projections:
-
-.. code-block:: python
-
-    nodes, edges = ox.graph_to_gdfs(graph, nodes=True, edges=True)
-    nodes.crs = {'init': 'epsg:4326'}  # WGS 84, System used in GPS
-    nodes_proj = nodes.to_crs({'init': 'epsg:3395'})  # Mercator projection
-    edges.crs = {'init': 'epsg:4326'}
-    edges_proj = nodes.to_crs({'init': 'epsg:3395'})
-
-When projecting both the map and the track you want to match, make sure to use the same projection.
