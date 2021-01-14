@@ -14,10 +14,20 @@ logger = logging.getLogger("be.kuleuven.cs.dtai.mapmatching")
 
 
 class Segment(object):
-    """Segment and interpolated point"""
+    """Segment in the graph and its interpolated point."""
     __slots__ = ["l1", "p1", "l2", "p2", "_pi", "_ti"]
 
     def __init__(self, l1, p1, l2=None, p2=None, pi=None, ti=None):
+        """Create a new segment.
+
+        :param l1: Label of the node that is the start of the segment.
+        :param p1: Point (coordinate) of the start node.
+        :param l2: Label of the node that is the end of the segment.
+        :param p2: Point (coordinate) of the end node.
+        :param pi: Interpolated point. The point that is the best match and
+            can be in between p1 and p2.
+        :param ti: Position of pi on the segment [p1,p2], thus pi = p1+t1*(p2-p1).
+        """
         self.l1 = l1  # Start of segment, label
         self.p1 = p1  # point
         self.l2 = l2  # End of segment, if None the segment is a point

@@ -12,6 +12,8 @@ import sys
 import os
 import logging
 from pathlib import Path
+
+sys.path.append("..")
 import leuvenmapmatching as mm
 from leuvenmapmatching.map.inmem import InMemMap
 from leuvenmapmatching.matcher.simple import SimpleMatcher

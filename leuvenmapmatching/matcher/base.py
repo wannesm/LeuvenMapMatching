@@ -43,6 +43,23 @@ class BaseMatching(object):
                  dist_obs: float=0.0, obs: int=0, obs_ne: int=0,
                  prev: Optional[Set['BaseMatching']]=None, stop: bool=False, length: int=1,
                  **_kwargs):
+        """
+
+        :param matcher: Reference to the Matcher used to generate this matching object.
+        :param edge_m: Segment in the given graph (thus line between two nodes in the graph).
+        :param edge_o: Segment in the given observations (thus line in between two observations).
+        :param logprob: Log probability of this matching.
+        :param logprobema: Exponential Mean Average of Log probability.
+        :param logprobe: Emitting
+        :param logprobne: Non-emitting
+        :param dist_obs: Distance between map point and observation
+        :param obs: Reference to path entry index (observation)
+        :param obs_ne: Number of non-emitting states for this observation
+        :param prev: Previous best matching objects
+        :param stop: Stop after this matching (e.g. because probability is too low)
+        :param length: Lenght of current matching sequence through lattice.
+        :param _kwargs:
+        """
         self.edge_m: Segment = edge_m
         self.edge_o: Segment = edge_o
         self.logprob: float = logprob        # max probability
