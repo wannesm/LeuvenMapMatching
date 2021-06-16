@@ -150,6 +150,7 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
                 xytext = (xytext[0]+0.001, xytext[1]+0.0)
                 xytext = ax.transLimits.inverted().transform(xytext)
                 # key = str(key)[-3:]
+                print(f'annotate: {key} {coord} {xytext}')
                 ann = ax.annotate(key, xy=coord, xytext=xytext,
                             # textcoords=('axes fraction', 'axes fraction'),
                             # arrowprops=dict(arrowstyle='->'),
@@ -311,7 +312,7 @@ def plot_lattice(ax, to_pixels, matcher):
     for idx in range(len(matcher.lattice)):
         if len(matcher.lattice[idx]) == 0:
             continue
-        for m in matcher.lattice[idx].values():
+        for m in matcher.lattice[idx].values_all():
             for mp in m.prev:
                 if m.stop:
                     alpha = 0.1

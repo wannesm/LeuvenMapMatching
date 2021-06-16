@@ -224,6 +224,7 @@ def test_path3_many_obs():
         matcher.print_lattice()
         from leuvenmapmatching import visualization as mmviz
         mmviz.plot_map(mapdb, matcher=matcher, show_labels=True, show_matching=True, linewidth=10,
+                       show_graph=True, show_lattice=True,
                        filename=str(directory / "test_test_path_ne_3_mo.png"))
     assert path_pred == path_sol, f"Nodes not equal:\n{path_pred}\n{path_sol}"
 
