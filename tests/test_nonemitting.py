@@ -77,7 +77,46 @@ def test_path1():
         with (directory / 'lattice_path1.gv').open('w') as ofile:
             matcher.lattice_dot(file=ofile)
         mmviz.plot_map(mapdb, matcher=matcher, show_labels=True, show_matching=True,
+                       show_graph=True,
                        filename=str(directory / "test_nonemitting_test_path1.png"))
+    assert path_pred == path_sol, f"Nodes not equal:\n{path_pred}\n{path_sol}"
+
+
+def test_path1_inc():
+    mapdb, path1, path2, path_sol = setup_map()
+
+    matcher = SimpleMatcher(mapdb, max_dist_init=1,
+                            in_prob_norm=0.5, obs_noise=0.5,
+                            non_emitting_states=True, only_edges=False,
+                            max_lattice_width=1)
+
+    print('## PHASE 1 ##')
+    matcher.match(path1, unique=True)
+    path_pred = matcher.path_pred_onlynodes
+    if directory:
+        from leuvenmapmatching import visualization as mmviz
+        matcher.print_lattice_stats()
+        matcher.print_lattice()
+        with (directory / 'lattice_path1_inc1.gv').open('w') as ofile:
+            matcher.lattice_dot(file=ofile, precision=2, render=True)
+        mmviz.plot_map(mapdb, matcher=matcher, show_labels=True, show_matching=True,
+                       show_graph=True,
+                       filename=str(directory / "test_nonemitting_test_path1_inc1.png"))
+
+    print('## PHASE 2 ##')
+    matcher.increase_max_lattice_width(3, unique=True)
+    path_pred = matcher.path_pred_onlynodes
+    if directory:
+        from leuvenmapmatching import visualization as mmviz
+        matcher.print_lattice_stats()
+        matcher.print_lattice()
+        with (directory / 'lattice_path1_inc2.gv').open('w') as ofile:
+            matcher.lattice_dot(file=ofile, precision=2, render=True)
+        mmviz.plot_map(mapdb, matcher=matcher, show_labels=True, show_matching=True,
+                       show_graph=True,
+                       filename=str(directory / "test_nonemitting_test_path1_inc2.png"))
+
+
     assert path_pred == path_sol, f"Nodes not equal:\n{path_pred}\n{path_sol}"
 
 
@@ -99,7 +138,7 @@ def test_path1_dist():
             print(m)
         with (directory / 'lattice_path1.gv').open('w') as ofile:
             matcher.lattice_dot(file=ofile)
-        mmviz.plot_map(mapdb, matcher=matcher, show_labels=True, show_matching=True,
+        mmviz.plot_map(mapdb, matcher=matcher, show_labels=True, show_matching=True, show_graph=True,
                        filename=str(directory / "test_nonemitting_test_path1_dist.png"))
     assert path_pred == path_sol, f"Nodes not equal:\n{path_pred}\n{path_sol}"
 
@@ -324,12 +363,13 @@ if __name__ == "__main__":
     print(f"Saving files to {directory}")
     # visualize_map(pathnb=1)
     # test_path1()
+    test_path1_inc()
     # test_path1_dist()
     # test_path2()
     # test_path2_dist()
     # test_path2_incremental()
     # test_path_duplicate()
-    test_path3_many_obs()
+    # test_path3_many_obs()
     # test_path3_few_obs_en()
     # test_path3_few_obs_e()
     # test_path3_dist()

@@ -150,10 +150,11 @@ def test_path2_inc():
         matcher.print_lattice()
         from leuvenmapmatching import visualization as mmviz
         with (directory / 'test_path2_inc_1.gv').open('w') as ofile:
-            matcher.lattice_dot(file=ofile)
+            matcher.lattice_dot(file=ofile, precision=2, render=True)
         mmviz.plot_map(mapdb, matcher=matcher, show_labels=True, show_matching=True,
                        show_lattice=True, show_graph=True,
                        filename=str(directory / "test_path2_inc_1.png"))
+
     ## Next phases
     for phase_nb, phase_width in enumerate([2, 3]):
         print(f'=== PHASE {phase_nb + 2} ===')
@@ -163,7 +164,7 @@ def test_path2_inc():
             matcher.print_lattice()
             from leuvenmapmatching import visualization as mmviz
             with (directory / f'test_path2_inc_{phase_nb + 2}.gv').open('w') as ofile:
-                matcher.lattice_dot(file=ofile)
+                matcher.lattice_dot(file=ofile, precision=2, render=True)
             mmviz.plot_map(mapdb, matcher=matcher, show_labels=True, show_matching=True,
                            show_lattice=True, show_graph=True,
                            filename=str(directory / f"test_path2_inc_{phase_nb + 2}.png"))

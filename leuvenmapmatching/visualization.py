@@ -30,7 +30,8 @@ fontsize = 7  # 11
 
 def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False, z=None, bb=None,
              show_labels=False, matcher=None, show_graph=False, zoom_path=False, show_lattice=False,
-             show_matching=False, filename=None, linewidth=2, coord_trans=None):
+             show_matching=False, filename=None, linewidth=2, coord_trans=None,
+             figwidth=20):
     """Plot the db/graph and optionally include the observed path and inferred nodes.
 
     :param map_con: Map
@@ -93,8 +94,6 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
         bb = [lat_min, lon_min, lat_max, lon_max]
         logger.debug("bb = [{}, {}, {}, {}]".format(*bb))
 
-    width = 20
-
     if use_osm:
         from .util import dist_latlon
         project = dist_latlon.project
@@ -104,9 +103,9 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
         to_pixels = m.to_pixels
         x_max, y_max = to_pixels(lat_max, lon_max)
         x_min, y_min = to_pixels(lat_min, lon_min)
-        height = width / abs(x_max - x_min) * abs(y_max - y_min)
+        height = figwidth / abs(x_max - x_min) * abs(y_max - y_min)
         if ax is None:
-            ax = m.show_mpl(figsize=(width, height))
+            ax = m.show_mpl(figsize=(figwidth, height))
         else:
             ax = m.show_mpl(ax=ax)
         fig = None
@@ -121,9 +120,9 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
             return lon, lat
         x_max, y_max = to_pixels(lat_max, lon_max)
         x_min, y_min = to_pixels(lat_min, lon_min)
-        height = width / abs(lon_max - lon_min) * abs(lat_max - lat_min)
+        height = figwidth / abs(lon_max - lon_min) * abs(lat_max - lat_min)
         if ax is None:
-            fig, ax = plt.subplots(ncols=1, nrows=1, figsize=(width, height))
+            fig, ax = plt.subplots(ncols=1, nrows=1, figsize=(figwidth, height))
         else:
             fig = None
         ax.set_xlim([x_min, x_max])
@@ -150,7 +149,7 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
                 xytext = (xytext[0]+0.001, xytext[1]+0.0)
                 xytext = ax.transLimits.inverted().transform(xytext)
                 # key = str(key)[-3:]
-                print(f'annotate: {key} {coord} {xytext}')
+                # print(f'annotate: {key} {coord} {xytext}')
                 ann = ax.annotate(key, xy=coord, xytext=xytext,
                             # textcoords=('axes fraction', 'axes fraction'),
                             # arrowprops=dict(arrowstyle='->'),

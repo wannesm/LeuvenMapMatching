@@ -246,6 +246,7 @@ class DistanceMatcher(BaseMatcher):
         else:
             factor = 0
         if factor < self.restrained_ne_thr:
-            logger.debug(f"Skip non-emitting states to {next_ne_m.label}: {factor} < {self.restrained_ne_thr}")
+            logger.debug(f"Skip non-emitting states to {next_ne_m.label}: {factor} < {self.restrained_ne_thr} "
+                         "(observations close enough to each other)")
             return True
         return False

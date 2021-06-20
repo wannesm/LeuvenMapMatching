@@ -256,5 +256,5 @@ if __name__ == "__main__":
     # test_path1()
     # test_path1_full()
     # test_path2_proj()
-    test_path2()
-    # test_path3()
+    # test_path2()
+    test_path3()

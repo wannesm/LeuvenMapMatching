@@ -331,6 +331,8 @@ class LatticeColumn:
     def dict(self, obs_ne=None):
         if obs_ne is None:
             raise AttributeError('obs_ne should be value')
+        while obs_ne >= len(self.o):
+            self.o.append({})
         return self.o[obs_ne]
 
     def values_all(self):
@@ -370,14 +372,25 @@ class LatticeColumn:
         :return:
         """
         cur_lattice = [m for m in self.values(obs_ne) if not m.stop]
-        logger.debug('Prune lattice[{},{}] from {} to {}'
-                     .format(self.obs_idx, obs_ne, len(cur_lattice), max_lattice_width))
+        if __debug__:
+            logger.debug('Prune lattice[{},{}] from {} to {}'
+                         .format(self.obs_idx, obs_ne,
+                                 len([m for m in cur_lattice if not m.stop and m.delayed == expand_upto]),
+                                 max_lattice_width))
         if max_lattice_width is not None and len(cur_lattice) > max_lattice_width:
             ms = sorted(cur_lattice, key=lambda t: t.prune_key, reverse=True)
-            for m in ms[:max_lattice_width]:  # type: BaseMatching
+            cur_width = max_lattice_width
+            m_last = ms[cur_width - 1]
+            # Extend current width if next pruned matching has same logprob as last kept matching
+            # This increases the lattice width but otherwise the algorithm depends on the
+            # order of edges/nodes and is not deterministic.
+            while cur_width < len(ms) and ms[cur_width].logprob == m_last.logprob:
+                m_last = ms[cur_width]
+                cur_width += 1
+            for m in ms[:cur_width]:  # type: BaseMatching
                 if m.delayed > expand_upto:
                     m.delayed = expand_upto  # expand now
-            for m in ms[max_lattice_width:]:
+            for m in ms[cur_width:]:
                 if m.delayed <= expand_upto:
                     m.delayed = expand_upto + 1  # expand later
 
@@ -551,6 +564,9 @@ class BaseMatcher:
             if self.non_emitting_states:
                 # Fill in non-emitting states between previous and current observation
                 self._match_non_emitting_states(obs_idx - 1, expand=expand)
+            if self.max_lattice_width:
+                # Prune again if non_emitting_states reactives matches from match_states
+                self.lattice[obs_idx].prune(0, self.max_lattice_width, self.expand_now)
             if __debug__ and logger.isEnabledFor(logging.DEBUG):
                 self.print_lattice(obs_idx=obs_idx, label_width=default_label_width)
                 logger.debug(f"--- end obs {obs_idx} ---")
@@ -851,11 +867,11 @@ class BaseMatcher:
                 logger.debug("--- obs {}:{} --- {} - {} ---".format(obs_idx, nb_ne, obs, obs_next))
             cur_lattice = self._match_non_emitting_states_inner(cur_lattice, obs_idx, obs, obs_next, nb_ne,
                                                                 lattice_best, lattice_ne)
+            if self.max_lattice_width is not None:
+                self.lattice[obs_idx].prune(nb_ne, self.max_lattice_width, self.expand_now)
             # Link to next observation
             self._match_non_emitting_states_end(cur_lattice, obs_idx + 1, obs_next,
                                                 lattice_best, expand=expand)
-            if self.max_lattice_width is not None:
-                self.lattice[obs_idx].prune(nb_ne, self.max_lattice_width, self.expand_now)
         if self.max_lattice_width is not None:
             self.lattice[obs_idx].prune(0, self.max_lattice_width, self.expand_now)
         # logger.info('Used {} levels of non-emitting states'.format(nb_ne))
@@ -897,10 +913,10 @@ class BaseMatcher:
         # cur_lattice_new = dict()
         cur_lattice_new = self.lattice[obs_idx].dict(nb_ne)
         for m in cur_lattice.values():  # type: BaseMatching
-            if m.stop:
+            if m.stop or m.delayed != self.expand_now:
                 continue
             if m.shortkey in lattice_ne:
-                logger.debug(f"Skip non-emitting states from {m.label}")
+                logger.debug(f"Skip non-emitting states from {m.label}, already visited")
                 continue
             # == Move to neighbour edge from edge ==
             if m.edge_m.l2 is not None and self.only_edges:
@@ -1045,11 +1061,11 @@ class BaseMatcher:
                                 elif __debug__ and logger.isEnabledFor(logging.DEBUG):
                                     m_next.stop = True
                                     # lattice_toinsert.append(m_next)
-                                    self.lattice[obs_idx].upsert(n_next)
+                                    self.lattice[obs_idx].upsert(m_next)
                             else:
                                 lattice_best[m_next.shortkey] = m_next
                                 # lattice_toinsert.append(m_next)
-                                self.lattice[obs_idx].upsert(n_next)
+                                self.lattice[obs_idx].upsert(m_next)
                             if __debug__:
                                 logger.debug(str(m_next))
                     else:
@@ -1085,15 +1101,15 @@ class BaseMatcher:
                                 if m_next.logprob > lattice_best[m_next.shortkey].logprob:
                                     lattice_best[m_next.shortkey] = m_next
                                     # lattice_toinsert.append(m_next)
-                                    self.lattice[obs_idx].upsert(n_next)
+                                    self.lattice[obs_idx].upsert(m_next)
                                 elif __debug__ and logger.isEnabledFor(logging.DEBUG):
                                     m_next.stop = True
                                     # lattice_toinsert.append(m_next)
-                                    self.lattice[obs_idx].upsert(n_next)
+                                    self.lattice[obs_idx].upsert(m_next)
                             else:
                                 lattice_best[m_next.shortkey] = m_next
                                 # lattice_toinsert.append(m_next)
-                                self.lattice[obs_idx].upsert(n_next)
+                                self.lattice[obs_idx].upsert(m_next)
                             if __debug__:
                                 logger.debug(str(m_next))
                     else:
@@ -1213,11 +1229,22 @@ class BaseMatcher:
                 for m in sorted(self.lattice[idx].values(obs_ne), key=lambda t: str(t.label)):
                     print(m.__str__(label_width=label_width), file=file)
 
-    def lattice_dot(self, file=None):
+    def lattice_dot(self, file=None, precision=None, render=False):
+        """Write the lattice as a Graphviz DOT file.
+
+        :param file: File object to print to. Prints to stdout if None.
+        :param precision: Precision of (log) probabilities.
+        :param render: Try to render the generated Graphviz file.
+        """
         if file is None:
             file = sys.stdout
+        if precision is None:
+            prfmt = ''
+        else:
+            prfmt = f'.{precision}f'
         print('digraph lattice {', file=file)
         print('\trankdir=LR;', file=file)
+        # Vertices
         for idx_ob in range(len(self.lattice)):
             col = self.lattice[idx_ob]
             for idx_ne in range(len(col)):
@@ -1235,12 +1262,15 @@ class BaseMatcher:
                         cur_obs_ne = obs_ne
                     if stop:
                         options = 'label="{} x",color=gray,fontcolor=gray'.format(cname)
-                    elif delayed:
-                        options = 'label="{} +",color=gray,fontcolor=gray'.format(cname)
+                    elif delayed > self.expand_now:
+                        options = 'label="{} d{}",color=gray,fontcolor=gray'.format(cname, delayed)
+                    elif self.expand_now != 0:
+                        options = 'label="{} d{}"'.format(cname, delayed)
                     else:
-                        options = 'label="{} ."'.format(cname)
+                        options = 'label="{}  "'.format(cname)
                     print('\t\t{} [{}];'.format(cname, options), file=file)
                 print('\t};', file=file)
+        # Edges
         for idx_ob in range(len(self.lattice)):
             col = self.lattice[idx_ob]
             for idx_ne in range(len(col)):
@@ -1249,18 +1279,32 @@ class BaseMatcher:
                     continue
                 for m in ms:
                     for mp in m.prev:
-                        if m.stop or m.delayed:
+                        if m.stop or m.delayed > self.expand_now:
                             options = ',color=gray,fontcolor=gray'
                         else:
                             options = ''
-                        print(f'\t {mp.cname} -> {m.cname} [label="{m.logprob}"{options}];', file=file)
+                        print(f'\t {mp.cname} -> {m.cname} [label="{m.logprob:{prfmt}}"{options}];', file=file)
                     for mp in m.prev_other:
-                        if m.stop or m.delayed:
+                        if m.stop or m.delayed > self.expand_now:
                             options = ',color=gray,fontcolor=gray'
                         else:
                             options = ''
-                        print(f'\t {mp.cname} -> {m.cname} [color=gray,label="{m.logprob}"{options}];', file=file)
+                        print(f'\t {mp.cname} -> {m.cname} [color=gray,label="{m.logprob:{prfmt}}"{options}];', file=file)
         print('}', file=file)
+        if render and file is not None:
+            import subprocess as sp
+            from pathlib import Path
+            from io import TextIOWrapper
+            if isinstance(file, Path):
+                fn = str(file.canonical())
+            elif isinstance(file, TextIOWrapper):
+                file.flush()
+                fn = file.name
+            else:
+                fn = str(file)
+            cmd = ['dot', '-Tpdf', '-O', fn]
+            logger.debug(' '.join(cmd))
+            sp.call(cmd)
 
     def print_lattice_stats(self, file=None, verbose=False):
         if file is None:
