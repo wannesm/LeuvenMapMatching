@@ -535,7 +535,7 @@ class BaseMatcher:
             self.lattice_best = []
             return [], 0
         if __debug__ and logger.isEnabledFor(logging.DEBUG):
-            self.print_lattice(obs_idx=0, label_width=default_label_width)
+            self.print_lattice(obs_idx=0, label_width=default_label_width, debug=True)
 
         # Start iterating over observations 1..end
         t_start = time.time()
@@ -568,7 +568,7 @@ class BaseMatcher:
                 # Prune again if non_emitting_states reactives matches from match_states
                 self.lattice[obs_idx].prune(0, self.max_lattice_width, self.expand_now)
             if __debug__ and logger.isEnabledFor(logging.DEBUG):
-                self.print_lattice(obs_idx=obs_idx, label_width=default_label_width)
+                self.print_lattice(obs_idx=obs_idx, label_width=default_label_width, debug=True)
                 logger.debug(f"--- end obs {obs_idx} ---")
 
         t_delta = time.time() - t_start
@@ -621,7 +621,7 @@ class BaseMatcher:
         else:
             start_obs_idx = len(self.path)
             for idx in range(len(self.path)):
-                self.lattice[start_obs_idx + idx] = dict()
+                self.lattice[start_obs_idx + idx] = LatticeColumn(start_obs_idx + idx)
             self.path += path
 
         # Start iterating over observations 1..end
@@ -634,7 +634,7 @@ class BaseMatcher:
             if __debug__:
                 logger.debug(f"--- obs {obs_idx} --- {self.path[obs_idx]} ---")
             cnt_lat_size_not_zero = False
-            for m_tmp in self.lattice[obs_idx - 1].values():
+            for m_tmp in self.lattice[obs_idx - 1].values(0):
                 if not m_tmp.stop:
                     cnt_lat_size_not_zero = True
                     break
@@ -651,7 +651,7 @@ class BaseMatcher:
                 self._match_non_emitting_states(obs_idx - 1)
             if __debug__:
                 if logger.isEnabledFor(logging.DEBUG):
-                    self.print_lattice(obs_idx=obs_idx, label_width=default_label_width)
+                    self.print_lattice(obs_idx=obs_idx, label_width=default_label_width, debug=True)
 
         t_delta = time.time() - t_start
         logger.info("Build lattice in {} seconds".format(t_delta))
@@ -1116,56 +1116,39 @@ class BaseMatcher:
                         if __debug__:
                             logger.debug(self.matching.repr_static(('x', '{} < self-loop'.format(nbr_label))))
 
+    def get_matching(self, identifier):
+        m = None
+        if isinstance(identifier, BaseMatching):
+            m = identifier
+        elif type(identifier) is str:
+            parts = identifier.split('-')
+            idx, ne, key = None, None, None
+            if len(parts) == 4:
+                nodea, nodeb, idx, ne = [int(part) for part in parts]
+                key = (nodea, nodeb, idx, ne)
+            elif len(parts) == 3:
+                node, idx, ne = [int(part) for part in parts]
+                key = (node, idx, ne)
+            else:
+                raise AttributeError(f'Unknown string format for matching. '
+                                     'Expects <node>-<idx>-<ne> or <node>-<node>-<idx>-<ne>.')
+            col = self.lattice[idx]  # type: LatticeColumn
+            col_ne = col.o[ne]
+            m = col_ne[key]
+        return m
 
-    # def _cleanup_lattice(self, obs_idx):
-    #     """Remove all lattice entries that cannot be part of a backtracking path starting at obs_idx."""
-        # TODO make lattice smaller. Current version does not work as it creates gaps.
-        # if obs_idx <= 1:
-        #     return
-        # all_prev = set()
-        # for m in self.lattice[obs_idx].values():
-        #     all_prev.update(m.prev)
-        #
-        # lattice_col = self.lattice[obs_idx - 1]
-        # to_del = []
-        # for label, m in lattice_col.items():
-        #     if m not in all_prev:
-        #         to_del.append(label)
-        # for label in to_del:
-        #     del lattice_col[label]
+    def get_matching_path(self, start_m):
+        start_m = self.get_matching(start_m)
+        return self._build_matching_path(start_m)
 
-    def _build_node_path(self, start_idx, unique=True, max_depth=None, last_is_e=False):
-        """Build the path from the lattice.
-
-        :param start_idx:
-        :param unique:
-        :param max_depth:
-        :param last_is_e: Last matched lattice node should be an emitting state.
-            In case the matching stops early, the longest path can be in between two observations
-            and thus be a nonemitting state (which by definition has a lower probability than the
-            last emitting state). If this argument is set to true, the longer match is preferred.
-        :return:
-        """
-        self.lattice_best = []
-        node_max = None
-        node_max_ne = 0
+    def _build_matching_path(self, start_m, max_depth=None):
+        lattice_best = []
+        node_max = start_m
         cur_depth = 0
-        if last_is_e:
-            for m in self.lattice[start_idx].values_all():  # type:BaseMatching
-                if not m.stop and (node_max is None or m.logprob > node_max.logprob):
-                    node_max = m
-        else:
-            for m in self.lattice[start_idx].values_all():  # type:BaseMatching
-                if not m.stop and (node_max is None or m.obs_ne > node_max_ne or m.logprob > node_max.logprob):
-                    node_max_ne = m.obs_ne
-                    node_max = m
-        if node_max is None:
-            raise Exception("Did not find a matching node for path point at index {}".format(start_idx))
         if __debug__ and logger.isEnabledFor(logging.DEBUG):
             logger.debug(self.matching.repr_header(stop="             "))
         logger.debug("Start ({}): {}".format(node_max.obs, node_max))
-        node_path_rev = [node_max.shortkey]
-        self.lattice_best.append(node_max)
+        lattice_best.append(node_max)
         if node_max.is_emitting():
             cur_depth += 1
         # for obs_idx in reversed(range(start_idx)):
@@ -1180,21 +1163,50 @@ class BaseMatcher:
             if node_max is None:
                 raise Exception("Did not find a matching node for path point at index {}".format(node_max_last.obs))
             logger.debug("Max   ({}): {}".format(node_max.obs, node_max))
-            node_path_rev.append(node_max.shortkey)
-            self.lattice_best.append(node_max)
+            lattice_best.append(node_max)
             if node_max.is_emitting():
                 cur_depth += 1
+        lattice_best = list(reversed(lattice_best))
+        return lattice_best
 
-        self.lattice_best = list(reversed(self.lattice_best))
+    def _build_node_path(self, start_idx, unique=True, max_depth=None, last_is_e=False):
+        """Build the path from the lattice.
+
+        :param start_idx:
+        :param unique:
+        :param max_depth:
+        :param last_is_e: Last matched lattice node should be an emitting state.
+            In case the matching stops early, the longest path can be in between two observations
+            and thus be a nonemitting state (which by definition has a lower probability than the
+            last emitting state). If this argument is set to true, the longer match is preferred.
+        :return:
+        """
+        node_max = None
+        node_max_ne = 0
+        if last_is_e:
+            for m in self.lattice[start_idx].values_all():  # type:BaseMatching
+                if not m.stop and (node_max is None or m.logprob > node_max.logprob):
+                    node_max = m
+        else:
+            for m in self.lattice[start_idx].values_all():  # type:BaseMatching
+                if not m.stop and (node_max is None or m.obs_ne > node_max_ne or m.logprob > node_max.logprob):
+                    node_max_ne = m.obs_ne
+                    node_max = m
+        if node_max is None:
+            raise Exception("Did not find a matching node for path point at index {}".format(start_idx))
+
+        self.lattice_best = self._build_matching_path(node_max, max_depth)
+
+        node_path = [m.shortkey for m in self.lattice_best]
         if unique:
             self.node_path = []
             prev_node = None
-            for node in reversed(node_path_rev):
+            for node in node_path:
                 if node != prev_node:
                     self.node_path.append(node)
                     prev_node = node
         else:
-            self.node_path = list(reversed(node_path_rev))
+            self.node_path = node_path
         return self.node_path
 
     def increase_max_lattice_width(self, max_lattice_width, unique=False, tqdm=None):
@@ -1210,9 +1222,13 @@ class BaseMatcher:
         bb = lat_min, lon_min, lat_max, lon_max
         return bb
 
-    def print_lattice(self, file=None, obs_idx=None, obs_ne=0, label_width=None):
-        if file is None:
-            file = sys.stdout
+    def print_lattice(self, file=None, obs_idx=None, obs_ne=0, label_width=None, debug=False):
+        if debug:
+            xprint = logger.debug
+        else:
+            if file is None:
+                file = sys.stdout
+            xprint = lambda arg: print(arg, file=file)
         # print("Lattice:", file=file)
         if obs_idx is not None:
             idxs = [obs_idx]
@@ -1224,10 +1240,10 @@ class BaseMatcher:
                     label_width = 0
                     for m in self.lattice[idx].values(obs_ne):
                         label_width = max(label_width, len(str(m.label)))
-                print("--- obs {} ---".format(idx), file=file)
-                print(self.matching.repr_header(label_width=label_width), file=file)
+                xprint("--- obs {} ---".format(idx))
+                xprint(self.matching.repr_header(label_width=label_width))
                 for m in sorted(self.lattice[idx].values(obs_ne), key=lambda t: str(t.label)):
-                    print(m.__str__(label_width=label_width), file=file)
+                    xprint(m.__str__(label_width=label_width))
 
     def lattice_dot(self, file=None, precision=None, render=False):
         """Write the lattice as a Graphviz DOT file.

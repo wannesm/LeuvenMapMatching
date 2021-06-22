@@ -25,7 +25,7 @@ def locations_to_map(locations, map_con, filename=None):
 
 
 def bb_to_map(bb, map_con, filename=None):
-    """
+    """Download map from overpass-api.de.
 
     :param bb: [lon_min, lat_min, lon_max, lat_max]
     :param map:
@@ -65,3 +65,68 @@ def file_to_map(filename, map_con):
     logger.debug("Purging database ...")
     map_con.purge()
     logger.debug("... done")
+
+
+def download_map_xml(fn, bbox, force=False, verbose=False):
+    """Download map from overpass-api.de based on a given bbox
+
+    :param fn: Filename where to store the map as xml
+    :param bbox: String or array with [lon_min, lat_min, lon_max, lat_max]
+    :param force: Also download if file already exists
+    :param verbose: Verbose output
+    :return:
+    """
+    fn = Path(fn)
+    if type(bbox) is list:
+        bb_str = ",".join(str(coord) for coord in bbox)
+    elif type(bbox) is str:
+        bb_str = bbox
+    else:
+        raise AttributeError('Unknown type for bbox: {}'.format(type(bbox)))
+    if force or not fn.exists():
+        if verbose:
+            print("Downloading {}".format(fn))
+        import requests
+        url = f'http://overpass-api.de/api/map?bbox={bb_str}'
+        r = requests.get(url, stream=True)
+        with fn.open('wb') as ofile:
+            for chunk in r.iter_content(chunk_size=1024):
+                if chunk:
+                    ofile.write(chunk)
+    else:
+        if verbose:
+            print("File already exists")
+
+
+def create_map_from_xml(fn, include_footways=False, include_parking=False):
+    """Create an InMemMap from an OpenStreetMap XML file.
+
+    Used for testing routes on OpenStreetMap.
+    """
+    from ..map.inmem import InMemMap
+    map_con = InMemMap("map", use_latlon=True)
+    cnt = 0
+    ways_filter = ['bridleway', 'bus_guideway', 'track']
+    if not include_footways:
+        ways_filter += ['footway', 'cycleway', 'path']
+    parking_filter = ['driveway']
+    if not include_parking:
+        parking_filter += ['parking_aisle']
+    for entity in osmread.parse_file(str(fn)):
+        if isinstance(entity, osmread.Way):
+            tags = entity.tags
+            if 'highway' in tags \
+                and not (tags['highway'] in ways_filter) \
+                and not ('access' in tags and tags['access'] == 'private') \
+                and not ('landuse' in tags and tags['landuse'] == 'square') \
+                and not ('amenity' in tags and tags['amenity'] == 'parking') \
+                and not ('service' in tags and tags['service'] in parking_filter) \
+                and not ('area' in tags and tags['area'] == 'yes'):
+                for node_a, node_b in zip(entity.nodes, entity.nodes[1:]):
+                    map_con.add_edge(node_a, node_b)
+                    # Some roads are one-way. We'll add both directions.
+                    map_con.add_edge(node_b, node_a)
+        if isinstance(entity, osmread.Node):
+            map_con.add_node(entity.id, (entity.lat, entity.lon))
+    map_con.purge()
+    return map_con
