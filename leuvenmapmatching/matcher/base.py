@@ -36,13 +36,13 @@ class BaseMatching(object):
     __slots__ = ['matcher', 'edge_m', 'edge_o',
                  'logprob', 'logprobema', 'logprobe', 'logprobne',
                  'obs', 'obs_ne', 'dist_obs',
-                 'prev', 'prev_other', 'stop', 'length', 'delayed']
+                 'prev', 'prev_other', 'stop', 'length', 'delayed', 'dist_m', 'dist_o']
 
     def __init__(self, matcher: 'BaseMatcher', edge_m: Segment, edge_o: Segment,
                  logprob=-np.inf, logprobema=-np.inf, logprobe=-np.inf, logprobne=-np.inf,
                  dist_obs: float = 0.0, obs: int = 0, obs_ne: int = 0,
                  prev: Optional[Set['BaseMatching']] = None, stop: bool = False, length: int = 1,
-                 delayed: int = 0, **_kwargs):
+                 delayed: int = 0, dist_m: float = 0, dist_o: float = 0, **_kwargs):
         """
 
         :param matcher: Reference to the Matcher used to generate this matching object.
@@ -59,6 +59,8 @@ class BaseMatching(object):
         :param stop: Stop after this matching (e.g. because probability is too low)
         :param length: Lenght of current matching sequence through lattice.
         :param delayed: This matching is temporarily stopped if >0 (e.g. to first explore better options).
+        :param dist_m: Distance over graph
+        :param dist_o: Distance over observations
         :param _kwargs:
         """
         self.edge_m: Segment = edge_m
@@ -75,13 +77,15 @@ class BaseMatching(object):
         self.stop: bool = stop
         self.length: int = length
         self.delayed: int = delayed
+        self.dist_m: float = dist_m
+        self.dist_o: float = dist_o
         self.matcher: BaseMatcher = matcher
 
     @property
-    def prune_key(self):
+    def prune_value(self):
         """Pruning the lattice (e.g. to delay) is based on this key."""
-        # return self.logprob
-        return self.logprobema
+        return self.logprob
+        # return self.logprobema
 
     def next(self, edge_m: Segment, edge_o: Segment, obs: int = 0, obs_ne: int = 0):
         """Create a next lattice Matching object with this Matching object as the previous one in the lattice."""
@@ -120,9 +124,13 @@ class BaseMatching(object):
         else:
             raise Exception(f"Should not happen")
 
-        logprob_trans, props_trans = self.matcher.logprob_trans(self, edge_m, edge_o,
+        new_dist_o, new_dist_m = self.matcher.distance_progress(self, edge_m, edge_o,
                                                                 is_prev_ne=(self.obs_ne != 0),
                                                                 is_next_ne=(obs_ne != 0))
+        logprob_trans, props_trans = self.matcher.logprob_trans(self, edge_m, edge_o,
+                                                                is_prev_ne=(self.obs_ne != 0),
+                                                                is_next_ne=(obs_ne != 0),
+                                                                dist_o=new_dist_o, dist_m=new_dist_m)
         logprob_obs, props_obs = self.matcher.logprob_obs(dist, self, edge_m, edge_o,
                                                           is_ne=(obs_ne != 0))
         if __debug__ and logprob_trans > 0:
@@ -162,6 +170,7 @@ class BaseMatching(object):
                                     logprobe=new_logprobe, logprobema=new_logprobema,
                                     obs=obs, obs_ne=obs_ne, prev={self}, dist_obs=dist,
                                     stop=new_stop, length=new_length, delayed=self.delayed,
+                                    dist_m=new_dist_m, dist_o=new_dist_o,
                                     **props_trans, **props_obs)
             return m_next
         else:
@@ -223,6 +232,8 @@ class BaseMatching(object):
         self.prev = m_other.prev
         self.stop = m_other.stop
         self.delayed = m_other.delayed
+        self.dist_o = m_other.dist_o
+        self.dist_m = m_other.dist_m
         self.length = m_other.length
 
     def is_nonemitting(self):
@@ -370,7 +381,10 @@ class LatticeColumn:
         return c[matching.key]
 
     def prune(self, obs_ne, max_lattice_width, expand_upto, prune_thr=None):
-        """
+        """Prune given column in the lattice to fit in max_lattice_width.
+        Also ignore all matchings with a probability lower than prune_thr. These are
+        matchings that are worse than the matchings at the next observation that are
+        retained after pruning.
 
         :param obs_ne:
         :param max_lattice_width:
@@ -383,27 +397,32 @@ class LatticeColumn:
                          .format(self.obs_idx, obs_ne,
                                  len([m for m in cur_lattice if not m.stop and m.delayed == expand_upto]),
                                  max_lattice_width, prune_thr))
+            cnt_pruned = 0
         if max_lattice_width is not None and len(cur_lattice) > max_lattice_width:
-            ms = sorted(cur_lattice, key=lambda t: t.prune_key, reverse=True)
+            ms = sorted(cur_lattice, key=lambda t: t.prune_value, reverse=True)
             cur_width = max_lattice_width
             m_last = ms[cur_width - 1]
             # Extend current width if next pruned matching has same logprob as last kept matching
             # This increases the lattice width but otherwise the algorithm depends on the
             # order of edges/nodes and is not deterministic.
-            while cur_width < len(ms) and ms[cur_width].prune_key == m_last.prune_key:
+            while cur_width < len(ms) and ms[cur_width].prune_value == m_last.prune_value:
                 m_last = ms[cur_width]
                 cur_width += 1
             if prune_thr is not None:
-                while cur_width > 0 and ms[cur_width - 1].prune_key < prune_thr:
+                while cur_width > 0 and ms[cur_width - 1].prune_value < prune_thr:
                     cur_width -= 1
             for m in ms[:cur_width]:  # type: BaseMatching
                 if m.delayed > expand_upto:
                     m.delayed = expand_upto  # expand now
             for m in ms[cur_width:]:
                 if m.delayed <= expand_upto:
+                    if __debug__:
+                        cnt_pruned += 1
                     m.delayed = expand_upto + 1  # expand later
             if cur_width > 0:
-                prune_thr = ms[cur_width - 1].prune_key
+                prune_thr = ms[cur_width - 1].prune_value
+        if __debug__:
+            logger.debug(f'Pruned {cnt_pruned} matchings, return {prune_thr=}')
         return prune_thr
 
 class BaseMatcher:
@@ -476,9 +495,18 @@ class BaseMatcher:
         # Penalties
         self.ne_length_factor_log = math.log(non_emitting_length_factor)
 
+    def distance_progress(self, prev_m, edge_m, edge_o,
+                          is_prev_ne=False, is_next_ne=False):
+        """Distance progression for this matching.
+
+        :return: Distance over observations, Distance on graph
+        """
+        return 0
+
     def logprob_trans(self, prev_m, edge_m, edge_o,
-                      is_prev_ne=False, is_next_ne=False):
-        # type: (BaseMatcher, BaseMatching, Segment, Segment, bool, bool) -> Tuple[float, Dict[str, Any]]
+                      is_prev_ne=False, is_next_ne=False,
+                      dist_o=0, dist_m=0):
+        # type: (BaseMatcher, BaseMatching, Segment, Segment, bool, bool, float, float) -> Tuple[float, Dict[str, Any]]
         """Transition probability.
 
         Note: In contrast with a regular HMM, this cannot be a probability density function, it needs

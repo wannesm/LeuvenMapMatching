@@ -12,6 +12,7 @@ import math
 
 from .base import BaseMatching, BaseMatcher
 from ..util.segment import Segment
+from ..util.debug import printd
 
 MYPY = False
 if MYPY:
@@ -146,9 +147,31 @@ class DistanceMatcher(BaseMatcher):
 
         self.notconnectededges_factor_log = math.log(0.5)
 
+    def distance_progress(self, prev_m: BaseMatching, edge_m, edge_o,
+                          is_prev_ne=False, is_next_ne=False):
+        d_z = self.map.distance(prev_m.edge_o.pi, edge_o.pi)
+        is_same_edge = False
+        if (prev_m.edge_m.l1 == edge_m.l1 and prev_m.edge_m.l2 == edge_m.l2) or \
+                (prev_m.edge_m.l1 == edge_m.l2 and prev_m.edge_m.l2 == edge_m.l1):
+            is_same_edge = True
+        if ((not self.exact_dt_s) or
+                is_same_edge or  # On same edge
+                prev_m.edge_m.l2 != edge_m.l1):  # Edges are not connected
+            d_x = self.map.distance(prev_m.edge_m.pi, edge_m.pi)
+        else:
+            # Take into account the curvature
+            d_x = self.map.distance(prev_m.edge_m.pi, prev_m.edge_m.p2) + self.map.distance(prev_m.edge_m.p2, edge_m.pi)
+
+        if is_next_ne:
+            # For non-emitting states, the distances are added
+            d_z += prev_m.dist_o
+            d_x += prev_m.dist_m
+
+        return d_z, d_x
+
     def logprob_trans(self, prev_m, edge_m, edge_o,
-                      is_prev_ne=False, is_next_ne=False):
-        # type: (DistanceMatcher, DistanceMatching, Segment, Segment, bool, bool) -> Tuple[float, Dict[str, Any]]
+                      is_prev_ne=False, is_next_ne=False, dist_o=0, dist_m=0):
+        # type: (DistanceMatcher, DistanceMatching, Segment, Segment, bool, bool, float, float) -> Tuple[float, Dict[str, Any]]
         """Transition probability.
 
         The probability is defined with a formula from the exponential family.
@@ -163,25 +186,19 @@ class DistanceMatcher(BaseMatcher):
 
         Note: We should also smooth the distance between observations to handle outliers better.
 
-        :param prev_m:
-        :param edge_m:
-        :param edge_o:
-        :param is_prev_ne:
-        :param is_next_ne:
+        :param prev_m: Previous matching / state
+        :param edge_m: Edge between matchings / states
+        :param edge_o: Edge between observations
+        :param is_prev_ne: Is previous state non-emitting
+        :param is_next_ne: Is the next state non-emitting
+        :param dist_o: First output of distance_progress
+        :param dist_m: Second output of distance_progress
         :return:
         """
-        d_z = self.map.distance(prev_m.edge_o.pi, edge_o.pi)
-        is_same_edge = False
-        if (prev_m.edge_m.l1 == edge_m.l1 and prev_m.edge_m.l2 == edge_m.l2) or \
-            (prev_m.edge_m.l1 == edge_m.l2 and prev_m.edge_m.l2 == edge_m.l1):
-            is_same_edge = True
-        if ((not self.exact_dt_s) or
-                is_same_edge or  # On same edge
-                prev_m.edge_m.l2 != edge_m.l1):  # Edges are not connected
-            d_x = self.map.distance(prev_m.edge_m.pi, edge_m.pi)
-        else:
-            # Take into account the curvature
-            d_x = self.map.distance(prev_m.edge_m.pi, prev_m.edge_m.p2) + self.map.distance(prev_m.edge_m.p2, edge_m.pi)
+        # d_z, d_x = self.distance_progress(prev_m, edge_m, edge_o, is_prev_ne, is_next_ne)
+        # assert d_z == dist_o, f'{d_z=}, {dist_o=}'
+        # assert d_x == dist_m, f'{d_x=}, {dist_m=}'
+        d_z, d_x = dist_o, dist_m
         # print(f"Prev-o: {prev_m.edge_o} / {prev_m.edge_o.loc_to_str()}")
         # print(f"Cur-o:  {edge_o} / {edge_o.loc_to_str()}")
         # print(f"Prev-m: {prev_m.edge_m} / {prev_m.edge_m.loc_to_str()}")
@@ -194,6 +211,7 @@ class DistanceMatcher(BaseMatcher):
         else:
             beta = self.beta
         logprob = -d_t ** 2 / beta
+        printd(f'trans: {logprob=}, {d_t=}, {d_z=}, {d_x=}')
 
         # Penalties
         if prev_m.edge_m.label == edge_m.label:
@@ -238,6 +256,7 @@ class DistanceMatcher(BaseMatcher):
         else:
             sigma = self.sigma
         result = -dist ** 2 / sigma
+        printd(f'obs: logprob={result}, {dist=}')
         props = {
             'lpe': result
         }
