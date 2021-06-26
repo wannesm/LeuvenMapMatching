@@ -25,13 +25,13 @@ match_ne_color = mcolors.CSS4_COLORS['olive']
 lattice_color = mcolors.CSS4_COLORS['magenta']
 nodes_color = mcolors.CSS4_COLORS['cyan']
 path_color = mcolors.CSS4_COLORS['blue']
-fontsize = 7  # 11
+fontsize = 11  # 7  # 11
 
 
 def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False, z=None, bb=None,
              show_labels=False, matcher=None, show_graph=False, zoom_path=False, show_lattice=False,
              show_matching=False, filename=None, linewidth=2, coord_trans=None,
-             figwidth=20):
+             figwidth=20, lattice_nodes=None):
     """Plot the db/graph and optionally include the observed path and inferred nodes.
 
     :param map_con: Map
@@ -49,7 +49,10 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
         path = matcher.path
         counts = matcher.node_counts()
         nodes = None
-        lat_nodes = matcher.lattice_best
+        if lattice_nodes is None:
+            lat_nodes = matcher.lattice_best
+        else:
+            lat_nodes = lattice_nodes
     else:
         lat_nodes = None
 
@@ -207,7 +210,7 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
                 node_locs.append((lat, lon, node))
         else:
             prev_m = None
-            for m in matcher.lattice_best:
+            for m in lat_nodes:
                 if prev_m is not None and prev_m.edge_m.l2 == m.edge_m.l1:
                     lat, lon = m.edge_m.p1
                     node_locs.append((lat, lon, m.edge_m.l1))
