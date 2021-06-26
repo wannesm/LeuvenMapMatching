@@ -136,9 +136,12 @@ class BaseMatching(object):
             new_logprob = new_logprobe
             new_length = self.length + 1
         else:
+            # Non-emitting states require normalisation
             # "* e^(ne_length_factor_log)" or "- ne_length_factor_log" for every step to a non-emitting
             # state to prefer shorter paths
             new_logprobe = self.logprobe + self.matcher.ne_length_factor_log
+            # The obvious choice would be average to compensate for that non-emitting states
+            # create different path lengths between emitting nodes.
             # We use min() as it is a monotonic function, in contrast with an average
             new_logprobne = min(self.logprobne, new_logprob_delta)
             new_logprob = new_logprobe + new_logprobne
@@ -249,6 +252,9 @@ class BaseMatching(object):
         return repr_tmpl.format(stop, self.label, self.logprob, self.logprob / self.length,
                                 self.logprobema, self.logprobne, self.obs,
                                 self.dist_obs, ",".join([str(prev.label) for prev in self.prev]))
+
+    def __repr__(self):
+        return self.label
 
     @staticmethod
     def repr_header(label_width=None, stop=""):
@@ -363,7 +369,7 @@ class LatticeColumn:
             c[matching.key] = matching
         return c[matching.key]
 
-    def prune(self, obs_ne, max_lattice_width, expand_upto):
+    def prune(self, obs_ne, max_lattice_width, expand_upto, prune_thr=None):
         """
 
         :param obs_ne:
@@ -373,10 +379,10 @@ class LatticeColumn:
         """
         cur_lattice = [m for m in self.values(obs_ne) if not m.stop]
         if __debug__:
-            logger.debug('Prune lattice[{},{}] from {} to {}'
+            logger.debug('Prune lattice[{},{}] from {} to {}, with prune thr {}'
                          .format(self.obs_idx, obs_ne,
                                  len([m for m in cur_lattice if not m.stop and m.delayed == expand_upto]),
-                                 max_lattice_width))
+                                 max_lattice_width, prune_thr))
         if max_lattice_width is not None and len(cur_lattice) > max_lattice_width:
             ms = sorted(cur_lattice, key=lambda t: t.prune_key, reverse=True)
             cur_width = max_lattice_width
@@ -384,16 +390,21 @@ class LatticeColumn:
             # Extend current width if next pruned matching has same logprob as last kept matching
             # This increases the lattice width but otherwise the algorithm depends on the
             # order of edges/nodes and is not deterministic.
-            while cur_width < len(ms) and ms[cur_width].logprob == m_last.logprob:
+            while cur_width < len(ms) and ms[cur_width].prune_key == m_last.prune_key:
                 m_last = ms[cur_width]
                 cur_width += 1
+            if prune_thr is not None:
+                while cur_width > 0 and ms[cur_width - 1].prune_key < prune_thr:
+                    cur_width -= 1
             for m in ms[:cur_width]:  # type: BaseMatching
                 if m.delayed > expand_upto:
                     m.delayed = expand_upto  # expand now
             for m in ms[cur_width:]:
                 if m.delayed <= expand_upto:
                     m.delayed = expand_upto + 1  # expand later
-
+            if cur_width > 0:
+                prune_thr = ms[cur_width - 1].prune_key
+        return prune_thr
 
 class BaseMatcher:
 
@@ -861,6 +872,7 @@ class BaseMatcher:
                          for m in self.lattice[obs_idx + 1].values(0) if not m.stop and self._skip_ne_states(m))
         # cur_lattice = set(self.lattice[obs_idx].values())
         nb_ne = 0
+        prune_thr = None
         while len(cur_lattice) > 0 and nb_ne < self.non_emitting_states_maxnb:
             nb_ne += 1
             if __debug__:
@@ -868,12 +880,14 @@ class BaseMatcher:
             cur_lattice = self._match_non_emitting_states_inner(cur_lattice, obs_idx, obs, obs_next, nb_ne,
                                                                 lattice_best, lattice_ne)
             if self.max_lattice_width is not None:
-                self.lattice[obs_idx].prune(nb_ne, self.max_lattice_width, self.expand_now)
+                self.lattice[obs_idx].prune(nb_ne, self.max_lattice_width, self.expand_now, prune_thr)
             # Link to next observation
             self._match_non_emitting_states_end(cur_lattice, obs_idx + 1, obs_next,
                                                 lattice_best, expand=expand)
+            if self.max_lattice_width is not None:
+                prune_thr = self.lattice[obs_idx + 1].prune(0, self.max_lattice_width, self.expand_now, None)
         if self.max_lattice_width is not None:
-            self.lattice[obs_idx].prune(0, self.max_lattice_width, self.expand_now)
+            self.lattice[obs_idx + 1].prune(0, self.max_lattice_width, self.expand_now, None)
         # logger.info('Used {} levels of non-emitting states'.format(nb_ne))
         # for m in lattice_toinsert:
         #     self._insert(m)
@@ -945,10 +959,11 @@ class BaseMatcher:
                                 if m_next.shortkey in lattice_best:
                                     if approx_leq(m_next.dist_obs, lattice_best[m_next.shortkey].dist_obs):
                                         cur_lattice_new[m_next.key].update(m_next)
-                                    elif __debug__ and logger.isEnabledFor(logging.DEBUG):
-                                        logger.debug(f"   | Stopped trace: distance larger than best for key {m_next.shortkey}: "
-                                                     f"{m_next.dist_obs} > {lattice_best[m_next.shortkey].dist_obs}")
+                                    else:
                                         m_next.stop = True
+                                        if __debug__ and logger.isEnabledFor(logging.DEBUG):
+                                            logger.debug(f"   | Stopped trace: distance larger than best for key {m_next.shortkey}: "
+                                                         f"{m_next.dist_obs} > {lattice_best[m_next.shortkey].dist_obs}")
                                 else:
                                     cur_lattice_new[m_next.key].update(m_next)
                             else:
@@ -1116,30 +1131,100 @@ class BaseMatcher:
                         if __debug__:
                             logger.debug(self.matching.repr_static(('x', '{} < self-loop'.format(nbr_label))))
 
-    def get_matching(self, identifier):
-        m = None
+    def get_matching(self, identifier=None):
+        m = None  # type: Optional[BaseMatching]
         if isinstance(identifier, BaseMatching):
             m = identifier
+        elif identifier is None:
+            col = self.lattice[len(self.lattice) - 1]
+            for curm in col.values_all():
+                if m is None or curm.logprob > m.logprob:
+                    m = curm
+        elif type(identifier) is int:
+            # If integer, search for the best matching at this index in the lattice
+            for cur_m in self.lattice[identifier].values_all():  # type:BaseMatching
+                if not cur_m.stop and (m is None or cur_m.logprob > m.logprob):
+                    m = cur_m
         elif type(identifier) is str:
+            # If string, try to parse identifier
             parts = identifier.split('-')
             idx, ne, key = None, None, None
             if len(parts) == 4:
                 nodea, nodeb, idx, ne = [int(part) for part in parts]
                 key = (nodea, nodeb, idx, ne)
+                col = self.lattice[idx]  # type: LatticeColumn
+                col_ne = col.o[ne]
+                m = col_ne[key]
             elif len(parts) == 3:
                 node, idx, ne = [int(part) for part in parts]
                 key = (node, idx, ne)
+                col = self.lattice[idx]  # type: LatticeColumn
+                col_ne = col.o[ne]
+                m = col_ne[key]
+            elif len(parts) == 1:
+                m = None
+                l1 = int(parts[0])
+                for l in self.lattice.values():  # type: LatticeColumn
+                    for curm in l.values_all():
+                        if (curm.edge_m.l1 == l1 or curm.edge_m.l2 == l1) and \
+                                (m is None or curm.logprob > m.logprob):
+                            m = curm
             else:
                 raise AttributeError(f'Unknown string format for matching. '
                                      'Expects <node>-<idx>-<ne> or <node>-<node>-<idx>-<ne>.')
-            col = self.lattice[idx]  # type: LatticeColumn
-            col_ne = col.o[ne]
-            m = col_ne[key]
+
         return m
 
     def get_matching_path(self, start_m):
+        """List of Matching objects that end in the given Matching object."""
         start_m = self.get_matching(start_m)
         return self._build_matching_path(start_m)
+
+    def get_node_path(self, start_m, only_nodes=False):
+        """List of node/edge names that end in the given Matching object."""
+        path = self.get_matching_path(start_m)
+        node_path = [m.shortkey for m in path]
+        if only_nodes:
+            node_path = self.node_path_to_only_nodes(node_path)
+        return node_path
+
+    def node_path_to_only_nodes(self, path):
+        """Path of nodes and edges to only nodes.
+
+        :param path: List of node names or edges as (node name, node name)
+        :return: List of node names
+        """
+        nodes = []
+        prev_state = path[0]
+        if type(prev_state) is tuple:
+            nodes.append(prev_state[0])
+            nodes.append(prev_state[1])
+            prev_node = prev_state[1]
+        else:
+            nodes.append(prev_state)
+            prev_node = prev_state
+        for state in path[1:]:
+            if state == prev_state:
+                continue
+            if type(state) is not tuple:
+                if state != prev_node:
+                    nodes.append(state)
+                    prev_node = state
+            elif type(state) is tuple:
+                if state[0] == prev_node:
+                    if state[1] != prev_node:
+                        nodes.append(state[1])
+                        prev_node = state[1]
+                elif state[1] == prev_node:
+                    if state[0] != prev_node:
+                        nodes.append(state[0])
+                        prev_node = state[0]
+                else:
+                    raise Exception(f"State {state} does not have as previous node {prev_node}")
+            else:
+                raise Exception(f"Unknown type of state: {state} ({type(state)})")
+            prev_state = state
+        return nodes
 
     def _build_matching_path(self, start_m, max_depth=None):
         lattice_best = []
@@ -1412,34 +1497,4 @@ class BaseMatcher:
         """A list with all the nodes (no edges) the matched path passes through."""
         if self.node_path is None or len(self.node_path) == 0:
             return []
-        nodes = []
-        prev_state = self.node_path[0]
-        if type(prev_state) is tuple:
-            nodes.append(prev_state[0])
-            nodes.append(prev_state[1])
-            prev_node = prev_state[1]
-        else:
-            nodes.append(prev_state)
-            prev_node = prev_state
-        for state in self.node_path[1:]:
-            if state == prev_state:
-                continue
-            if type(state) is not tuple:
-                if state != prev_node:
-                    nodes.append(state)
-                    prev_node = state
-            elif type(state) is tuple:
-                if state[0] == prev_node:
-                    if state[1] != prev_node:
-                        nodes.append(state[1])
-                        prev_node = state[1]
-                elif state[1] == prev_node:
-                    if state[0] != prev_node:
-                        nodes.append(state[0])
-                        prev_node = state[0]
-                else:
-                    raise Exception(f"State {state} does not have as previous node {prev_node}")
-            else:
-                raise Exception(f"Unknown type of state: {state} ({type(state)})")
-            prev_state = state
-        return nodes
+        return self.node_path_to_only_nodes(self.node_path)

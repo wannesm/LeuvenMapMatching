@@ -63,6 +63,9 @@ class DistanceMatching(BaseMatching):
             res += f" {self.lpt:>9.2f} | {self.lpe:>9.2f} |"
         return res
 
+    def __repr__(self):
+        return self.label
+
 
 class DistanceMatcher(BaseMatcher):
     """
@@ -168,11 +171,16 @@ class DistanceMatcher(BaseMatcher):
         :return:
         """
         d_z = self.map.distance(prev_m.edge_o.pi, edge_o.pi)
+        is_same_edge = False
+        if (prev_m.edge_m.l1 == edge_m.l1 and prev_m.edge_m.l2 == edge_m.l2) or \
+            (prev_m.edge_m.l1 == edge_m.l2 and prev_m.edge_m.l2 == edge_m.l1):
+            is_same_edge = True
         if ((not self.exact_dt_s) or
-                prev_m.edge_m.label == edge_m.label or  # On same edge
+                is_same_edge or  # On same edge
                 prev_m.edge_m.l2 != edge_m.l1):  # Edges are not connected
             d_x = self.map.distance(prev_m.edge_m.pi, edge_m.pi)
         else:
+            # Take into account the curvature
             d_x = self.map.distance(prev_m.edge_m.pi, prev_m.edge_m.p2) + self.map.distance(prev_m.edge_m.p2, edge_m.pi)
         # print(f"Prev-o: {prev_m.edge_o} / {prev_m.edge_o.loc_to_str()}")
         # print(f"Cur-o:  {edge_o} / {edge_o.loc_to_str()}")
