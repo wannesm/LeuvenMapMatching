@@ -147,31 +147,9 @@ class DistanceMatcher(BaseMatcher):
 
         self.notconnectededges_factor_log = math.log(0.5)
 
-    def distance_progress(self, prev_m: BaseMatching, edge_m, edge_o,
-                          is_prev_ne=False, is_next_ne=False):
-        d_z = self.map.distance(prev_m.edge_o.pi, edge_o.pi)
-        is_same_edge = False
-        if (prev_m.edge_m.l1 == edge_m.l1 and prev_m.edge_m.l2 == edge_m.l2) or \
-                (prev_m.edge_m.l1 == edge_m.l2 and prev_m.edge_m.l2 == edge_m.l1):
-            is_same_edge = True
-        if ((not self.exact_dt_s) or
-                is_same_edge or  # On same edge
-                prev_m.edge_m.l2 != edge_m.l1):  # Edges are not connected
-            d_x = self.map.distance(prev_m.edge_m.pi, edge_m.pi)
-        else:
-            # Take into account the curvature
-            d_x = self.map.distance(prev_m.edge_m.pi, prev_m.edge_m.p2) + self.map.distance(prev_m.edge_m.p2, edge_m.pi)
-
-        if is_next_ne:
-            # For non-emitting states, the distances are added
-            d_z += prev_m.dist_o
-            d_x += prev_m.dist_m
-
-        return d_z, d_x
-
     def logprob_trans(self, prev_m, edge_m, edge_o,
-                      is_prev_ne=False, is_next_ne=False, dist_o=0, dist_m=0):
-        # type: (DistanceMatcher, DistanceMatching, Segment, Segment, bool, bool, float, float) -> Tuple[float, Dict[str, Any]]
+                      is_prev_ne=False, is_next_ne=False):
+        # type: (DistanceMatcher, DistanceMatching, Segment, Segment, bool, bool) -> Tuple[float, Dict[str, Any]]
         """Transition probability.
 
         The probability is defined with a formula from the exponential family.
@@ -195,15 +173,26 @@ class DistanceMatcher(BaseMatcher):
         :param dist_m: Second output of distance_progress
         :return:
         """
-        # d_z, d_x = self.distance_progress(prev_m, edge_m, edge_o, is_prev_ne, is_next_ne)
-        # assert d_z == dist_o, f'{d_z=}, {dist_o=}'
-        # assert d_x == dist_m, f'{d_x=}, {dist_m=}'
-        d_z, d_x = dist_o, dist_m
-        # print(f"Prev-o: {prev_m.edge_o} / {prev_m.edge_o.loc_to_str()}")
-        # print(f"Cur-o:  {edge_o} / {edge_o.loc_to_str()}")
-        # print(f"Prev-m: {prev_m.edge_m} / {prev_m.edge_m.loc_to_str()}")
-        # print(f"Cur-m:  {edge_m} / {edge_m.loc_to_str()}")
-        # print(f"Dist: {d_z} -- {d_x}")
+        d_z = self.map.distance(prev_m.edge_o.pi, edge_o.pi)
+        is_same_edge = False
+        if (prev_m.edge_m.l1 == edge_m.l1 and prev_m.edge_m.l2 == edge_m.l2) or \
+                (prev_m.edge_m.l1 == edge_m.l2 and prev_m.edge_m.l2 == edge_m.l1):
+            is_same_edge = True
+        if ((not self.exact_dt_s) or
+                is_same_edge or  # On same edge
+                prev_m.edge_m.l2 != edge_m.l1):  # Edges are not connected
+            d_x = self.map.distance(prev_m.edge_m.pi, edge_m.pi)
+        else:
+            # Take into account the curvature
+            d_x = self.map.distance(prev_m.edge_m.pi, prev_m.edge_m.p2) + self.map.distance(prev_m.edge_m.p2, edge_m.pi)
+
+        if is_next_ne:
+            # For non-emitting states, the distances are added
+            # Otherwise it can map to a sequence of short segments and stay at the same
+            # observation because the difference is then always small.
+            d_z += prev_m.d_o
+            d_x += prev_m.d_s
+
         d_t = abs(d_z - d_x)
         # p_dt = 1 / beta * math.exp(-d_t / beta)
         if is_prev_ne or is_next_ne:

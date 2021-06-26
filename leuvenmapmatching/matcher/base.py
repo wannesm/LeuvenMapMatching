@@ -36,13 +36,13 @@ class BaseMatching(object):
     __slots__ = ['matcher', 'edge_m', 'edge_o',
                  'logprob', 'logprobema', 'logprobe', 'logprobne',
                  'obs', 'obs_ne', 'dist_obs',
-                 'prev', 'prev_other', 'stop', 'length', 'delayed', 'dist_m', 'dist_o']
+                 'prev', 'prev_other', 'stop', 'length', 'delayed']
 
     def __init__(self, matcher: 'BaseMatcher', edge_m: Segment, edge_o: Segment,
                  logprob=-np.inf, logprobema=-np.inf, logprobe=-np.inf, logprobne=-np.inf,
                  dist_obs: float = 0.0, obs: int = 0, obs_ne: int = 0,
                  prev: Optional[Set['BaseMatching']] = None, stop: bool = False, length: int = 1,
-                 delayed: int = 0, dist_m: float = 0, dist_o: float = 0, **_kwargs):
+                 delayed: int = 0, **_kwargs):
         """
 
         :param matcher: Reference to the Matcher used to generate this matching object.
@@ -77,8 +77,6 @@ class BaseMatching(object):
         self.stop: bool = stop
         self.length: int = length
         self.delayed: int = delayed
-        self.dist_m: float = dist_m
-        self.dist_o: float = dist_o
         self.matcher: BaseMatcher = matcher
 
     @property
@@ -124,13 +122,9 @@ class BaseMatching(object):
         else:
             raise Exception(f"Should not happen")
 
-        new_dist_o, new_dist_m = self.matcher.distance_progress(self, edge_m, edge_o,
-                                                                is_prev_ne=(self.obs_ne != 0),
-                                                                is_next_ne=(obs_ne != 0))
         logprob_trans, props_trans = self.matcher.logprob_trans(self, edge_m, edge_o,
                                                                 is_prev_ne=(self.obs_ne != 0),
-                                                                is_next_ne=(obs_ne != 0),
-                                                                dist_o=new_dist_o, dist_m=new_dist_m)
+                                                                is_next_ne=(obs_ne != 0))
         logprob_obs, props_obs = self.matcher.logprob_obs(dist, self, edge_m, edge_o,
                                                           is_ne=(obs_ne != 0))
         if __debug__ and logprob_trans > 0:
@@ -170,7 +164,6 @@ class BaseMatching(object):
                                     logprobe=new_logprobe, logprobema=new_logprobema,
                                     obs=obs, obs_ne=obs_ne, prev={self}, dist_obs=dist,
                                     stop=new_stop, length=new_length, delayed=self.delayed,
-                                    dist_m=new_dist_m, dist_o=new_dist_o,
                                     **props_trans, **props_obs)
             return m_next
         else:
@@ -232,8 +225,6 @@ class BaseMatching(object):
         self.prev = m_other.prev
         self.stop = m_other.stop
         self.delayed = m_other.delayed
-        self.dist_o = m_other.dist_o
-        self.dist_m = m_other.dist_m
         self.length = m_other.length
 
     def is_nonemitting(self):
@@ -495,18 +486,9 @@ class BaseMatcher:
         # Penalties
         self.ne_length_factor_log = math.log(non_emitting_length_factor)
 
-    def distance_progress(self, prev_m, edge_m, edge_o,
-                          is_prev_ne=False, is_next_ne=False):
-        """Distance progression for this matching.
-
-        :return: Distance over observations, Distance on graph
-        """
-        return 0
-
     def logprob_trans(self, prev_m, edge_m, edge_o,
-                      is_prev_ne=False, is_next_ne=False,
-                      dist_o=0, dist_m=0):
-        # type: (BaseMatcher, BaseMatching, Segment, Segment, bool, bool, float, float) -> Tuple[float, Dict[str, Any]]
+                      is_prev_ne=False, is_next_ne=False):
+        # type: (BaseMatcher, BaseMatching, Segment, Segment, bool, bool) -> Tuple[float, Dict[str, Any]]
         """Transition probability.
 
         Note: In contrast with a regular HMM, this cannot be a probability density function, it needs
