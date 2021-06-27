@@ -92,9 +92,9 @@ def test_path2_proj():
     track = [map_con.latlon2yx(p[0], p[1]) for p in gpx_to_path(track2_fn)]
     matcher = DistanceMatcher(map_con, max_dist=300, max_dist_init=25, min_prob_norm=0.0001,
                               non_emitting_length_factor=0.75,
-                              obs_noise=50, obs_noise_ne=75,
-                              dist_noise=30,
-                              max_lattice_width=3,
+                              obs_noise=50, obs_noise_ne=50,
+                              dist_noise=50,
+                              max_lattice_width=5,
                               non_emitting_states=True)
     states, last_idx = matcher.match(track, unique=False)
     nodes = matcher.path_pred_onlynodes
@@ -116,8 +116,8 @@ def test_path2():
     track = [(p[0], p[1]) for p in gpx_to_path(track2_fn)]
     matcher = DistanceMatcher(map_con, max_dist=300, max_dist_init=25, min_prob_norm=0.0001,
                               non_emitting_length_factor=0.75,
-                              obs_noise=50, obs_noise_ne=75,
-                              dist_noise=30,
+                              obs_noise=50, obs_noise_ne=50,
+                              dist_noise=50,
                               max_lattice_width=5,
                               non_emitting_states=True)
     states, last_idx = matcher.match(track, unique=False)
@@ -129,6 +129,7 @@ def test_path2():
     nodes_sol = [2634474831, 1096512242, 3051083902, 1096512239, 1096512241, 1096512240, 1096508366, 1096508372,
                  16483861, 3051083900, 16483864, 16483865, 3060515058, 16526534, 16526532, 1274158119, 16526540,
                  3060597377, 16526541, 16424220, 1233373340, 613125597, 1076057753]
+    print(nodes)
 
     assert nodes == nodes_sol, f"Nodes do not match: {nodes}"
 
@@ -214,6 +215,6 @@ if __name__ == "__main__":
     print(f"Saving files to {directory}")
     # test_path1()
     # test_path1_full()
-    test_path2_proj()
-    # test_path2()
+    # test_path2_proj()
+    test_path2()
     # test_path3()

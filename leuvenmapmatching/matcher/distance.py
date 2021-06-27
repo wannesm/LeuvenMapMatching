@@ -144,6 +144,7 @@ class DistanceMatcher(BaseMatcher):
         self.avoid_goingback = kwargs.get('avoid_goingback', True)
         self.gobackonedge_factor_log = math.log(0.5)
         self.gobacktoedge_factor_log = math.log(0.5)
+        self.first_farend_penalty = math.log(0.75)  # should be > gobacktoedge_factor_log
 
         self.notconnectededges_factor_log = math.log(0.5)
 
@@ -200,7 +201,6 @@ class DistanceMatcher(BaseMatcher):
         else:
             beta = self.beta
         logprob = -d_t ** 2 / beta
-        printd(f'trans: {logprob=}, {d_t=}, {d_z=}, {d_x=}')
 
         # Penalties
         if prev_m.edge_m.label == edge_m.label:
@@ -208,6 +208,9 @@ class DistanceMatcher(BaseMatcher):
             if self.avoid_goingback and edge_m.key == prev_m.edge_m.key and edge_m.ti < prev_m.edge_m.ti:
                 # Going back on edge (direction is from p1 to p2 of the segment)
                 logprob += self.gobackonedge_factor_log  # Prefer not going back
+        elif (prev_m.edge_m.l1, prev_m.edge_m.l2) == (edge_m.l2, edge_m.l1):
+            if self.avoid_goingback:
+                logprob += self.gobackonedge_factor_log
         else:
             # Moving states
             if prev_m.edge_m.l2 != edge_m.l1:
@@ -245,7 +248,6 @@ class DistanceMatcher(BaseMatcher):
         else:
             sigma = self.sigma
         result = -dist ** 2 / sigma
-        printd(f'obs: logprob={result}, {dist=}')
         props = {
             'lpe': result
         }

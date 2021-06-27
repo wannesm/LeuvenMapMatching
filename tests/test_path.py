@@ -77,7 +77,7 @@ def test_path1_dist():
     matcher.match(path)
     if directory:
         from leuvenmapmatching import visualization as mmviz
-        mmviz.plot_map(mapdb, matcher=matcher, show_labels=True, show_matching=True,
+        mmviz.plot_map(mapdb, matcher=matcher, show_labels=True, show_matching=True, show_graph=True,
                        filename=str(directory / "test_path1_dist.png"))
     nodes_pred = matcher.path_pred_onlynodes
     assert nodes_pred == path_sol_nodes, f"Nodes not equal:\n{nodes_pred}\n{path_sol_nodes}"
@@ -366,8 +366,8 @@ if __name__ == "__main__":
     # test_path1()
     # test_path1_dist()
     # test_path2()
-    test_path2_inc()
-    # test_path2_dist()
+    # test_path2_inc()
+    test_path2_dist()
     # test_path_outlier()
     # test_path_outlier2()
     # test_path_outlier_dist()

@@ -482,6 +482,7 @@ class BaseMatcher:
         self.max_lattice_width = max_lattice_width
         self.only_edges = only_edges
         self.expand_now = 0  # all m.delayed <= expand_upto will be expanded
+        self.first_farend_penalty = 0
 
         # Penalties
         self.ne_length_factor_log = math.log(non_emitting_length_factor)
@@ -736,6 +737,11 @@ class BaseMatcher:
                     continue
                 edge_m = Segment(label1, loc1, label2, loc2, pi, ti)
                 edge_o = Segment(f"O{0}", self.path[0])
+                if self.first_farend_penalty is not None:
+                    d1 = self.map.distance(edge_m.p1, edge_o.p1)
+                    d2 = self.map.distance(edge_m.p2, edge_o.p1)
+                    if d2 < d1:
+                        logprob_init += self.first_farend_penalty
                 m_next = self.matching.first(logprob_init, edge_m, edge_o, self, dist_obs)
                 if m_next is not None:
                     self.lattice[0].upsert(m_next)
