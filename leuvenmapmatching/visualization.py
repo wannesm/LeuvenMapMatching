@@ -211,7 +211,8 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
         else:
             prev_m = None
             for m in lat_nodes:
-                if prev_m is not None and prev_m.edge_m.l2 == m.edge_m.l1:
+                if prev_m is not None and prev_m.edge_m.l2 == m.edge_m.l1 \
+                        and prev_m.edge_m.l1 != m.edge_m.l2:
                     lat, lon = m.edge_m.p1
                     node_locs.append((lat, lon, m.edge_m.l1))
                 lat, lon = m.edge_m.pi

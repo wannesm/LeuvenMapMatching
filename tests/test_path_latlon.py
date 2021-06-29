@@ -91,7 +91,7 @@ def test_path2_proj():
     map_con = map_con_latlon.to_xy()
     track = [map_con.latlon2yx(p[0], p[1]) for p in gpx_to_path(track2_fn)]
     matcher = DistanceMatcher(map_con, max_dist=300, max_dist_init=25, min_prob_norm=0.0001,
-                              non_emitting_length_factor=0.75,
+                              non_emitting_length_factor=0.95,
                               obs_noise=50, obs_noise_ne=50,
                               dist_noise=50,
                               max_lattice_width=5,
@@ -107,7 +107,11 @@ def test_path2_proj():
                  16483861, 1096508360, 159656075, 1096508382, 16483862, 3051083898, 16526535, 3060597381, 3060515059,
                  16526534, 16526532, 1274158119, 16526540, 3060597377, 16526541, 16424220, 1233373340, 613125597,
                  1076057753]
-    assert nodes == nodes_sol, f"Nodes do not match: {nodes}"
+    nodes_sol2 = [1096512242, 3051083902, 1096512239, 1096512241, 1096512240, 159654664, 1096508373, 1096508381,
+                  16483859, 1096508369, 159654663, 1096508363, 16483862, 3051083898, 16526535, 3060597381, 3060515059,
+                  16526534, 16526532, 611867918, 3060725817, 16483866, 3060725817, 611867918, 16526532, 1274158119,
+                  16526540, 3060597377, 16526541, 16424220, 1233373340, 613125597, 1076057753]
+    assert (nodes == nodes_sol) or (nodes == nodes_sol2), f"Nodes do not match: {nodes}"
 
 
 def test_path2():
@@ -115,7 +119,7 @@ def test_path2():
     map_con = create_map_from_xml(osm2_fn)
     track = [(p[0], p[1]) for p in gpx_to_path(track2_fn)]
     matcher = DistanceMatcher(map_con, max_dist=300, max_dist_init=25, min_prob_norm=0.0001,
-                              non_emitting_length_factor=0.75,
+                              non_emitting_length_factor=0.95,
                               obs_noise=50, obs_noise_ne=50,
                               dist_noise=50,
                               max_lattice_width=5,
@@ -129,9 +133,12 @@ def test_path2():
     nodes_sol = [2634474831, 1096512242, 3051083902, 1096512239, 1096512241, 1096512240, 1096508366, 1096508372,
                  16483861, 3051083900, 16483864, 16483865, 3060515058, 16526534, 16526532, 1274158119, 16526540,
                  3060597377, 16526541, 16424220, 1233373340, 613125597, 1076057753]
-    print(nodes)
+    nodes_sol2 = [2634474831, 1096512242, 3051083902, 1096512239, 1096512241, 1096512240, 159654664, 1096508373,
+                  1096508381, 16483859, 1096508369, 159654663, 1096508363, 16483862, 3051083898, 16526535, 3060597381,
+                  3060515059, 16526534, 16526532, 1274158119, 16526540, 3060597377, 16526541, 16424220, 1233373340,
+                  613125597, 1076057753]
 
-    assert nodes == nodes_sol, f"Nodes do not match: {nodes}"
+    assert (nodes == nodes_sol) or (nodes == nodes_sol2), f"Nodes do not match: {nodes}"
 
 
 def test_path3():
