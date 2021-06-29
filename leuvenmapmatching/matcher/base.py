@@ -1252,7 +1252,9 @@ class BaseMatcher:
                 if prev_m is not None and (node_max is None or prev_m.logprob > node_max.logprob):
                     node_max = prev_m
             if node_max is None:
-                raise Exception("Did not find a matching node for path point at index {}".format(node_max_last.obs))
+                logger.error("Did not find a matching node for path point at index {}. ".format(node_max_last.obs) +
+                             "Stopped building path.")
+                break
             logger.debug("Max   ({}): {}".format(node_max.obs, node_max))
             lattice_best.append(node_max)
             if node_max.is_emitting():
@@ -1284,7 +1286,8 @@ class BaseMatcher:
                     node_max_ne = m.obs_ne
                     node_max = m
         if node_max is None:
-            raise Exception("Did not find a matching node for path point at index {}".format(start_idx))
+            logger.error("Did not find a matching node for path point at index {}".format(start_idx))
+            return None
 
         self.lattice_best = self._build_matching_path(node_max, max_depth)
 
