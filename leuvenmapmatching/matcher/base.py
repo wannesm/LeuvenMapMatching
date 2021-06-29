@@ -1066,7 +1066,9 @@ class BaseMatcher:
                 if prev_m is not None and (node_max is None or prev_m.logprob > node_max.logprob):
                     node_max = prev_m
             if node_max is None:
-                raise Exception("Did not find a matching node for path point at index {}".format(node_max_last.obs))
+                logger.error("Did not find a matching node for path point at index {}. ".format(node_max_last.obs) +
+                             "Stopped building path.")
+                break
             logger.debug("Max   ({}): {}".format(node_max.obs, node_max))
             node_path_rev.append(node_max.shortkey)
             self.lattice_best.append(node_max)
