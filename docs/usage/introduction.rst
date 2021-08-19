@@ -11,6 +11,10 @@ The ``min_prob_norm`` prunes the lattice in that it drops paths that drop below 
 The probability is normalized to allow for easier reasoning about the probability of a path.
 It is computed as the exponential smoothed log probability components instead of the sum as would be the case
 for log likelihood.
+Because the number of possible paths quickly grows, it is recommended to set the
+``max_lattice_width`` argument. It will only continue the search with this number of
+possible paths at every step. If no solution is found, this value can be incremented
+using the ``increase_max_lattice_width`` method.
 
 .. code-block:: python
 
@@ -35,7 +39,7 @@ for log likelihood.
             (2.3, 3.5), (2.4, 3.2), (2.6, 3.1), (2.9, 3.1), (3.0, 3.2),
             (3.1, 3.8), (3.0, 4.0), (3.1, 4.3), (3.1, 4.6), (3.0, 4.9)]
 
-    matcher = DistanceMatcher(map_con, max_dist=2, obs_noise=1, min_prob_norm=0.5)
+    matcher = DistanceMatcher(map_con, max_dist=2, obs_noise=1, min_prob_norm=0.5, max_lattice_width=5)
     states, _ = matcher.match(path)
     nodes = matcher.path_pred_onlynodes
 
