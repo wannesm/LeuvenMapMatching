@@ -45,9 +45,10 @@ class SimpleMatcher(BaseMatcher):
         # also the previous state, thus if we go back
         self.gobacktoedge_factor_log = math.log(0.5)
         # Transition probability is divided (in logprob_trans) by this factor if a transition is made
+        # This is to try to stay on the same node unless there is a good reason
         self.transition_factor = math.log(0.9)
 
-    def logprob_trans(self, prev_m:BaseMatching, edge_m:Segment, edge_o:Segment,
+    def logprob_trans(self, prev_m: BaseMatching, edge_m: Segment, edge_o: Segment,
                       is_prev_ne=False, is_next_ne=False):
         """Transition probability.
 

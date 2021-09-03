@@ -42,6 +42,12 @@ class Segment(object):
         return f"{self.l1}-{self.l2}"
 
     @property
+    def rlabel(self):
+        if self.l2 is None:
+            return self.l1
+        return f"{self.l2}-{self.l1}"
+
+    @property
     def key(self):
         if self.l2 is None:
             return self.l1

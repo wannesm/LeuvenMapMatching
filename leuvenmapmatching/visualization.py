@@ -25,12 +25,13 @@ match_ne_color = mcolors.CSS4_COLORS['olive']
 lattice_color = mcolors.CSS4_COLORS['magenta']
 nodes_color = mcolors.CSS4_COLORS['cyan']
 path_color = mcolors.CSS4_COLORS['blue']
-fontsize = 7  # 11
+fontsize = 11  # 7  # 11
 
 
 def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False, z=None, bb=None,
              show_labels=False, matcher=None, show_graph=False, zoom_path=False, show_lattice=False,
-             show_matching=False, filename=None, linewidth=2, coord_trans=None):
+             show_matching=False, filename=None, linewidth=2, coord_trans=None,
+             figwidth=20, lattice_nodes=None):
     """Plot the db/graph and optionally include the observed path and inferred nodes.
 
     :param map_con: Map
@@ -48,7 +49,10 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
         path = matcher.path
         counts = matcher.node_counts()
         nodes = None
-        lat_nodes = matcher.lattice_best
+        if lattice_nodes is None:
+            lat_nodes = matcher.lattice_best
+        else:
+            lat_nodes = lattice_nodes
     else:
         lat_nodes = None
 
@@ -93,8 +97,6 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
         bb = [lat_min, lon_min, lat_max, lon_max]
         logger.debug("bb = [{}, {}, {}, {}]".format(*bb))
 
-    width = 20
-
     if use_osm:
         from .util import dist_latlon
         project = dist_latlon.project
@@ -104,9 +106,9 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
         to_pixels = m.to_pixels
         x_max, y_max = to_pixels(lat_max, lon_max)
         x_min, y_min = to_pixels(lat_min, lon_min)
-        height = width / abs(x_max - x_min) * abs(y_max - y_min)
+        height = figwidth / abs(x_max - x_min) * abs(y_max - y_min)
         if ax is None:
-            ax = m.show_mpl(figsize=(width, height))
+            ax = m.show_mpl(figsize=(figwidth, height))
         else:
             ax = m.show_mpl(ax=ax)
         fig = None
@@ -121,9 +123,9 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
             return lon, lat
         x_max, y_max = to_pixels(lat_max, lon_max)
         x_min, y_min = to_pixels(lat_min, lon_min)
-        height = width / abs(lon_max - lon_min) * abs(lat_max - lat_min)
+        height = figwidth / abs(lon_max - lon_min) * abs(lat_max - lat_min)
         if ax is None:
-            fig, ax = plt.subplots(ncols=1, nrows=1, figsize=(width, height))
+            fig, ax = plt.subplots(ncols=1, nrows=1, figsize=(figwidth, height))
         else:
             fig = None
         ax.set_xlim([x_min, x_max])
@@ -150,6 +152,7 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
                 xytext = (xytext[0]+0.001, xytext[1]+0.0)
                 xytext = ax.transLimits.inverted().transform(xytext)
                 # key = str(key)[-3:]
+                # print(f'annotate: {key} {coord} {xytext}')
                 ann = ax.annotate(key, xy=coord, xytext=xytext,
                             # textcoords=('axes fraction', 'axes fraction'),
                             # arrowprops=dict(arrowstyle='->'),
@@ -207,8 +210,9 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
                 node_locs.append((lat, lon, node))
         else:
             prev_m = None
-            for m in matcher.lattice_best:
-                if prev_m is not None and prev_m.edge_m.l2 == m.edge_m.l1:
+            for m in lat_nodes:
+                if prev_m is not None and prev_m.edge_m.l2 == m.edge_m.l1 \
+                        and prev_m.edge_m.l1 != m.edge_m.l2:
                     lat, lon = m.edge_m.p1
                     node_locs.append((lat, lon, m.edge_m.l1))
                 lat, lon = m.edge_m.pi
@@ -311,7 +315,7 @@ def plot_lattice(ax, to_pixels, matcher):
     for idx in range(len(matcher.lattice)):
         if len(matcher.lattice[idx]) == 0:
             continue
-        for m in matcher.lattice[idx].values():
+        for m in matcher.lattice[idx].values_all():
             for mp in m.prev:
                 if m.stop:
                     alpha = 0.1

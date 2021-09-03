@@ -13,4 +13,5 @@ from . import map, matcher, util
 
 logger = logging.getLogger("be.kuleuven.cs.dtai.mapmatching")
 
-__version__ = '0.5.4'
+__version__ = '1.1.0'
+

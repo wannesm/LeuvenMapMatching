@@ -12,6 +12,7 @@ import math
 
 from .base import BaseMatching, BaseMatcher
 from ..util.segment import Segment
+from ..util.debug import printd
 
 MYPY = False
 if MYPY:
@@ -62,6 +63,9 @@ class DistanceMatching(BaseMatching):
         if logger.isEnabledFor(logging.DEBUG):
             res += f" {self.lpt:>9.2f} | {self.lpe:>9.2f} |"
         return res
+
+    def __repr__(self):
+        return self.label
 
 
 class DistanceMatcher(BaseMatcher):
@@ -140,6 +144,7 @@ class DistanceMatcher(BaseMatcher):
         self.avoid_goingback = kwargs.get('avoid_goingback', True)
         self.gobackonedge_factor_log = math.log(0.5)
         self.gobacktoedge_factor_log = math.log(0.5)
+        self.first_farend_penalty = math.log(0.75)  # should be > gobacktoedge_factor_log
 
         self.notconnectededges_factor_log = math.log(0.5)
 
@@ -160,25 +165,35 @@ class DistanceMatcher(BaseMatcher):
 
         Note: We should also smooth the distance between observations to handle outliers better.
 
-        :param prev_m:
-        :param edge_m:
-        :param edge_o:
-        :param is_prev_ne:
-        :param is_next_ne:
+        :param prev_m: Previous matching / state
+        :param edge_m: Edge between matchings / states
+        :param edge_o: Edge between observations
+        :param is_prev_ne: Is previous state non-emitting
+        :param is_next_ne: Is the next state non-emitting
+        :param dist_o: First output of distance_progress
+        :param dist_m: Second output of distance_progress
         :return:
         """
         d_z = self.map.distance(prev_m.edge_o.pi, edge_o.pi)
+        is_same_edge = False
+        if (prev_m.edge_m.l1 == edge_m.l1 and prev_m.edge_m.l2 == edge_m.l2) or \
+                (prev_m.edge_m.l1 == edge_m.l2 and prev_m.edge_m.l2 == edge_m.l1):
+            is_same_edge = True
         if ((not self.exact_dt_s) or
-                prev_m.edge_m.label == edge_m.label or  # On same edge
+                is_same_edge or  # On same edge
                 prev_m.edge_m.l2 != edge_m.l1):  # Edges are not connected
             d_x = self.map.distance(prev_m.edge_m.pi, edge_m.pi)
         else:
+            # Take into account the curvature
             d_x = self.map.distance(prev_m.edge_m.pi, prev_m.edge_m.p2) + self.map.distance(prev_m.edge_m.p2, edge_m.pi)
-        # print(f"Prev-o: {prev_m.edge_o} / {prev_m.edge_o.loc_to_str()}")
-        # print(f"Cur-o:  {edge_o} / {edge_o.loc_to_str()}")
-        # print(f"Prev-m: {prev_m.edge_m} / {prev_m.edge_m.loc_to_str()}")
-        # print(f"Cur-m:  {edge_m} / {edge_m.loc_to_str()}")
-        # print(f"Dist: {d_z} -- {d_x}")
+
+        if is_next_ne:
+            # For non-emitting states, the distances are added
+            # Otherwise it can map to a sequence of short segments and stay at the same
+            # observation because the difference is then always small.
+            d_z += prev_m.d_o
+            d_x += prev_m.d_s
+
         d_t = abs(d_z - d_x)
         # p_dt = 1 / beta * math.exp(-d_t / beta)
         if is_prev_ne or is_next_ne:
@@ -193,6 +208,9 @@ class DistanceMatcher(BaseMatcher):
             if self.avoid_goingback and edge_m.key == prev_m.edge_m.key and edge_m.ti < prev_m.edge_m.ti:
                 # Going back on edge (direction is from p1 to p2 of the segment)
                 logprob += self.gobackonedge_factor_log  # Prefer not going back
+        elif (prev_m.edge_m.l1, prev_m.edge_m.l2) == (edge_m.l2, edge_m.l1):
+            if self.avoid_goingback:
+                logprob += self.gobackonedge_factor_log
         else:
             # Moving states
             if prev_m.edge_m.l2 != edge_m.l1:
@@ -246,6 +264,7 @@ class DistanceMatcher(BaseMatcher):
         else:
             factor = 0
         if factor < self.restrained_ne_thr:
-            logger.debug(f"Skip non-emitting states to {next_ne_m.label}: {factor} < {self.restrained_ne_thr}")
+            logger.debug(f"Skip non-emitting states to {next_ne_m.label}: {factor} < {self.restrained_ne_thr} "
+                         "(observations close enough to each other)")
             return True
         return False

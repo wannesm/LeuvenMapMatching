@@ -36,13 +36,13 @@ class BaseMatching(object):
     __slots__ = ['matcher', 'edge_m', 'edge_o',
                  'logprob', 'logprobema', 'logprobe', 'logprobne',
                  'obs', 'obs_ne', 'dist_obs',
-                 'prev', 'prev_other', 'stop', 'length']
+                 'prev', 'prev_other', 'stop', 'length', 'delayed']
 
     def __init__(self, matcher: 'BaseMatcher', edge_m: Segment, edge_o: Segment,
                  logprob=-np.inf, logprobema=-np.inf, logprobe=-np.inf, logprobne=-np.inf,
-                 dist_obs: float=0.0, obs: int=0, obs_ne: int=0,
-                 prev: Optional[Set['BaseMatching']]=None, stop: bool=False, length: int=1,
-                 **_kwargs):
+                 dist_obs: float = 0.0, obs: int = 0, obs_ne: int = 0,
+                 prev: Optional[Set['BaseMatching']] = None, stop: bool = False, length: int = 1,
+                 delayed: int = 0, **_kwargs):
         """
 
         :param matcher: Reference to the Matcher used to generate this matching object.
@@ -58,6 +58,9 @@ class BaseMatching(object):
         :param prev: Previous best matching objects
         :param stop: Stop after this matching (e.g. because probability is too low)
         :param length: Lenght of current matching sequence through lattice.
+        :param delayed: This matching is temporarily stopped if >0 (e.g. to first explore better options).
+        :param dist_m: Distance over graph
+        :param dist_o: Distance over observations
         :param _kwargs:
         """
         self.edge_m: Segment = edge_m
@@ -73,9 +76,16 @@ class BaseMatching(object):
         self.prev_other: Set[BaseMatching] = set()  # Previous matching objects with lower logprob
         self.stop: bool = stop
         self.length: int = length
+        self.delayed: int = delayed
         self.matcher: BaseMatcher = matcher
 
-    def next(self, edge_m: Segment, edge_o: Segment, obs: int=0, obs_ne: int=0):
+    @property
+    def prune_value(self):
+        """Pruning the lattice (e.g. to delay) is based on this key."""
+        return self.logprob
+        # return self.logprobema
+
+    def next(self, edge_m: Segment, edge_o: Segment, obs: int = 0, obs_ne: int = 0):
         """Create a next lattice Matching object with this Matching object as the previous one in the lattice."""
         new_stop = False
         if edge_m.is_point() and edge_o.is_point():
@@ -128,9 +138,12 @@ class BaseMatching(object):
             new_logprob = new_logprobe
             new_length = self.length + 1
         else:
+            # Non-emitting states require normalisation
             # "* e^(ne_length_factor_log)" or "- ne_length_factor_log" for every step to a non-emitting
             # state to prefer shorter paths
             new_logprobe = self.logprobe + self.matcher.ne_length_factor_log
+            # The obvious choice would be average to compensate for that non-emitting states
+            # create different path lengths between emitting nodes.
             # We use min() as it is a monotonic function, in contrast with an average
             new_logprobne = min(self.logprobne, new_logprob_delta)
             new_logprob = new_logprobe + new_logprobne
@@ -150,7 +163,8 @@ class BaseMatching(object):
                                     logprob=new_logprob, logprobne=new_logprobne,
                                     logprobe=new_logprobe, logprobema=new_logprobema,
                                     obs=obs, obs_ne=obs_ne, prev={self}, dist_obs=dist,
-                                    stop=new_stop, length=new_length, **props_trans, **props_obs)
+                                    stop=new_stop, length=new_length, delayed=self.delayed,
+                                    **props_trans, **props_obs)
             return m_next
         else:
             return None
@@ -170,7 +184,7 @@ class BaseMatching(object):
             return None
 
     def update(self, m_next):
-        """Update the current entry if the new matching object is better.
+        """Update the current entry if the new matching object for this state is better.
 
         :param m_next: The new matching object representing the same node in the lattice.
         :return: True if the current object is replaced, False otherwise
@@ -189,7 +203,8 @@ class BaseMatching(object):
         #     self.stop = m_next.stop
         #     return False
         assert self.length == m_next.length
-        if (self.stop and not m_next.stop) or (self.stop == m_next.stop and self.logprob < m_next.logprob):
+        if (self.stop and not m_next.stop) \
+                or (self.stop == m_next.stop and self.logprob < m_next.logprob):
             self._update_inner(m_next)
             return True
         else:
@@ -209,6 +224,7 @@ class BaseMatching(object):
         self.prev_other.update(self.prev)  # Do we use this?
         self.prev = m_other.prev
         self.stop = m_other.stop
+        self.delayed = m_other.delayed
         self.length = m_other.length
 
     def is_nonemitting(self):
@@ -226,7 +242,11 @@ class BaseMatching(object):
             return next(iter(self.prev)).last_emitting_logprob()
 
     def __str__(self, label_width=None):
-        stop = "x" if self.stop else ""
+        stop = ''
+        if self.stop:
+            stop = 'x'
+        else:
+            stop = f'{self.delayed}'
         if label_width is None:
             label_width = default_label_width
         repr_tmpl = "{:<2} | {:<"+str(label_width)+"} | {:10.5f} | {:10.5f} | {:10.5f} | {:10.5f} | " +\
@@ -234,6 +254,9 @@ class BaseMatching(object):
         return repr_tmpl.format(stop, self.label, self.logprob, self.logprob / self.length,
                                 self.logprobema, self.logprobne, self.obs,
                                 self.dist_obs, ",".join([str(prev.label) for prev in self.prev]))
+
+    def __repr__(self):
+        return self.label
 
     @staticmethod
     def repr_header(label_width=None, stop=""):
@@ -297,6 +320,102 @@ class BaseMatching(object):
         return self.cname.__hash__()
 
 
+class LatticeColumn:
+
+    def __init__(self, obs_idx):
+        # 0 = obs, >0 = non-emitting between this obs and next
+        self.obs_idx = obs_idx
+        self.o = []  # type list[dict[label,Matching]]
+
+    def __contains__(self, item):
+        for c in self.o:
+            if item in c:
+                return True
+        return False
+
+    def __len__(self):
+        return len(self.o)
+
+    def dict(self, obs_ne=None):
+        if obs_ne is None:
+            raise AttributeError('obs_ne should be value')
+        while obs_ne >= len(self.o):
+            self.o.append({})
+        return self.o[obs_ne]
+
+    def values_all(self):
+        """All matches for the emitting layer and all non-emitting layers."""
+        values = set()
+        for o in self.o:
+            values.update(o.values())
+        return values
+
+    def values(self, obs_ne=None):
+        if obs_ne is None:
+            raise AttributeError('obs_ne should be value')
+        if len(self.o) <= obs_ne:
+            return []
+        return self.o[obs_ne].values()
+
+    def upsert(self, matching):
+        # type: (BaseMatching) -> None
+        if matching is None:
+            return None
+        while matching.obs_ne >= len(self.o):
+            self.o.append({})
+        c = self.o[matching.obs_ne]
+        if matching.key in c:
+            other_matching = c[matching.key]  # type: BaseMatching
+            other_matching.update(matching)
+        else:
+            c[matching.key] = matching
+        return c[matching.key]
+
+    def prune(self, obs_ne, max_lattice_width, expand_upto, prune_thr=None):
+        """Prune given column in the lattice to fit in max_lattice_width.
+        Also ignore all matchings with a probability lower than prune_thr. These are
+        matchings that are worse than the matchings at the next observation that are
+        retained after pruning.
+
+        :param obs_ne:
+        :param max_lattice_width:
+        :param expand_upto: The current expand level
+        :return:
+        """
+        cur_lattice = [m for m in self.values(obs_ne) if not m.stop]
+        if __debug__:
+            logger.debug('Prune lattice[{},{}] from {} to {}, with prune thr {}'
+                         .format(self.obs_idx, obs_ne,
+                                 len([m for m in cur_lattice if not m.stop and m.delayed == expand_upto]),
+                                 max_lattice_width, prune_thr))
+            cnt_pruned = 0
+        if max_lattice_width is not None and len(cur_lattice) > max_lattice_width:
+            ms = sorted(cur_lattice, key=lambda t: t.prune_value, reverse=True)
+            cur_width = max_lattice_width
+            m_last = ms[cur_width - 1]
+            # Extend current width if next pruned matching has same logprob as last kept matching
+            # This increases the lattice width but otherwise the algorithm depends on the
+            # order of edges/nodes and is not deterministic.
+            while cur_width < len(ms) and ms[cur_width].prune_value == m_last.prune_value:
+                m_last = ms[cur_width]
+                cur_width += 1
+            if prune_thr is not None:
+                while cur_width > 0 and ms[cur_width - 1].prune_value < prune_thr:
+                    cur_width -= 1
+            for m in ms[:cur_width]:  # type: BaseMatching
+                if m.delayed > expand_upto:
+                    m.delayed = expand_upto  # expand now
+            for m in ms[cur_width:]:
+                if m.delayed <= expand_upto:
+                    if __debug__:
+                        cnt_pruned += 1
+                    m.delayed = expand_upto + 1  # expand later
+            if cur_width > 0:
+                prune_thr = ms[cur_width - 1].prune_value
+        if __debug__:
+            logger.debug(f'Pruned {cnt_pruned} matchings, return {prune_thr=}')
+        return prune_thr
+
 class BaseMatcher:
 
     def __init__(self, map_con, obs_noise=1, max_dist_init=None, max_dist=None, min_prob_norm=None,
@@ -317,9 +436,10 @@ class BaseMatcher:
             not associated with an observation. Here we assume it can be associated with a location in between
             two observations to allow for pruning. It is advised to set min_prob_norm and/or max_dist to avoid
             visiting all possible nodes in the graph.
-        :param max_lattice_width: Only keep track of this number of states (thus locations) for a given observation.
-            Restrict the lattice (or possible candidate states per observation) to this value.
+        :param max_lattice_width: Only continue from a limited number of states (thus locations) for a given observation.
             If there are more possible next states, the states with the best likelihood so far are selected.
+            The other states are 'delayed'. If the matching is rerun later with a larger value, the algorithms
+            continuous from these delayed states.
         :param only_edges: Do not include nodes as states, only edges. This is the typical setting for HMM methods.
         :param matching: Matching type
         :param non_emitting_length_factor: Reduce the probability of a sequence of non-emitting states the longer it
@@ -353,7 +473,7 @@ class BaseMatcher:
             self.obs_noise_ne = obs_noise_ne
 
         self.path = None
-        self.lattice = None  # dict[idx,dict[label,Matching]]
+        self.lattice = None  # type: Optional[dict[int,LatticeColumn]]
         self.lattice_best = None
         self.node_path = None
         self.matching = matching
@@ -361,6 +481,7 @@ class BaseMatcher:
         self.non_emitting_states_maxnb = 100
         self.max_lattice_width = max_lattice_width
         self.only_edges = only_edges
+        self.expand_now = 0  # all m.delayed <= expand_upto will be expanded
 
         # Penalties
         self.ne_length_factor_log = math.log(non_emitting_length_factor)
@@ -404,13 +525,9 @@ class BaseMatcher:
         return False
 
     def _insert(self, m_next):
-        if m_next.key in self.lattice[m_next.obs]:
-            self.lattice[m_next.obs][m_next.key].update(m_next)
-        else:
-            self.lattice[m_next.obs][m_next.key] = m_next
-        return self.lattice[m_next.obs][m_next.key]
+        return self.lattice[m_next.obs].upsert(m_next)
 
-    def match(self, path, unique=False, tqdm=None):
+    def match(self, path, unique=False, tqdm=None, expand=False):
         """Dynamic Programming based (HMM-like) map matcher.
 
         If the matcher fails to match the entire path, the last matched index is returned.
@@ -419,17 +536,27 @@ class BaseMatcher:
         :param path: list[Union[tuple[lat, lon], tuple[lat, lon, time]]
         :param unique: Only retain unique nodes in the sequence (avoid repetitions)
         :param tqdm: Use a tqdm progress reporter (default is None)
+        :param expand: Expand the current lattice (delayed matches)
         :return: Tuple of (List of state keys, index of last observation that was matched)
         """
         if __debug__:
             logger.debug("Start matching path of length {}".format(len(path)))
 
         # Initialisation
-        self.path = path
+        if expand:
+            if self.path != path:
+                raise Exception(f'Cannot expand for a new path, should be the same path.')
+            self.expand_now += 1
+        else:
+            self.path = path
+            self.expand_now = 0
+
         nb_start_nodes = self._create_start_nodes(use_edges=self.only_edges)
         if nb_start_nodes == 0:
             self.lattice_best = []
             return [], 0
+        if __debug__ and logger.isEnabledFor(logging.DEBUG):
+            self.print_lattice(obs_idx=0, label_width=default_label_width, debug=True)
 
         # Start iterating over observations 1..end
         t_start = time.time()
@@ -440,8 +567,9 @@ class BaseMatcher:
         for obs_idx in iterator:
             if __debug__:
                 logger.debug("--- obs {} --- {} ---".format(obs_idx, self.path[obs_idx]))
+            # check if early stopping has occured
             cnt_lat_size_not_zero = False
-            for m_tmp in self.lattice[obs_idx - 1].values():
+            for m_tmp in self.lattice[obs_idx - 1].values(0):
                 if not m_tmp.stop:
                     cnt_lat_size_not_zero = True
                     break
@@ -452,12 +580,16 @@ class BaseMatcher:
                 early_stop_idx = obs_idx - 1
                 logger.info(f'Stopped early at observation {early_stop_idx}')
                 break
+            # Expand matches
             self._match_states(obs_idx)
             if self.non_emitting_states:
                 # Fill in non-emitting states between previous and current observation
-                self._match_non_emitting_states(obs_idx - 1)
+                self._match_non_emitting_states(obs_idx - 1, expand=expand)
+            if self.max_lattice_width:
+                # Prune again if non_emitting_states reactives matches from match_states
+                self.lattice[obs_idx].prune(0, self.max_lattice_width, self.expand_now)
             if __debug__ and logger.isEnabledFor(logging.DEBUG):
-                self.print_lattice(obs_idx=obs_idx, label_width=default_label_width)
+                self.print_lattice(obs_idx=obs_idx, label_width=default_label_width, debug=True)
                 logger.debug(f"--- end obs {obs_idx} ---")
 
         t_delta = time.time() - t_start
@@ -467,7 +599,7 @@ class BaseMatcher:
         # Backtrack to find best path
         if not early_stop_idx:
             one_no_stop = False
-            for m in self.lattice[len(path) - 1].values():
+            for m in self.lattice[len(path) - 1].values_all():  # todo: could be values(0) ?
                 if not m.stop:
                     one_no_stop = True
                     break
@@ -493,7 +625,7 @@ class BaseMatcher:
         :param unique: Only retain unique nodes in the sequence (avoid repetitions)
         :param tqdm: Use a tqdm progress reporter (default is None)
         :param backtrace_len: Length of the computed path throught the lattice.
-          If None the path through the lattice will the length of the last given path.
+          If None the path through the lattice will be the length of the last given path.
           If -1, the full path is computed.
         :return: Tuple of (List of state keys, index of last observation that was matched)
         """
@@ -510,7 +642,7 @@ class BaseMatcher:
         else:
             start_obs_idx = len(self.path)
             for idx in range(len(self.path)):
-                self.lattice[start_obs_idx + idx] = dict()
+                self.lattice[start_obs_idx + idx] = LatticeColumn(start_obs_idx + idx)
             self.path += path
 
         # Start iterating over observations 1..end
@@ -523,7 +655,7 @@ class BaseMatcher:
             if __debug__:
                 logger.debug(f"--- obs {obs_idx} --- {self.path[obs_idx]} ---")
             cnt_lat_size_not_zero = False
-            for m_tmp in self.lattice[obs_idx - 1].values():
+            for m_tmp in self.lattice[obs_idx - 1].values(0):
                 if not m_tmp.stop:
                     cnt_lat_size_not_zero = True
                     break
@@ -540,7 +672,7 @@ class BaseMatcher:
                 self._match_non_emitting_states(obs_idx - 1)
             if __debug__:
                 if logger.isEnabledFor(logging.DEBUG):
-                    self.print_lattice(obs_idx=obs_idx, label_width=default_label_width)
+                    self.print_lattice(obs_idx=obs_idx, label_width=default_label_width, debug=True)
 
         t_delta = time.time() - t_start
         logger.info("Build lattice in {} seconds".format(t_delta))
@@ -566,15 +698,20 @@ class BaseMatcher:
         return False
 
     def _create_start_nodes(self, use_edges=True):
-        """
+        """Find those nodes that are close to the first point in the path.
 
         :return: Number of created start points.
         """
         # Initialisation on first observation
+        if self.expand_now > 0:
+            # No need to search for new points, only activate delayed matches
+            self.lattice[0].prune(0, self.max_lattice_width, self.expand_now)
+            return len(self.lattice[0])
+
         t_start = time.time()
         self.lattice = dict()
-        for idx in range(len(self.path)):
-            self.lattice[idx] = dict()
+        for obs_idx in range(len(self.path)):
+            self.lattice[obs_idx] = LatticeColumn(obs_idx)
 
         if use_edges:
             nodes = self.map.edges_closeto(self.path[0], max_dist=self.max_dist_init)
@@ -601,10 +738,7 @@ class BaseMatcher:
                 edge_o = Segment(f"O{0}", self.path[0])
                 m_next = self.matching.first(logprob_init, edge_m, edge_o, self, dist_obs)
                 if m_next is not None:
-                    if m_next.key in self.lattice[0]:
-                        self.lattice[0][m_next.key].update(m_next)
-                    else:
-                        self.lattice[0][m_next.key] = m_next
+                    self.lattice[0].upsert(m_next)
                     if __debug__:
                         logger.debug(str(m_next))
         else:
@@ -614,11 +748,11 @@ class BaseMatcher:
                 edge_o = Segment(f"O{0}", self.path[0])
                 m_next = self.matching.first(logprob_init, edge_m, edge_o, self, dist_obs)
                 if m_next is not None:
-                    self.lattice[0][m_next.key] = m_next
+                    self.lattice[0].upsert(m_next)
                     if __debug__:
                         logger.debug(str(m_next))
         if self.max_lattice_width:
-            self._prune_lattice(0)
+            self.lattice[0].prune(0, max_lattice_width=self.max_lattice_width, expand_upto=self.expand_now)
             # if self.non_emitting_states:
             #     self._match_non_emitting_states(0, path)
         return len(self.lattice[0])
@@ -629,10 +763,11 @@ class BaseMatcher:
         :param obs_idx:
         :return: True is new states have been found, False otherwise.
         """
-        prev_lattice = [m for m in self.lattice[obs_idx - 1].values() if not m.stop]
+        prev_lattice = [m for m in self.lattice[obs_idx - 1].values(0) if not m.stop and m.delayed == self.expand_now]
         count = 0
         for m in prev_lattice:  # type: BaseMatching
             if m.stop:
+                assert(False)  # should not happen
                 continue
             count += 1
             if m.edge_m.is_point():
@@ -644,7 +779,7 @@ class BaseMatcher:
                         logger.debug("No neighbours found for node {}".format(m.edge_m.l1))
                     continue
                 if __debug__:
-                    logger.debug("   Move to {} neighbours from node {}".format(len(nbrs), m.edge_m.l1))
+                    logger.debug("   + Move to {} neighbours from node {}".format(len(nbrs), m.edge_m.l1))
                     logger.debug(m.repr_header())
                 for nbr_label, nbr_loc in nbrs:
                     # === Move from node to node (or stay on node) ===
@@ -713,14 +848,14 @@ class BaseMatcher:
                                 if __debug__:
                                     logger.debug(str(m_next))
         if self.max_lattice_width:
-            self._prune_lattice(obs_idx)
+            self.lattice[obs_idx].prune(0, self.max_lattice_width, self.expand_now)
         if count == 0:
             if __debug__:
                 logger.debug("No active solution found anymore")
             return False
         return True
 
-    def _match_non_emitting_states(self, obs_idx):
+    def _match_non_emitting_states(self, obs_idx, expand=False):
         """Match sequences of nodes that all refer to the same observation at obs_idx.
 
         Assumptions:
@@ -735,32 +870,37 @@ class BaseMatcher:
         else:
             obs_next = None
         # The current states are the current observation's states
-        cur_lattice = dict((m.key, m) for m in self.lattice[obs_idx].values() if not m.stop)
+        if expand:
+            cur_lattice = dict((m.key, m) for m in self.lattice[obs_idx].values(0) if not m.stop and m.delayed == self.expand_now)
+        else:
+            cur_lattice = dict((m.key, m) for m in self.lattice[obs_idx].values(0) if not (m.stop or m.delayed > 0))
         lattice_toinsert = list()
         # The current best states are the next observation's states if you would ignore non-emitting states
         lattice_best = dict((m.shortkey, m)
-                            for m in self.lattice[obs_idx + 1].values() if not m.stop)
+                            for m in self.lattice[obs_idx + 1].values(0) if not m.stop)
         lattice_ne = set(m.shortkey
-                         for m in self.lattice[obs_idx + 1].values() if not m.stop and self._skip_ne_states(m))
+                         for m in self.lattice[obs_idx + 1].values(0) if not m.stop and self._skip_ne_states(m))
         # cur_lattice = set(self.lattice[obs_idx].values())
         nb_ne = 0
+        prune_thr = None
         while len(cur_lattice) > 0 and nb_ne < self.non_emitting_states_maxnb:
             nb_ne += 1
             if __debug__:
                 logger.debug("--- obs {}:{} --- {} - {} ---".format(obs_idx, nb_ne, obs, obs_next))
             cur_lattice = self._match_non_emitting_states_inner(cur_lattice, obs_idx, obs, obs_next, nb_ne,
-                                                                lattice_toinsert, lattice_best, lattice_ne)
+                                                                lattice_best, lattice_ne)
+            if self.max_lattice_width is not None:
+                self.lattice[obs_idx].prune(nb_ne, self.max_lattice_width, self.expand_now, prune_thr)
             # Link to next observation
             self._match_non_emitting_states_end(cur_lattice, obs_idx + 1, obs_next,
-                                                lattice_toinsert, lattice_best)
-            if self.max_lattice_width is not None and len(cur_lattice) > self.max_lattice_width:
-                ms = sorted(cur_lattice.values(), key=lambda t: t.logprob, reverse=True)
-                cur_lattice = dict()
-                for m in ms[:self.max_lattice_width]:
-                    cur_lattice[m.key] = m
+                                                lattice_best, expand=expand)
+            if self.max_lattice_width is not None:
+                prune_thr = self.lattice[obs_idx + 1].prune(0, self.max_lattice_width, self.expand_now, None)
+        if self.max_lattice_width is not None:
+            self.lattice[obs_idx + 1].prune(0, self.max_lattice_width, self.expand_now, None)
         # logger.info('Used {} levels of non-emitting states'.format(nb_ne))
-        for m in lattice_toinsert:
-            self._insert(m)
+        # for m in lattice_toinsert:
+        #     self._insert(m)
 
     def _node_in_prev_ne(self, m_next, label):
         """Is the given node already visited in the chain of non-emitting states.
@@ -793,13 +933,14 @@ class BaseMatcher:
             return True
 
     def _match_non_emitting_states_inner(self, cur_lattice, obs_idx, obs, obs_next, nb_ne,
-                                         lattice_toinsert, lattice_best, lattice_ne):
-        cur_lattice_new = dict()
+                                         lattice_best, lattice_ne):
+        # cur_lattice_new = dict()
+        cur_lattice_new = self.lattice[obs_idx].dict(nb_ne)
         for m in cur_lattice.values():  # type: BaseMatching
-            if m.stop:
+            if m.stop or m.delayed != self.expand_now:
                 continue
             if m.shortkey in lattice_ne:
-                logger.debug(f"Skip non-emitting states from {m.label}")
+                logger.debug(f"Skip non-emitting states from {m.label}, already visited")
                 continue
             # == Move to neighbour edge from edge ==
             if m.edge_m.l2 is not None and self.only_edges:
@@ -809,10 +950,6 @@ class BaseMatcher:
                     if __debug__:
                         logger.debug(f"No neighbours found for edge {m.edge_m.label} ({m.label}, non-emitting)")
                     continue
-                if __debug__:
-                    logger.debug(f"   Move to {len(nbrs)} neighbours from edge {m.edge_m.label} "
-                                 f"({m.label}, non-emitting)")
-                    logger.debug(m.repr_header())
                 for nbr_label1, nbr_loc1, nbr_label2, nbr_loc2 in nbrs:
                     if self._node_in_prev_ne(m, nbr_label2):
                         if __debug__:
@@ -828,10 +965,11 @@ class BaseMatcher:
                                 if m_next.shortkey in lattice_best:
                                     if approx_leq(m_next.dist_obs, lattice_best[m_next.shortkey].dist_obs):
                                         cur_lattice_new[m_next.key].update(m_next)
-                                    elif __debug__ and logger.isEnabledFor(logging.DEBUG):
-                                        logger.debug(f"   | Stopped trace: distance larger than best for key {m_next.shortkey}: "
-                                                     f"{m_next.dist_obs} > {lattice_best[m_next.shortkey].dist_obs}")
+                                    else:
                                         m_next.stop = True
+                                        if __debug__ and logger.isEnabledFor(logging.DEBUG):
+                                            logger.debug(f"   | Stopped trace: distance larger than best for key {m_next.shortkey}: "
+                                                         f"{m_next.dist_obs} > {lattice_best[m_next.shortkey].dist_obs}")
                                 else:
                                     cur_lattice_new[m_next.key].update(m_next)
                             else:
@@ -840,7 +978,7 @@ class BaseMatcher:
                                     if approx_leq(m_next.dist_obs, lattice_best[m_next.shortkey].dist_obs):
                                         cur_lattice_new[m_next.key] = m_next
                                         # lattice_best[m_next.shortkey] = m_next
-                                        lattice_toinsert.append(m_next)
+                                        # lattice_toinsert.append(m_next)
                                     else:
                                         if __debug__ and logger.isEnabledFor(logging.DEBUG):
                                             logger.debug(f"   | Stopped trace: distance larger than best for key {m_next.shortkey}: "
@@ -849,7 +987,7 @@ class BaseMatcher:
                                 else:
                                     cur_lattice_new[m_next.key] = m_next
                                     # lattice_best[m_next.shortkey] = m_next
-                                    lattice_toinsert.append(m_next)
+                                    # lattice_toinsert.append(m_next)
                             # cur_lattice_new.add(m_next)
                             if __debug__:
                                 logger.debug(str(m_next))
@@ -867,7 +1005,7 @@ class BaseMatcher:
                     continue
                 if __debug__:
                     logger.debug(
-                        f"   Move to {len(nbrs)} neighbours from node {cur_node} ({m.label}, non-emitting)")
+                        f"   + Move to {len(nbrs)} neighbours from node {cur_node} ({m.label}, non-emitting)")
                     logger.debug(m.repr_header())
                 for nbr_label, nbr_loc in nbrs:
                     # print(f"self._node_in_prev_ne({m.label}, {nbr_label}) = {self._node_in_prev_ne(m, nbr_label)}")
@@ -889,14 +1027,15 @@ class BaseMatcher:
                                     if m_next.dist_obs < lattice_best[m_next.shortkey].dist_obs:
                                         cur_lattice_new[m_next.key] = m_next
                                         lattice_best[m_next.shortkey] = m_next
-                                        lattice_toinsert.append(m_next)
+                                        # lattice_toinsert.append(m_next)
                                     elif __debug__ and logger.isEnabledFor(logging.DEBUG):
                                         m_next.stop = True
-                                        lattice_toinsert.append(m_next)
+                                        cur_lattice_new[m_next.key] = m_next
+                                        # lattice_toinsert.append(m_next)
                                 else:
                                     cur_lattice_new[m_next.key] = m_next
                                     lattice_best[m_next.shortkey] = m_next
-                                    lattice_toinsert.append(m_next)
+                                    # lattice_toinsert.append(m_next)
                             # cur_lattice_new.add(m_next)
                             if __debug__:
                                 logger.debug(str(m_next))
@@ -907,9 +1046,9 @@ class BaseMatcher:
         return cur_lattice_new
 
     def _match_non_emitting_states_end(self, cur_lattice, obs_idx, obs_next,
-                                       lattice_toinsert, lattice_best):
+                                       lattice_best, expand=False):
         for m in cur_lattice.values():  # type: BaseMatching
-            if m.stop:
+            if m.stop or m.delayed > self.expand_now:
                 continue
             if m.edge_m.l2 is not None:
                 # Move to neighbour edge from edge
@@ -920,7 +1059,7 @@ class BaseMatcher:
                         logger.debug("No neighbours found for edge {} ({})".format(m.edge_m.label, m.label))
                     continue
                 if __debug__:
-                    logger.debug(f"   Move to {len(nbrs)} neighbours from edge {m.edge_m.label} "
+                    logger.debug(f"   + Move to {len(nbrs)} neighbours from edge {m.edge_m.label} "
                                  f"({m.label}, non-emitting->emitting)")
                     logger.debug(m.repr_header())
                 for nbr_label1, nbr_loc1, nbr_label2, nbr_loc2 in nbrs:
@@ -938,13 +1077,16 @@ class BaseMatcher:
                                 # if m_next.dist_obs < lattice_best[m_next.shortkey].dist_obs:
                                 if m_next.logprob > lattice_best[m_next.shortkey].logprob:
                                     lattice_best[m_next.shortkey] = m_next
-                                    lattice_toinsert.append(m_next)
+                                    # lattice_toinsert.append(m_next)
+                                    self.lattice[obs_idx].upsert(m_next)
                                 elif __debug__ and logger.isEnabledFor(logging.DEBUG):
                                     m_next.stop = True
-                                    lattice_toinsert.append(m_next)
+                                    # lattice_toinsert.append(m_next)
+                                    self.lattice[obs_idx].upsert(m_next)
                             else:
                                 lattice_best[m_next.shortkey] = m_next
-                                lattice_toinsert.append(m_next)
+                                # lattice_toinsert.append(m_next)
+                                self.lattice[obs_idx].upsert(m_next)
                             if __debug__:
                                 logger.debug(str(m_next))
                     else:
@@ -960,7 +1102,7 @@ class BaseMatcher:
                         logger.debug("No neighbours found for node {}".format(cur_node, m.label))
                     continue
                 if __debug__:
-                    logger.debug(f"   Move to {len(nbrs)} neighbours from node {cur_node} "
+                    logger.debug(f"   + Move to {len(nbrs)} neighbours from node {cur_node} "
                                  f"({m.label}, non-emitting->emitting)")
                     logger.debug(m.repr_header())
                 for nbr_label, nbr_loc in nbrs:
@@ -979,81 +1121,125 @@ class BaseMatcher:
                                 # if m_next.dist_obs < lattice_best[m_next.shortkey].dist_obs:
                                 if m_next.logprob > lattice_best[m_next.shortkey].logprob:
                                     lattice_best[m_next.shortkey] = m_next
-                                    lattice_toinsert.append(m_next)
+                                    # lattice_toinsert.append(m_next)
+                                    self.lattice[obs_idx].upsert(m_next)
                                 elif __debug__ and logger.isEnabledFor(logging.DEBUG):
                                     m_next.stop = True
-                                    lattice_toinsert.append(m_next)
+                                    # lattice_toinsert.append(m_next)
+                                    self.lattice[obs_idx].upsert(m_next)
                             else:
                                 lattice_best[m_next.shortkey] = m_next
-                                lattice_toinsert.append(m_next)
+                                # lattice_toinsert.append(m_next)
+                                self.lattice[obs_idx].upsert(m_next)
                             if __debug__:
                                 logger.debug(str(m_next))
                     else:
                         if __debug__:
                             logger.debug(self.matching.repr_static(('x', '{} < self-loop'.format(nbr_label))))
 
-    def _prune_lattice(self, obs_idx):
-        logger.debug('Prune lattice[{}] from {} to {}'
-                     .format(obs_idx, len(self.lattice[obs_idx]), self.max_lattice_width))
-        if len(self.lattice[obs_idx]) <= self.max_lattice_width:
-            return
-        top_m = [m for m in self.lattice[obs_idx].values() if not m.stop]
-        top_m.sort(key=lambda m: m.logprobema, reverse=True)
-        self.lattice[obs_idx] = dict((m.key, m) for m in top_m[:self.max_lattice_width])
-        self._cleanup_lattice(obs_idx)
-        if __debug__ and logger.isEnabledFor(logging.DEBUG):
-            for m in self.lattice[obs_idx].values():
-                logger.debug(str(m))
+    def get_matching(self, identifier=None):
+        m = None  # type: Optional[BaseMatching]
+        if isinstance(identifier, BaseMatching):
+            m = identifier
+        elif identifier is None:
+            col = self.lattice[len(self.lattice) - 1]
+            for curm in col.values_all():
+                if m is None or curm.logprob > m.logprob:
+                    m = curm
+        elif type(identifier) is int:
+            # If integer, search for the best matching at this index in the lattice
+            for cur_m in self.lattice[identifier].values_all():  # type:BaseMatching
+                if not cur_m.stop and (m is None or cur_m.logprob > m.logprob):
+                    m = cur_m
+        elif type(identifier) is str:
+            # If string, try to parse identifier
+            parts = identifier.split('-')
+            idx, ne, key = None, None, None
+            if len(parts) == 4:
+                nodea, nodeb, idx, ne = [int(part) for part in parts]
+                key = (nodea, nodeb, idx, ne)
+                col = self.lattice[idx]  # type: LatticeColumn
+                col_ne = col.o[ne]
+                m = col_ne[key]
+            elif len(parts) == 3:
+                node, idx, ne = [int(part) for part in parts]
+                key = (node, idx, ne)
+                col = self.lattice[idx]  # type: LatticeColumn
+                col_ne = col.o[ne]
+                m = col_ne[key]
+            elif len(parts) == 1:
+                m = None
+                l1 = int(parts[0])
+                for l in self.lattice.values():  # type: LatticeColumn
+                    for curm in l.values_all():
+                        if (curm.edge_m.l1 == l1 or curm.edge_m.l2 == l1) and \
+                                (m is None or curm.logprob > m.logprob):
+                            m = curm
+            else:
+                raise AttributeError(f'Unknown string format for matching. '
+                                     'Expects <node>-<idx>-<ne> or <node>-<node>-<idx>-<ne>.')
 
-    def _cleanup_lattice(self, obs_idx):
-        """Remove all lattice entries that cannot be part of a backtracking path starting at obs_idx."""
-        # TODO make lattice smaller. Current version does not work as it creates gaps.
-        # if obs_idx <= 1:
-        #     return
-        # all_prev = set()
-        # for m in self.lattice[obs_idx].values():
-        #     all_prev.update(m.prev)
-        #
-        # lattice_col = self.lattice[obs_idx - 1]
-        # to_del = []
-        # for label, m in lattice_col.items():
-        #     if m not in all_prev:
-        #         to_del.append(label)
-        # for label in to_del:
-        #     del lattice_col[label]
+        return m
 
-    def _build_node_path(self, start_idx, unique=True, max_depth=None, last_is_e=False):
-        """Build the path from the lattice.
+    def get_matching_path(self, start_m):
+        """List of Matching objects that end in the given Matching object."""
+        start_m = self.get_matching(start_m)
+        return self._build_matching_path(start_m)
 
-        :param start_idx:
-        :param unique:
-        :param max_depth:
-        :param last_is_e: Last matched lattice node should be an emitting state.
-            In case the matching stops early, the longest path can be in between two observations
-            and thus be a nonemitting state (which by definition has a lower probability than the
-            last emitting state). If this argument is set to true, the longer match is preferred.
-        :return:
+    def get_node_path(self, start_m, only_nodes=False):
+        """List of node/edge names that end in the given Matching object."""
+        path = self.get_matching_path(start_m)
+        node_path = [m.shortkey for m in path]
+        if only_nodes:
+            node_path = self.node_path_to_only_nodes(node_path)
+        return node_path
+
+    def node_path_to_only_nodes(self, path):
+        """Path of nodes and edges to only nodes.
+
+        :param path: List of node names or edges as (node name, node name)
+        :return: List of node names
         """
-        self.lattice_best = []
-        node_max = None
-        node_max_ne = 0
-        cur_depth = 0
-        if last_is_e:
-            for m in self.lattice[start_idx].values():  # type:BaseMatching
-                if not m.stop and (node_max is None or m.logprob > node_max.logprob):
-                    node_max = m
+        nodes = []
+        prev_state = path[0]
+        if type(prev_state) is tuple:
+            nodes.append(prev_state[0])
+            nodes.append(prev_state[1])
+            prev_node = prev_state[1]
         else:
-            for m in self.lattice[start_idx].values():  # type:BaseMatching
-                if not m.stop and (node_max is None or m.obs_ne > node_max_ne or m.logprob > node_max.logprob):
-                    node_max_ne = m.obs_ne
-                    node_max = m
-        if node_max is None:
-            raise Exception("Did not find a matching node for path point at index {}".format(start_idx))
+            nodes.append(prev_state)
+            prev_node = prev_state
+        for state in path[1:]:
+            if state == prev_state:
+                continue
+            if type(state) is not tuple:
+                if state != prev_node:
+                    nodes.append(state)
+                    prev_node = state
+            elif type(state) is tuple:
+                if state[0] == prev_node:
+                    if state[1] != prev_node:
+                        nodes.append(state[1])
+                        prev_node = state[1]
+                elif state[1] == prev_node:
+                    if state[0] != prev_node:
+                        nodes.append(state[0])
+                        prev_node = state[0]
+                else:
+                    raise Exception(f"State {state} does not have as previous node {prev_node}")
+            else:
+                raise Exception(f"Unknown type of state: {state} ({type(state)})")
+            prev_state = state
+        return nodes
+
+    def _build_matching_path(self, start_m, max_depth=None):
+        lattice_best = []
+        node_max = start_m
+        cur_depth = 0
         if __debug__ and logger.isEnabledFor(logging.DEBUG):
             logger.debug(self.matching.repr_header(stop="             "))
         logger.debug("Start ({}): {}".format(node_max.obs, node_max))
-        node_path_rev = [node_max.shortkey]
-        self.lattice_best.append(node_max)
+        lattice_best.append(node_max)
         if node_max.is_emitting():
             cur_depth += 1
         # for obs_idx in reversed(range(start_idx)):
@@ -1070,22 +1256,56 @@ class BaseMatcher:
                              "Stopped building path.")
                 break
             logger.debug("Max   ({}): {}".format(node_max.obs, node_max))
-            node_path_rev.append(node_max.shortkey)
-            self.lattice_best.append(node_max)
+            lattice_best.append(node_max)
             if node_max.is_emitting():
                 cur_depth += 1
+        lattice_best = list(reversed(lattice_best))
+        return lattice_best
 
-        self.lattice_best = list(reversed(self.lattice_best))
+    def _build_node_path(self, start_idx, unique=True, max_depth=None, last_is_e=False):
+        """Build the path from the lattice.
+
+        :param start_idx:
+        :param unique:
+        :param max_depth:
+        :param last_is_e: Last matched lattice node should be an emitting state.
+            In case the matching stops early, the longest path can be in between two observations
+            and thus be a nonemitting state (which by definition has a lower probability than the
+            last emitting state). If this argument is set to true, the longer match is preferred.
+        :return:
+        """
+        node_max = None
+        node_max_ne = 0
+        if last_is_e:
+            for m in self.lattice[start_idx].values_all():  # type:BaseMatching
+                if not m.stop and (node_max is None or m.logprob > node_max.logprob):
+                    node_max = m
+        else:
+            for m in self.lattice[start_idx].values_all():  # type:BaseMatching
+                if not m.stop and (node_max is None or m.obs_ne > node_max_ne or m.logprob > node_max.logprob):
+                    node_max_ne = m.obs_ne
+                    node_max = m
+        if node_max is None:
+            logger.error("Did not find a matching node for path point at index {}".format(start_idx))
+            return None
+
+        self.lattice_best = self._build_matching_path(node_max, max_depth)
+
+        node_path = [m.shortkey for m in self.lattice_best]
         if unique:
             self.node_path = []
             prev_node = None
-            for node in reversed(node_path_rev):
+            for node in node_path:
                 if node != prev_node:
                     self.node_path.append(node)
                     prev_node = node
         else:
-            self.node_path = list(reversed(node_path_rev))
+            self.node_path = node_path
         return self.node_path
+
+    def increase_max_lattice_width(self, max_lattice_width, unique=False, tqdm=None):
+        self.max_lattice_width = max_lattice_width
+        return self.match(self.path, unique=unique, tqdm=tqdm, expand=True)
 
     def path_bb(self):
         """Get boundig box of matched path (if it exists, otherwise return None)."""
@@ -1096,9 +1316,13 @@ class BaseMatcher:
         bb = lat_min, lon_min, lat_max, lon_max
         return bb
 
-    def print_lattice(self, file=None, obs_idx=None, label_width=None):
-        if file is None:
-            file = sys.stdout
+    def print_lattice(self, file=None, obs_idx=None, obs_ne=0, label_width=None, debug=False):
+        if debug:
+            xprint = logger.debug
+        else:
+            if file is None:
+                file = sys.stdout
+            xprint = lambda arg: print(arg, file=file)
         # print("Lattice:", file=file)
         if obs_idx is not None:
             idxs = [obs_idx]
@@ -1108,53 +1332,89 @@ class BaseMatcher:
             if len(self.lattice[idx]) > 0:
                 if label_width is None:
                     label_width = 0
-                    for m in self.lattice[idx].values():
+                    for m in self.lattice[idx].values(obs_ne):
                         label_width = max(label_width, len(str(m.label)))
-                print("--- obs {} ---".format(idx), file=file)
-                print(self.matching.repr_header(label_width=label_width), file=file)
-                for m in sorted(self.lattice[idx].values(), key=lambda t: str(t.label)):
-                    print(m.__str__(label_width=label_width), file=file)
+                xprint("--- obs {} ---".format(idx))
+                xprint(self.matching.repr_header(label_width=label_width))
+                for m in sorted(self.lattice[idx].values(obs_ne), key=lambda t: str(t.label)):
+                    xprint(m.__str__(label_width=label_width))
 
-    def lattice_dot(self, file=None):
+    def lattice_dot(self, file=None, precision=None, render=False):
+        """Write the lattice as a Graphviz DOT file.
+
+        :param file: File object to print to. Prints to stdout if None.
+        :param precision: Precision of (log) probabilities.
+        :param render: Try to render the generated Graphviz file.
+        """
         if file is None:
             file = sys.stdout
+        if precision is None:
+            prfmt = ''
+        else:
+            prfmt = f'.{precision}f'
         print('digraph lattice {', file=file)
         print('\trankdir=LR;', file=file)
-        for idx in range(len(self.lattice)):
-            if len(self.lattice[idx]) == 0:
-                continue
-            cnames = [(m.obs_ne, m.cname, m.stop) for m in self.lattice[idx].values()]
-            cnames.sort()
-            cur_obs_ne = -1
-            print('\t{\n\t\trank=same; ', file=file)
-            for obs_ne, cname, stop, in cnames:
-                if obs_ne != cur_obs_ne:
-                    if cur_obs_ne != -1:
-                        print('\t};\n\t{\n\t\trank=same; ', file=file)
-                    cur_obs_ne = obs_ne
-                if stop:
-                    options = 'label="{} x",color=gray,fontcolor=gray'.format(cname)
-                else:
-                    options = 'label="{} ."'.format(cname)
-                print('\t\t{} [{}];'.format(cname, options), file=file)
-            print('\t};', file=file)
-        for idx in range(len(self.lattice)):
-            if len(self.lattice[idx]) == 0:
-                continue
-            for m in self.lattice[idx].values():
-                for mp in m.prev:
-                    if m.stop:
-                        options = ',color=gray,fontcolor=gray'
+        # Vertices
+        for idx_ob in range(len(self.lattice)):
+            col = self.lattice[idx_ob]
+            for idx_ne in range(len(col)):
+                ms = col.values(idx_ne)
+                if len(ms) == 0:
+                    continue
+                cnames = [(m.obs_ne, m.cname, m.stop, m.delayed) for m in ms]
+                cnames.sort()
+                cur_obs_ne = -1
+                print('\t{\n\t\trank=same; ', file=file)
+                for obs_ne, cname, stop, delayed in cnames:
+                    if obs_ne != cur_obs_ne:
+                        if cur_obs_ne != -1:
+                            print('\t};\n\t{\n\t\trank=same; ', file=file)
+                        cur_obs_ne = obs_ne
+                    if stop:
+                        options = 'label="{} x",color=gray,fontcolor=gray'.format(cname)
+                    elif delayed > self.expand_now:
+                        options = 'label="{} d{}",color=gray,fontcolor=gray'.format(cname, delayed)
+                    elif self.expand_now != 0:
+                        options = 'label="{} d{}"'.format(cname, delayed)
                     else:
-                        options = ''
-                    print(f'\t {mp.cname} -> {m.cname} [label="{m.logprob}"{options}];', file=file)
-                for mp in m.prev_other:
-                    if m.stop:
-                        options = ',color=gray,fontcolor=gray'
-                    else:
-                        options = ''
-                    print(f'\t {mp.cname} -> {m.cname} [color=gray,label="{m.logprob}"{options}];', file=file)
+                        options = 'label="{}  "'.format(cname)
+                    print('\t\t{} [{}];'.format(cname, options), file=file)
+                print('\t};', file=file)
+        # Edges
+        for idx_ob in range(len(self.lattice)):
+            col = self.lattice[idx_ob]
+            for idx_ne in range(len(col)):
+                ms = col.values(idx_ne)
+                if len(ms) == 0:
+                    continue
+                for m in ms:
+                    for mp in m.prev:
+                        if m.stop or m.delayed > self.expand_now:
+                            options = ',color=gray,fontcolor=gray'
+                        else:
+                            options = ''
+                        print(f'\t {mp.cname} -> {m.cname} [label="{m.logprob:{prfmt}}"{options}];', file=file)
+                    for mp in m.prev_other:
+                        if m.stop or m.delayed > self.expand_now:
+                            options = ',color=gray,fontcolor=gray'
+                        else:
+                            options = ''
+                        print(f'\t {mp.cname} -> {m.cname} [color=gray,label="{m.logprob:{prfmt}}"{options}];', file=file)
         print('}', file=file)
+        if render and file is not None:
+            import subprocess as sp
+            from pathlib import Path
+            from io import TextIOWrapper
+            if isinstance(file, Path):
+                fn = str(file.canonical())
+            elif isinstance(file, TextIOWrapper):
+                file.flush()
+                fn = file.name
+            else:
+                fn = str(file)
+            cmd = ['dot', '-Tpdf', '-O', fn]
+            logger.debug(' '.join(cmd))
+            sp.call(cmd)
 
     def print_lattice_stats(self, file=None, verbose=False):
         if file is None:
@@ -1169,7 +1429,7 @@ class BaseMatcher:
         if self.lattice:
             sizes = []
             for idx in range(len(self.lattice)):
-                level = self.lattice[idx]
+                level = self.lattice[idx].values(0)
                 # stats["#nodes[{}]".format(idx)] = len(level)
                 sizes.append(len(level))
                 total_nodes += len(level)
@@ -1202,7 +1462,7 @@ class BaseMatcher:
             return None
         counts = defaultdict(lambda: 0)
         for level in self.lattice.values():
-            for m in level.values():
+            for m in level.values_all():
                 counts[m.label] += 1
         return counts
 
@@ -1246,34 +1506,4 @@ class BaseMatcher:
         """A list with all the nodes (no edges) the matched path passes through."""
         if self.node_path is None or len(self.node_path) == 0:
             return []
-        nodes = []
-        prev_state = self.node_path[0]
-        if type(prev_state) is tuple:
-            nodes.append(prev_state[0])
-            nodes.append(prev_state[1])
-            prev_node = prev_state[1]
-        else:
-            nodes.append(prev_state)
-            prev_node = prev_state
-        for state in self.node_path[1:]:
-            if state == prev_state:
-                continue
-            if type(state) is not tuple:
-                if state != prev_node:
-                    nodes.append(state)
-                    prev_node = state
-            elif type(state) is tuple:
-                if state[0] == prev_node:
-                    if state[1] != prev_node:
-                        nodes.append(state[1])
-                        prev_node = state[1]
-                elif state[1] == prev_node:
-                    if state[0] != prev_node:
-                        nodes.append(state[0])
-                        prev_node = state[0]
-                else:
-                    raise Exception(f"State {state} does not have as previous node {prev_node}")
-            else:
-                raise Exception(f"Unknown type of state: {state} ({type(state)})")
-            prev_state = state
-        return nodes
+        return self.node_path_to_only_nodes(self.node_path)
