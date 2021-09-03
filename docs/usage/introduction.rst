@@ -12,7 +12,7 @@ The probability is normalized to allow for easier reasoning about the probabilit
 It is computed as the exponential smoothed log probability components instead of the sum as would be the case
 for log likelihood.
 Because the number of possible paths quickly grows, it is recommended to set the
-``max_lattice_width`` argument. It will only continue the search with this number of
+``max_lattice_width`` argument (available from version 1.0 onwards). It will only continue the search with this number of
 possible paths at every step. If no solution is found, this value can be incremented
 using the ``increase_max_lattice_width`` method.
 
