@@ -416,6 +416,7 @@ class LatticeColumn:
             logger.debug(f'Pruned {cnt_pruned} matchings, return {prune_thr=}')
         return prune_thr
 
+
 class BaseMatcher:
 
     def __init__(self, map_con, obs_noise=1, max_dist_init=None, max_dist=None, min_prob_norm=None,
@@ -437,9 +438,10 @@ class BaseMatcher:
             two observations to allow for pruning. It is advised to set min_prob_norm and/or max_dist to avoid
             visiting all possible nodes in the graph.
         :param max_lattice_width: Only continue from a limited number of states (thus locations) for a given observation.
+            This possibly speeds up the matching by a lot.
             If there are more possible next states, the states with the best likelihood so far are selected.
-            The other states are 'delayed'. If the matching is rerun later with a larger value, the algorithms
-            continuous from these delayed states.
+            The other states are 'delayed'. If the matching is continued later with a larger value using
+            `increase_max_lattice_width`, the algorithms continuous from these delayed states.
         :param only_edges: Do not include nodes as states, only edges. This is the typical setting for HMM methods.
         :param matching: Matching type
         :param non_emitting_length_factor: Reduce the probability of a sequence of non-emitting states the longer it
