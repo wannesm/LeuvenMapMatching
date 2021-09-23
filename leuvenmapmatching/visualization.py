@@ -53,8 +53,10 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
             lat_nodes = matcher.lattice_best
         else:
             lat_nodes = lattice_nodes
+        if lat_nodes is None:
+            lat_nodes = []
     else:
-        lat_nodes = None
+        lat_nodes = []
 
     if not bb:
         bb = map_con.bb()
@@ -208,7 +210,7 @@ def plot_map(map_con, path=None, nodes=None, counts=None, ax=None, use_osm=False
                     node = node[0]
                 lat, lon = map_con.node_coordinates(node)
                 node_locs.append((lat, lon, node))
-        else:
+        elif lat_nodes is not None:
             prev_m = None
             for m in lat_nodes:
                 if prev_m is not None and prev_m.edge_m.l2 == m.edge_m.l1 \
