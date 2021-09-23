@@ -413,7 +413,7 @@ class LatticeColumn:
             if cur_width > 0:
                 prune_thr = ms[cur_width - 1].prune_value
         if __debug__:
-            logger.debug(f'Pruned {cnt_pruned} matchings, return {prune_thr=}')
+            logger.debug(f'Pruned {cnt_pruned} matchings, return {prune_thr}')
         return prune_thr
 
 
