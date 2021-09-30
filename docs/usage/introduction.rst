@@ -12,9 +12,9 @@ The probability is normalized to allow for easier reasoning about the probabilit
 It is computed as the exponential smoothed log probability components instead of the sum as would be the case
 for log likelihood.
 Because the number of possible paths quickly grows, it is recommended to set the
-``max_lattice_width`` argument (available from version 1.0 onwards). It will only continue the search with this number of
-possible paths at every step. If no solution is found, this value can be incremented
-using the ``increase_max_lattice_width`` method.
+``max_lattice_width`` argument to speed up the algorithm (available from version 1.0 onwards).
+It will only continue the search with this number of possible paths at every step. If no solution is found,
+this value can be incremented using the ``increase_max_lattice_width`` method.
 
 .. code-block:: python
 
@@ -83,7 +83,7 @@ non-emitting states that ignore observations completely.
         "I": ((10, 2.0), ["H"])
     }, use_latlon=False)
     matcher = DistanceMatcher(mapdb, max_dist_init=0.2, obs_noise=1, obs_noise_ne=10,
-                              non_emitting_states=True, only_edges=True)
+                              non_emitting_states=True, only_edges=True , max_lattice_width=5)
     states, _ = matcher.match(path)
     nodes = matcher.path_pred_onlynodes
 

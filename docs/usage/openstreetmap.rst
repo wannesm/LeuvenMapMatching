@@ -77,7 +77,8 @@ You can create a list of latitude-longitude coordinates manually. Or read a gpx 
                              non_emitting_length_factor=0.75,
                              obs_noise=50, obs_noise_ne=75,  # meter
                              dist_noise=50,  # meter
-                             non_emitting_states=True)
+                             non_emitting_states=True,
+                             max_lattice_width=5)
     states, lastidx = matcher.match(track)
 
 
