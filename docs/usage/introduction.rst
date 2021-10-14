@@ -95,5 +95,5 @@ non-emitting states that ignore observations completely.
     matcher.print_lattice_stats()
 
     mmviz.plot_map(mapdb, matcher=matcher,
-                  show_labels=True, show_matching=True
-                  filename="output.png"))
+                  show_labels=True, show_matching=True,
+                  filename="output.png")
