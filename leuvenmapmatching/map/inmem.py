@@ -190,7 +190,7 @@ class InMemMap(BaseMap):
         if self.use_rtree and self.rtree:
             if type(node) is not int:
                 raise Exception(f"Rtree index only supports integer keys for vertices")
-            self.rtree.upsert(node, (loc[0], loc[1], loc[0], loc[1]))
+            self.rtree.insert(node, (loc[0], loc[1], loc[0], loc[1]))
 
     def del_node(self, node):
         if node not in self.graph:
@@ -352,7 +352,7 @@ class InMemMap(BaseMap):
 
         for label, data in self.graph.items():
             loc = data[0]
-            self.rtree.upsert(label, (loc[1], loc[0], loc[1], loc[0]))
+            self.rtree.insert(label, (loc[1], loc[0], loc[1], loc[0]))
         logger.debug(f"After filling rtree, size = {self.rtree_size()}")
 
     def to_xy(self, name=None, use_rtree=None):
