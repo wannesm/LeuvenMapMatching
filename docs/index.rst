@@ -46,6 +46,7 @@ Reference:
 
    classes/BaseMatching
    classes/BaseMatcher
+   classes/SimpleMatcher
    classes/DistanceMatcher
 
 

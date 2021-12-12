@@ -5,8 +5,11 @@ leuvenmapmatching.matcher.base
 
 Base Matcher and Matching classes.
 
+This a generic base class to be used by matchers. This class itself
+does not implement a working matcher.
+
 :author: Wannes Meert
-:copyright: Copyright 2015-2018 DTAI, KU Leuven and Sirris.
+:copyright: Copyright 2015-2021 DTAI, KU Leuven and Sirris.
 :license: Apache License, Version 2.0, see LICENSE for details.
 """
 from __future__ import print_function
@@ -424,6 +427,9 @@ class BaseMatcher:
                  only_edges=True, obs_noise_ne=None, matching=BaseMatching,
                  non_emitting_length_factor=0.75, **kwargs):
         """Initialize a matcher for map matching.
+
+        This a generic base class to be used by matchers. This class itself
+        does not implement a working matcher.
 
         Distances are in meters when using latitude-longitude.
 

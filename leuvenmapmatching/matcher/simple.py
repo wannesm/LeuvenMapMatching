@@ -52,7 +52,7 @@ class SimpleMatcher(BaseMatcher):
                       is_prev_ne=False, is_next_ne=False):
         """Transition probability.
 
-        Note: In contrast with a regular HMM, this cannot be a probability density function, it needs
+        Note: In contrast with a regular HMM, this is not a probability density function, it needs
               to be a proper probability (thus values between 0.0 and 1.0).
         """
         logprob = 0
@@ -78,7 +78,7 @@ class SimpleMatcher(BaseMatcher):
     def logprob_obs(self, dist, prev_m, new_edge_m, new_edge_o, is_ne=False):
         """Emission probability.
 
-        Note: In contrast with a regular HMM, this cannot be a probability density function, it needs
+        Note: In contrast with a regular HMM, this is not a probability density function, it needs
               to be a proper probability (thus values between 0.0 and 1.0).
         """
         if is_ne:

@@ -40,3 +40,11 @@ deploy: prepare_dist prepare_tag
 .PHONY: docs
 docs:
 	export PYTHONPATH=..; cd docs; make html
+
+.PHONY: docsclean
+docsclean:
+	cd docs; make clean
+
+.PHONY: clean
+clean: docsclean
+
