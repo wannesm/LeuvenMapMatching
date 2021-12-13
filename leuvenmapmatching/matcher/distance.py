@@ -70,8 +70,9 @@ class DistanceMatching(BaseMatching):
 
 class DistanceMatcher(BaseMatcher):
     """
-    Map Matching that takes into account the distance on the map wrt distance between the
-    observations.
+    Map Matching that takes into account the distance between matched locations on the map compared to
+    the distance between the observations (that are matched to these locations). It thus prefers matched
+    paths that have a similar distance than the observations.
 
     Inspired on the method presented in:
 

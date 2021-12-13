@@ -21,7 +21,8 @@ class SimpleMatching(BaseMatching):
 class SimpleMatcher(BaseMatcher):
 
     def __init__(self, *args, **kwargs):
-        """
+        """A simple matcher that prefers paths where each matched location is as close as possible to the
+        observed position.
 
         :param avoid_goingback: Change the transition probability to be lower for the direction the path is coming
             from.
