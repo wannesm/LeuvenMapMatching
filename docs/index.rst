@@ -42,12 +42,10 @@ Reference:
 
 
 .. toctree::
+   :maxdepth: 2
    :caption: Classes
 
-   classes/BaseMatching
-   classes/BaseMatcher
-   classes/SimpleMatcher
-   classes/DistanceMatcher
+   classes/overview
 
 
 Indices and tables

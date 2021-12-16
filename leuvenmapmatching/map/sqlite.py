@@ -46,6 +46,7 @@ class SqliteMap(BaseMap):
         """Store a map as a SQLite instance.
 
         This class supports:
+
         - Indexing using rtrees to allow for fast searching of points on the map.
           When using the rtree index, only integer numbers are allowed as node labels.
         - Serializing to write and read from files.

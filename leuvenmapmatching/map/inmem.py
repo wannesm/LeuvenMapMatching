@@ -53,6 +53,7 @@ class InMemMap(BaseMap):
         class (e.g. to connect to your database instance).
 
         This class supports:
+
         - Indexing using rtrees to allow for fast searching of points on the map.
           When using the rtree index, only integer numbers are allowed as node labels.
         - Serializing to write and read from files.
