@@ -94,6 +94,29 @@ class InMemMap(BaseMap):
             self.xy2lonlat = pyproj_notfound
 
         self.linked_edges = linked_edges  # type: Optional[Dict[EdgeType, Set[Tuple[EdgeType]]]]
+        self.vertex_label_map = None
+
+    def vertex_label_to_int(self, label, create=False):
+        if type(label) is int:
+            return label
+        if self.vertex_label_map is None:
+            if not create:
+                return label
+            self.vertex_label_map = dict()
+        if label in self.vertex_label_map:
+            new_label = self.vertex_label_map[label]
+        else:
+            new_label = len(self.vertex_label_map)
+            self.vertex_label_map[label] = new_label
+        return new_label
+
+    def vertices_labels_to_int(self):
+        graph = dict()
+        for label, (loc, nbrs) in self.graph.items():
+            new_label = self.vertex_label_to_int(label, create=True)
+            new_nbrs = [self.vertex_label_to_int(nbr, create=True) for nbr in nbrs]
+            graph[new_label] = (loc, new_nbrs)
+        self.graph = graph
 
     def serialize(self):
         """Create a serializable data structure."""
@@ -329,6 +352,8 @@ class InMemMap(BaseMap):
                 def generator_function():
                     for label, data in self.graph.items():
                         lat, lon = data[0]
+                        if type(label) is not int:
+                            raise Exception(f"Rtree index only supports integer keys for vertices")
                         yield (label, (lat, lon, lat, lon), None)
             args.append(generator_function())
 
