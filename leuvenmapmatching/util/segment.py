@@ -99,4 +99,4 @@ class Segment(object):
         return f"{self.l1}-{self.l2}"
 
     def __repr__(self):
-        return self.__str__()
+        return "Segment<" + self.__str__() + ">"

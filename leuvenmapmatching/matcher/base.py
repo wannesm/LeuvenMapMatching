@@ -259,7 +259,7 @@ class BaseMatching(object):
                                 self.dist_obs, ",".join([str(prev.label) for prev in self.prev]))
 
     def __repr__(self):
-        return self.label
+        return "Matching<"+str(self.label)+">"
 
     @staticmethod
     def repr_header(label_width=None, stop=""):
@@ -545,7 +545,7 @@ class BaseMatcher:
         :param unique: Only retain unique nodes in the sequence (avoid repetitions)
         :param tqdm: Use a tqdm progress reporter (default is None)
         :param expand: Expand the current lattice (delayed matches)
-        :return: Tuple of (List of state keys, index of last observation that was matched)
+        :return: Tuple of (List of BaseMatching, index of last observation that was matched)
         """
         if __debug__:
             logger.debug("Start matching path of length {}".format(len(path)))
