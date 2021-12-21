@@ -460,7 +460,7 @@ class BaseMatcher:
         - :meth:`logprob_obs`
 
         """
-        self.map = map_con
+        self.map = map_con  # type: BaseMap
         if max_dist:
             self.max_dist = max_dist
         else:
@@ -482,13 +482,14 @@ class BaseMatcher:
 
         self.path = None
         self.lattice = None  # type: Optional[dict[int,LatticeColumn]]
-        self.lattice_best = None
-        self.node_path = None
+        # Best path through lattice:
+        self.lattice_best = None  # type: Optional[list[BaseMatching]]
+        self.node_path = None  # type: Optional[list[str]]
         self.matching = matching
-        self.non_emitting_states = non_emitting_states
+        self.non_emitting_states = non_emitting_states  # type: bool
         self.non_emitting_states_maxnb = 100
-        self.max_lattice_width = max_lattice_width
-        self.only_edges = only_edges
+        self.max_lattice_width = max_lattice_width  # type: Optional[int]
+        self.only_edges = only_edges  # type: bool
         self.expand_now = 0  # all m.delayed <= expand_upto will be expanded
 
         # Penalties
@@ -1515,3 +1516,35 @@ class BaseMatcher:
         if self.node_path is None or len(self.node_path) == 0:
             return []
         return self.node_path_to_only_nodes(self.node_path)
+
+    def path_pred_distance(self):
+        """Total distance of the matched path."""
+        if self.lattice_best is None:
+            return None
+        if len(self.lattice_best) == 1:
+            return 0
+        dist = 0
+        m_prev = self.lattice_best[0]
+        for idx, m in enumerate(self.lattice_best[1:]):
+            if m_prev.edge_m.label != m.edge_m.label and m_prev.edge_m.l2 == m.edge_m.l1:
+                # Go over the connection between two edges to compute the distance
+                cdist = self.map.distance(m_prev.edge_m.pi, m_prev.edge_m.p2)
+                cdist += self.map.distance(m_prev.edge_m.p2, m.edge_m.pi)
+            else:
+                cdist = self.map.distance(m_prev.edge_m.pi, m.edge_m.pi)
+            dist += cdist
+            m_prev = m
+        return dist
+
+    def path_distance(self):
+        """Total distance of the observations."""
+        if self.lattice_best is None:
+            return None
+        if len(self.lattice_best) == 1:
+            return 0
+        dist = 0
+        m_prev = self.lattice_best[0]
+        for m in self.lattice_best[1:]:
+            dist += self.map.distance(m_prev.edge_o.pi, m.edge_o.pi)
+            m_prev = m
+        return dist
