@@ -18,8 +18,8 @@ the verbosity level of the package. For example:
     logger.addHandler(logging.StreamHandler(sys.stdout))
 
 
-Inspect the matching
---------------------
+Inspect the best matching
+-------------------------
 
 The best match is available in ``matcher.lattice_best``. This is a list of
 ``Matching`` objects. For example after running the first example in the introduction:
@@ -55,3 +55,42 @@ objects that express the observation and map: ``matching.edge_o`` and ``matching
    (0.8, 0.7)
    >>> match.edge_o.p1  # Same as pi because no interpolation
    (0.8, 0.7)
+
+Inspect the matching lattice
+----------------------------
+
+All paths through the lattice are available in ``matcher.lattice``.
+The lattice is a dictionary with a ``LatticeColumn`` object for each observation
+(in case the full path of observations is matched).
+
+For each observation, you can inspect the ``Matching`` objects with:
+
+.. code-block:: python
+
+    >>> matcher.lattice
+    {0: <leuvenmapmatching.matcher.base.LatticeColumn at 0x12369bf40>,
+     1: <leuvenmapmatching.matcher.base.LatticeColumn at 0x123639dc0>,
+     2: <leuvenmapmatching.matcher.base.LatticeColumn at 0x123603f40>,
+     ...
+    >>> matcher.lattice[0].values_all()
+    {Matching<A-B-0-0>,
+     Matching<A-B-0-1>,
+     Matching<A-C-0-0>,
+     ...
+
+To start backtracking you can, for example, see which matching object
+for the last element has the highest probability (thus the best match):
+
+.. code-block:: python
+
+    >>> m = max(matcher.lattice[len(path)-1].values_all(), key=lambda m: m.logprob)
+    >>> m.logprob
+    -0.6835815469734807
+
+The previous matching objects can be queried with:
+
+.. code-block:: python
+
+    >>> m.prev
+    {Matching<E-F-20-0>}
+
