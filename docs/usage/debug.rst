@@ -87,10 +87,16 @@ for the last element has the highest probability (thus the best match):
     >>> m.logprob
     -0.6835815469734807
 
-The previous matching objects can be queried with:
+The previous matching objects can be queried with. These are only those
+matches that are connected to this matchin the lattice (in this case
+nodes in the street graph with an edge to the current node):
 
 .. code-block:: python
 
-    >>> m.prev
+    >>> m.prev  # Best previous match with a connection (multiple if equal probability)
     {Matching<E-F-20-0>}
-
+    >>> m.prev_other  # All previous matches in the lattice with a connection
+    {Matching<C-E-20-0>,
+     Matching<D-E-20-0>,
+     Matching<F-E-20-0>,
+     Matching<Y-E-20-0>}
