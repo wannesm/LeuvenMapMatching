@@ -68,5 +68,5 @@ Developed with the support of [Elucidata.be](http://www.elucidata.be).
 
 ## License
 
-Copyright 2015-2018, KU Leuven - DTAI Research Group, Sirris - Elucidata Group  
+Copyright 2015-2022, KU Leuven - DTAI Research Group, Sirris - Elucidata Group  
 Apache License, Version 2.0.
