@@ -1,5 +1,9 @@
 # Leuven.MapMatching
 
+[![PyPi Version](https://img.shields.io/pypi/v/leuvenmapmatching.svg)](https://pypi.org/project/leuvenmapmatching/)
+[![Documentation Status](https://readthedocs.org/projects/leuvenmapmatching/badge/?version=latest)](https://leuvenmapmatching.readthedocs.io/en/latest/?badge=latest)
+
+
 Align a trace of GPS measurements to a map or road segments.
 
 The matching is based on a Hidden Markov Model (HMM) with non-emitting 
