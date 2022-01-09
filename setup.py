@@ -28,7 +28,7 @@ setup(
     packages=find_packages(),
     author='Wannes Meert',
     author_email='wannes.meert@cs.kuleuven.be',
-    url='https://dtai.cs.kuleuven.be',
+    url='https://github.com/wannesm/LeuvenMapMatching',
     description='Match a trace of locations to a map',
     python_requires='>=3.6',
     license='Apache 2.0',
