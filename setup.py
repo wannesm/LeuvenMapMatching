@@ -29,7 +29,7 @@ setup(
     author='Wannes Meert',
     author_email='wannes.meert@cs.kuleuven.be',
     url='https://github.com/wannesm/LeuvenMapMatching',
-    description='Match a trace of locations to a map',
+    description='Match a trace of GPS positions to a locations and streets on a map',
     python_requires='>=3.6',
     license='Apache 2.0',
     classifiers=[
