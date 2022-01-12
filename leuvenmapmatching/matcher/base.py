@@ -650,7 +650,7 @@ class BaseMatcher:
                 return [], 0
         else:
             start_obs_idx = len(self.path)
-            for idx in range(len(self.path)):
+            for idx in range(len(path)):
                 self.lattice[start_obs_idx + idx] = LatticeColumn(start_obs_idx + idx)
             self.path += path
 
