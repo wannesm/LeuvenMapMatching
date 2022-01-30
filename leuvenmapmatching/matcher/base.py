@@ -339,6 +339,12 @@ class LatticeColumn:
     def __len__(self):
         return len(self.o)
 
+    def set_delayed(self, delayed):
+        """Update all delayed values."""
+        for c in self.o:
+            for m in c.values():
+                m.delayed = delayed
+
     def dict(self, obs_ne=None):
         if obs_ne is None:
             raise AttributeError('obs_ne should be value')
@@ -553,9 +559,24 @@ class BaseMatcher:
 
         # Initialisation
         if expand:
-            if self.path != path:
-                raise Exception(f'Cannot expand for a new path, should be the same path.')
             self.expand_now += 1
+            if self.path != path:
+                is_path_extended = True
+                if len(path) > len(self.path):
+                    for pi, spi in zip(path, self.path):
+                        if pi != spi:
+                            is_path_extended = False
+                            break
+                else:
+                    is_path_extended = False
+                if is_path_extended:
+                    self.lattice[len(self.path) - 1].set_delayed(self.expand_now)
+                    for obs_idx in range(len(self.path), len(path)):
+                        if obs_idx not in self.lattice:
+                            self.lattice[obs_idx] = LatticeColumn(obs_idx)
+                    self.path = path
+                else:
+                    raise Exception(f'Cannot expand for a new path, should be the same path (or an extension).')
         else:
             self.path = path
             self.expand_now = 0

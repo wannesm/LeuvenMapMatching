@@ -31,8 +31,8 @@ The lattice will be built further every time a new subsequence of the path is gi
             (3.1, 3.8), (3.0, 4.0), (3.1, 4.3), (3.1, 4.6), (3.0, 4.9)]
 
     matcher = DistanceMatcher(map_con, max_dist=2, obs_noise=1, min_prob_norm=0.5)
-    states, _ = matcher.match_incremental(path[:5])
-    states, _ = matcher.match_incremental(path[5:], backtrace_len=-1)
+    states, _ = matcher.match(path[:5])
+    states, _ = matcher.match(path, expand=True)
     nodes = matcher.path_pred_onlynodes
 
     print("States\n------")
@@ -43,13 +43,3 @@ The lattice will be built further every time a new subsequence of the path is gi
     matcher.print_lattice_stats()
 
 
-If you do not want to store the entire lattice, you can create a new Matcher object using the
-:meth:`copy_lastinterface` before running the incremental matching. This new object will only
-contain the last part of the lattice.
-
-.. code-block:: python
-
-    matcher = DistanceMatcher(map_con, max_dist=2, obs_noise=1, min_prob_norm=0.5)
-    states, _ = matcher.match_incremental(path[:5])
-    matcher = matcher.copy_lastinterface()
-    states, _ = matcher.match_incremental(path[5:], backtrace_len=-1)
