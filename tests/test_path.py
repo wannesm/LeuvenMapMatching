@@ -13,7 +13,6 @@ import os
 import logging
 from pathlib import Path
 
-sys.path.append("..")
 import leuvenmapmatching as mm
 from leuvenmapmatching.map.inmem import InMemMap
 from leuvenmapmatching.matcher.simple import SimpleMatcher
@@ -379,12 +378,6 @@ def test_path4_dist_inc():
 
     matcher = DistanceMatcher(map_con, max_dist=2, obs_noise=1, min_prob_norm=0.5)
     matcher.match(path[:5])
-
-    # states, _ = matcher.match_incremental(path[:5])
-    # states, _ = matcher.match_incremental(path[5:], backtrace_len=-1)
-    nodes = matcher.path_pred_onlynodes
-    print(nodes)
-
     if directory:
         from leuvenmapmatching import visualization as mmviz
         mmviz.plot_map(map_con, matcher=matcher,
@@ -392,12 +385,14 @@ def test_path4_dist_inc():
                        filename=str(directory / "test_path4_dist_inc_1.png"))
 
     matcher.match(path, expand=True)
-
+    nodes = matcher.path_pred_onlynodes
     if directory:
         from leuvenmapmatching import visualization as mmviz
         mmviz.plot_map(map_con, matcher=matcher,
                        show_labels=True, show_matching=True, show_graph=True,
                        filename=str(directory / "test_path4_dist_inc_2.png"))
+    nodes_sol = ['X', 'A', 'B', 'D', 'E', 'F']
+    assert nodes == nodes_sol, "Nodes not equal:\n{}\n{}".format(nodes, nodes_sol)
 
 
 if __name__ == "__main__":

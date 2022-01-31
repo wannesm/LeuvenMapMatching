@@ -185,9 +185,9 @@ def test_path2_incremental():
 
     matcher = SimpleMatcher(mapdb, max_dist_init=1, min_prob_norm=0.5, obs_noise=0.5,
                                   non_emitting_states=True, only_edges=False)
-    matcher.match_incremental(path2[:2])
+    matcher.match(path2[:2])
     path_pred_1 = matcher.path_pred_onlynodes
-    matcher.match_incremental(path2[2:], backtrace_len=len(path2))
+    matcher.match(path2, expand=True)
     path_pred = matcher.path_pred_onlynodes
     if directory:
         from leuvenmapmatching import visualization as mmviz
