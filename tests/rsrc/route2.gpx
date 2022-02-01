@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+<gpx
+  version="1.0"
+  creator="Wannes"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns="http://www.topografix.com/GPX/1/0"
+  xsi:schemaLocation="http://www.topografix.com/GPX/1/0 http://www.topografix.com/GPX/1/0/gpx.xsd">
+
+<bounds minlat="50.870247" minlon="4.695133" maxlat="50.879428" maxlon="4.709056"/>
+
+<wpt lat="50.879428" lon="4.699974">
+   <name>START</name>
+</wpt>
+
+<trk>
+  <name>Test route</name>
+  <trkseg>
+      <trkpt lon="4.6997666" lat="50.8684188">
+          <name>1</name>
+      </trkpt>
+      <trkpt lon="4.7008181" lat="50.8692042">
+          <name>2</name>
+      </trkpt>
+      <trkpt lon="4.7007751" lat="50.8694344">
+          <name>3</name>
+      </trkpt>
+      <trkpt lon="4.7015691" lat="50.8699625">
+          <name>4</name>
+      </trkpt>
+      <trkpt lon="4.7035003" lat="50.8703282">
+          <name>5</name>
+      </trkpt>
+      <trkpt lon="4.7038221" lat="50.8714927">
+          <name>6</name>
+      </trkpt>
+      <trkpt lon="4.7042942" lat="50.8724812">
+          <name>7</name>
+      </trkpt>
+      <trkpt lon="4.7052813" lat="50.8731718">
+          <name>8</name>
+      </trkpt>
+  </trkseg>
+</trk>
+</gpx>
