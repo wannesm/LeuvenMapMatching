@@ -50,6 +50,7 @@ gps_data = this_path / "gps_data.txt"
 gps_data_pkl = gps_data.with_suffix(".pkl")
 ground_truth_route = this_path / "ground_truth_route.txt"
 road_network = this_path / "road_network.txt"
+road_network_zip = this_path / "road_network.zip"
 road_network_db = road_network.with_suffix(".sqlite")
 
 directory = None
@@ -176,6 +177,15 @@ def load_data():
     max_route_length = None  # 200
 
     # Paths
+    if not ground_truth_route.exists():
+        import requests
+        url = f'https://www.microsoft.com/en-us/research/uploads/prod/2017/07/ground_truth_route.txt'
+        logger.debug("Download gound_truth_route.txt from microsoft.com")
+        r = requests.get(url, stream=True)
+        with ground_truth_route.open('wb') as ofile:
+            for chunk in r.iter_content(chunk_size=1024):
+                if chunk:
+                    ofile.write(chunk)
     paths = read_paths(ground_truth_route)
 
     # Map
@@ -183,6 +193,19 @@ def load_data():
         map_con = SqliteMap.from_file(road_network_db)
         logger.debug(f"Read road network from db file {road_network_db} ({map_con.size()} nodes)")
     else:
+        if not road_network.exists():
+            import requests
+            url = f'https://www.microsoft.com/en-us/research/uploads/prod/2017/07/road_network.zip'
+            logger.debug("Download road_network.zip from microsoft.com")
+            r = requests.get(url, stream=True)
+            with road_network_zip.open('wb') as ofile:
+                for chunk in r.iter_content(chunk_size=1024):
+                    if chunk:
+                        ofile.write(chunk)
+            import zipfile
+            logger.debug("Unzipping road_network.zip")
+            with zipfile.ZipFile(str(road_network_zip), "r") as zip_ref:
+                zip_ref.extractall(str(road_network_zip.parent))
         map_con = read_map(road_network)
         correct_map(map_con)
         logger.debug(f"Create road network to db file {map_con.db_fn} ({map_con.size()} nodes)")
@@ -193,6 +216,15 @@ def load_data():
             route = pickle.load(ifile)
         logger.debug(f"Read gps route from file ({len(route)} points)")
     else:
+        if not gps_data.exists():
+            import requests
+            url = f'https://www.microsoft.com/en-us/research/uploads/prod/2017/07/gps_data.txt'
+            logger.debug("Download gps_data.txt from microsoft.com")
+            r = requests.get(url, stream=True)
+            with gps_data.open('wb') as ofile:
+                for chunk in r.iter_content(chunk_size=1024):
+                    if chunk:
+                        ofile.write(chunk)
         route = read_gps(gps_data)
         if max_route_length:
             route = route[:max_route_length]
@@ -421,6 +453,6 @@ if __name__ == "__main__":
     directory = Path(os.environ.get('TESTDIR', Path(__file__).parent))
     print(f"Saving files to {directory}")
     # test_route()
-    # test_route_slice1()
+    test_route_slice1()
     # test_bug1()
-    test_bug2()
+    # test_bug2()

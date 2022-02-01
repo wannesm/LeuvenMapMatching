@@ -51,7 +51,7 @@ def latlon2grs80(coordinates, lon_0=0.0, lat_ts=0.0, y_0=0, x_0=0.0, **kwargs):
     :param x_0: False easting
     """
     other_options = " ".join(f"+{key}={val}" for key, val in kwargs.items())
-    proj = pyproj.Proj(f"+proj=utm +ellps=GRS80 +units=m "
+    proj = pyproj.Proj(f"+proj=tmerc +ellps=GRS80 +units=m "
                        f"+lon_0={lon_0} +lat_ts={lat_ts} +y_0={y_0} +x_0={x_0} "
                        f"+no_defs {other_options}")
     for lon, lat in coordinates:

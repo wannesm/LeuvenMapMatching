@@ -70,7 +70,10 @@ class SqliteMap(BaseMap):
         if deserializing and not self.db_fn.exists():
             raise Exception(f"File not found: {self.db_fn}")
         logger.debug(f"Opening database: {self.db_fn}")
-        self.db = sqlite3.connect(str(self.db_fn))
+        try:
+            self.db = sqlite3.connect(str(self.db_fn))
+        except Exception as exc:
+            raise Exception(f'Problem with database: {self.db_fn}') from exc
         self.crs_lonlat = crs_lonlat
         self.crs_xy = crs_xy
         self.use_latlon = use_latlon
