@@ -73,6 +73,21 @@ def test_bug2():
     edges_fn = this_path / "edgesrl.csv"
     nodes_fn = this_path / "nodesrl.csv"
     path_fn = this_path / "path.csv"
+    zip_fn = this_path / "leuvenmapmatching_testdata.zip"
+
+    if not (edges_fn.exists() and nodes_fn.exists() and path_fn.exists()):
+        import requests
+        url = 'https://people.cs.kuleuven.be/wannes.meert/leuvenmapmatching/leuvenmapmatching_testdata.zip'
+        logger.debug("Download testfiles from kuleuven.be")
+        r = requests.get(url, stream=True)
+        with zip_fn.open('wb') as ofile:
+            for chunk in r.iter_content(chunk_size=1024):
+                if chunk:
+                    ofile.write(chunk)
+        import zipfile
+        logger.debug("Unzipping leuvenmapmatching_testdata.zip")
+        with zipfile.ZipFile(str(zip_fn), "r") as zip_ref:
+            zip_ref.extractall(str(zip_fn.parent))
 
     logger.debug(f"Reading map ...")
     mmap = SqliteMap("road_network", use_latlon=True, dir=this_path)
