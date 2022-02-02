@@ -38,7 +38,8 @@ def prepare_files(verbose=False, force=False, download_from_osm=False):
         download_map_xml(osm2_fn, '4.6997666,50.8684188,4.7052813,50.8731718', force=force, verbose=verbose)
         download_map_xml(osm3_fn, '4.69049,50.86784,4.71604,50.88784', force=force, verbose=verbose)
     else:
-        if not (osm_fn.exists() and osm2_fn.exists() and track_fn.exists() and track2_fn.exists()):
+        if not (osm_fn.exists() and osm2_fn.exists() and osm3_fn.exists() and
+                track_fn.exists() and track2_fn.exists()):
             import requests
             url = 'https://people.cs.kuleuven.be/wannes.meert/leuvenmapmatching/leuvenmapmatching_testdata2.zip'
             logger.debug("Download road_network.zip from kuleuven.be")
