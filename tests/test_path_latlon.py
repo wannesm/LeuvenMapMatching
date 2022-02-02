@@ -12,31 +12,45 @@ import sys
 import os
 import logging
 from pathlib import Path
-import osmread
 import pytest
 import leuvenmapmatching as mm
 import leuvenmapmatching.visualization as mm_viz
 from leuvenmapmatching.util.gpx import gpx_to_path
 from leuvenmapmatching.util.dist_latlon import interpolate_path
 from leuvenmapmatching.util.openstreetmap import create_map_from_xml, download_map_xml
-from leuvenmapmatching.map.inmem import InMemMap
 from leuvenmapmatching.matcher.distance import DistanceMatcher
 
 logger = mm.logger
-this_path = Path(os.path.realpath(__file__)).parent / "rsrc"
+this_path = Path(os.path.realpath(__file__)).parent / "rsrc" / "path_latlon"
 osm_fn = this_path / "osm_downloaded.xml"
 osm2_fn = this_path / "osm_downloaded2.xml"
 osm3_fn = this_path / "osm_downloaded3.xml"
 track_fn = this_path / "route.gpx"  # http://users.telenet.be/meirenwi/Leuven%20Stadswandeling%20-%205%20km%20RT.zip
 track2_fn = this_path / "route2.gpx"
 track3_fn = this_path / "route3.pgx"
+zip_fn = this_path / "leuvenmapmatching_testdata2.zip"
 directory = None
 
 
-def prepare_files(verbose=False, force=False):
-    download_map_xml(osm_fn, '4.694933,50.870047,4.709256000000001,50.879628', force=force, verbose=verbose)
-    download_map_xml(osm2_fn, '4.6997666,50.8684188,4.7052813,50.8731718', force=force, verbose=verbose)
-    download_map_xml(osm3_fn, '4.69049,50.86784,4.71604,50.88784', force=force, verbose=verbose)
+def prepare_files(verbose=False, force=False, download_from_osm=False):
+    if download_from_osm:
+        download_map_xml(osm_fn, '4.694933,50.870047,4.709256000000001,50.879628', force=force, verbose=verbose)
+        download_map_xml(osm2_fn, '4.6997666,50.8684188,4.7052813,50.8731718', force=force, verbose=verbose)
+        download_map_xml(osm3_fn, '4.69049,50.86784,4.71604,50.88784', force=force, verbose=verbose)
+    else:
+        if not (osm_fn.exists() and osm2_fn.exists() and track_fn.exists() and track2_fn.exists()):
+            import requests
+            url = 'https://people.cs.kuleuven.be/wannes.meert/leuvenmapmatching/leuvenmapmatching_testdata2.zip'
+            logger.debug("Download road_network.zip from kuleuven.be")
+            r = requests.get(url, stream=True)
+            with zip_fn.open('wb') as ofile:
+                for chunk in r.iter_content(chunk_size=1024):
+                    if chunk:
+                        ofile.write(chunk)
+            import zipfile
+            logger.debug("Unzipping road_network.zip")
+            with zipfile.ZipFile(str(zip_fn), "r") as zip_ref:
+                zip_ref.extractall(str(zip_fn.parent))
 
 
 def test_path1():
@@ -220,8 +234,8 @@ if __name__ == "__main__":
     logger.addHandler(logging.StreamHandler(sys.stdout))
     directory = Path(os.environ.get('TESTDIR', Path(__file__).parent))
     print(f"Saving files to {directory}")
-    # test_path1()
+    test_path1()
     # test_path1_full()
     # test_path2_proj()
-    test_path2()
+    # test_path2()
     # test_path3()
