@@ -83,10 +83,14 @@ class InMemMap(BaseMap):
         self.crs_lonlat = 'EPSG:4326' if crs_lonlat is None else crs_lonlat  # GPS
         self.crs_xy = 'EPSG:3395' if crs_xy is None else crs_xy  # Mercator projection
         if pyproj:
-            proj_lonlat = pyproj.Proj(self.crs_lonlat, preserve_units=True)
-            proj_xy = pyproj.Proj(self.crs_xy, preserve_units=True)
-            self.lonlat2xy = partial(pyproj.transform, proj_lonlat, proj_xy)
-            self.xy2lonlat = partial(pyproj.transform, proj_xy, proj_lonlat)
+            # proj_lonlat = pyproj.Proj(self.crs_lonlat, preserve_units=True)
+            # proj_xy = pyproj.Proj(self.crs_xy, preserve_units=True)
+            # self.lonlat2xy = partial(pyproj.transform, proj_lonlat, proj_xy)
+            # self.xy2lonlat = partial(pyproj.transform, proj_xy, proj_lonlat)
+            tr_lonlat2xy = pyproj.Transformer.from_crs(self.crs_lonlat, self.crs_xy)
+            self.lonlat2xy = tr_lonlat2xy.transform
+            tr_xy2lonlat = pyproj.Transformer.from_crs(self.crs_xy, self.crs_lonlat)
+            self.xy2lonlat = tr_xy2lonlat.transform
         else:
             def pyproj_notfound(*_args, **_kwargs):
                 raise Exception("pyproj package not found")
