@@ -150,6 +150,9 @@ def test_path2():
                                   non_emitting_states=True, only_edges=False)
     matcher.match(path2, unique=True)
     path_pred = matcher.path_pred_onlynodes
+
+    dists = matcher.path_all_distances()
+
     if directory:
         from leuvenmapmatching import visualization as mmviz
         matcher.print_lattice_stats()
@@ -363,9 +366,9 @@ if __name__ == "__main__":
     print(f"Saving files to {directory}")
     # visualize_map(pathnb=1)
     # test_path1()
-    test_path1_inc()
+    # test_path1_inc()
     # test_path1_dist()
-    # test_path2()
+    test_path2()
     # test_path2_dist()
     # test_path2_incremental()
     # test_path_duplicate()

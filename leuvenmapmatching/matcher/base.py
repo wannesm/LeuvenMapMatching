@@ -1491,3 +1491,14 @@ class BaseMatcher:
             dist += self.map.distance(m_prev.edge_o.pi, m.edge_o.pi)
             m_prev = m
         return dist
+
+    def path_all_distances(self):
+        """Return a list of all distances between observed trace and map.
+
+        One entry for each point in the map and point in the trace that are mapped to each other.
+        In case non-emitting nodes are used, extra entries can be present where a point in the trace
+        or a point in the map is mapped to a segment.
+        """
+        path = self.lattice_best
+        dists = [m.dist_obs for m in path]
+        return dists
