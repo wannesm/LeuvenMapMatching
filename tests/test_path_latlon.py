@@ -231,12 +231,14 @@ def test_path3():
 
 
 if __name__ == "__main__":
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.INFO)
     logger.addHandler(logging.StreamHandler(sys.stdout))
     directory = Path(os.environ.get('TESTDIR', Path(__file__).parent))
     print(f"Saving files to {directory}")
-    # test_path1()
+    import matplotlib as mpl
+    mpl.use('MacOSX')
+    test_path1()
     # test_path1_full()
-    test_path2_proj()
+    # test_path2_proj()
     # test_path2()
     # test_path3()

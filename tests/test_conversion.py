@@ -71,8 +71,8 @@ def test_destination1():
     dist = 124800
     lat2, lon2 = dll.destination_radians(lat1, lon1, bearing, dist)
     lat2, lon2 = (math.degrees(lat2), math.degrees(lon2))
-    print(lat2, lon2)
-    assert (lat2, lon2) == (53.188269553709034, 3.592721390871882), f"Got ({lat2}, {lon2})"
+    assert lat2 == pytest.approx(53.188269553709034), f"Got: {lat2}"
+    assert lon2 == pytest.approx(3.592721390871882), f"Got: {lon2}"
 
 
 def test_distance_segment_to_segment1():
