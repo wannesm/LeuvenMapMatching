@@ -92,12 +92,12 @@ This package is build on top of the `geopandas <http://geopandas.org>`_ package.
 .. code-block:: python
 
     import osmnx
-    graph = ox.graph_from_place('Leuven, Belgium', network_type='drive')
+    graph = ox.graph_from_place('Leuven, Belgium', network_type='drive', simplify=False)
     graph_proj = ox.project_graph(graph)
     
     # Create GeoDataFrames
     # Approach 1
-    nodes_proj, edges_proj = ox.graph_to_gdfs(graph_proj, nodes=True, edges=True, simplify=False)
+    nodes_proj, edges_proj = ox.graph_to_gdfs(graph_proj, nodes=True, edges=True)
     for nid, row in nodes_proj[['x', 'y']].iterrows():
         map_con.add_node(nid, (row['x'], row['y']))
     for nid, row in edges_proj[['u', 'v']].iterrows():
