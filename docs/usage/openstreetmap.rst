@@ -95,24 +95,21 @@ This package is build on top of the `geopandas <http://geopandas.org>`_ package.
     graph = ox.graph_from_place('Leuven, Belgium', network_type='drive', simplify=False)
     graph_proj = ox.project_graph(graph)
     
-    # Create GeoDataFrames
+    # Create GeoDataFrames (gdfs)
     # Approach 1
     nodes_proj, edges_proj = ox.graph_to_gdfs(graph_proj, nodes=True, edges=True)
     for nid, row in nodes_proj[['x', 'y']].iterrows():
         map_con.add_node(nid, (row['x'], row['y']))
-    for nid, row in edges_proj[['u', 'v']].iterrows():
-        map_con.add_edge(row['u'], row['v'])
+    for eid, _ in edges_proj.iterrows():
+        map_con.add_edge(eid[0], eid[1])
     
     # Approach 2
     nodes, edges = ox.graph_to_gdfs(graph_proj, nodes=True, edges=True)
-    
     nodes_proj = nodes.to_crs("EPSG:3395")
     edges_proj = edges.to_crs("EPSG:3395")
-    
     for nid, row in nodes_proj.iterrows():
         map_con.add_node(nid, (row['lat'], row['lon']))
-    
-    # adding edges using networkx graph
+    # We can also extract edges also directly from networkx graph
     for nid1, nid2, _ in graph.edges:
         map_con.add_edge(nid1, nid2)
 
