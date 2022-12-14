@@ -98,13 +98,14 @@ def download_map_xml(fn, bbox, force=False, verbose=False):
             print("File already exists")
 
 
-def create_map_from_xml(fn, include_footways=False, include_parking=False):
+def create_map_from_xml(fn, include_footways=False, include_parking=False,
+                        use_rtree=False, index_edges=False):
     """Create an InMemMap from an OpenStreetMap XML file.
 
     Used for testing routes on OpenStreetMap.
     """
     from ..map.inmem import InMemMap
-    map_con = InMemMap("map", use_latlon=True)
+    map_con = InMemMap("map", use_latlon=True, use_rtree=use_rtree, index_edges=index_edges)
     cnt = 0
     ways_filter = ['bridleway', 'bus_guideway', 'track']
     if not include_footways:

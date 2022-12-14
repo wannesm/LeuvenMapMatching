@@ -215,7 +215,7 @@ class InMemMap(BaseMap):
                 self.graph[node] = (loc, self.graph[node][1])
         else:
             self.graph[node] = (loc, [])
-        if self.use_rtree and self.rtree:
+        if self.use_rtree and self.rtree is not None and not self.index_edges:
             if type(node) is not int:
                 raise Exception(f"Rtree index only supports integer keys for vertices")
             self.rtree.insert(node, (loc[0], loc[1], loc[0], loc[1]))
@@ -241,6 +241,15 @@ class InMemMap(BaseMap):
             raise ValueError(f"Add {node_b} first as node")
         if node_b not in self.graph[node_a][1]:
             self.graph[node_a][1].append(node_b)
+        if self.use_rtree and self.rtree is not None and self.index_edges:
+            if type(node_a) is not int or type(node_b) is not int:
+                raise Exception(f"Rtree index only supports integer keys for vertices")
+            loc_a = self.graph[node_a][0]
+            loc_b = self.graph[node_b][0]
+            bb = (min(loc_a[0], loc_b[0]), min(loc_a[1], loc_b[1]),  # y_min, x_min
+                  max(loc_a[0], loc_b[0]), max(loc_a[1], loc_b[1]))  # y_max, x_max
+            self.rtree.insert(node_a, bb)
+            # self.rtree.insert(node_b, bb)
 
     def _items_in_bb(self, bb):
         if self.rtree is not None:

@@ -29,8 +29,8 @@ def distance(p1, p2):
     :param p2: (Lat, Lon)
     :return: Distance in meters
     """
-    lat1, lon1 = p1
-    lat2, lon2 = p2
+    lat1, lon1 = p1[0], p1[1]
+    lat2, lon2 = p2[0], p2[1]
     lat1, lon1 = radians(lat1), radians(lon1)
     lat2, lon2 = radians(lat2), radians(lon2)
     dist = distance_haversine_radians(lat1, lon1, lat2, lon2)
@@ -52,7 +52,7 @@ def distance_point_to_segment(p, s1, s2, delta=0.0, constrain=True):
     """
     lat1, lon1 = s1  # Start point
     lat2, lon2 = s2  # End point
-    lat3, lon3 = p
+    lat3, lon3 = p[0], p[1]
     lat1, lon1 = radians(lat1), radians(lon1)
     lat2, lon2 = radians(lat2), radians(lon2)
     lat3, lon3 = radians(lat3), radians(lon3)
@@ -116,14 +116,14 @@ def distance_segment_to_segment(f1, f2, t1, t2):
     # print(f"bf1f2 = {bf1f2} = {degrees(bf1f2)} degrees")
     f2 = (df1f2 * cos(bf1f2),  df1f2 * sin(bf1f2))
 
-    latt1, lont1 = t1
+    latt1, lont1 = t1[0], t1[1]
     latt1, lont1 = radians(latt1), radians(lont1)
     df1t1 = distance_haversine_radians(latf1, lonf1, latt1, lont1)
     bf1t1 = bearing_radians(latf1, lonf1, latt1, lont1)
     # print(f"bf1t1 = {bf1t1} = {degrees(bf1t1)} degrees")
     t1 = (df1t1 * cos(bf1t1), df1t1 * sin(bf1t1))
 
-    latt2, lont2 = t2
+    latt2, lont2 = t2[0], t2[1]
     latt2, lont2 = radians(latt2), radians(lont2)
     dt1t2 = distance_haversine_radians(latt1, lont1, latt2, lont2)
     # print(f"dt1t2 = {dt1t2}")
@@ -148,7 +148,8 @@ def project(s1, s2, p, delta=0.0):
 def box_around_point(p, dist):
     lat, lon = p
     latr, lonr = radians(lat), radians(lon)
-    diag_dist = sqrt(2 * dist ** 2)
+    # diag_dist = sqrt(2 * dist ** 2)
+    diag_dist = dist
     lat_t, lon_r = destination_radians(latr, lonr, radians(45), diag_dist)
     lat_b, lon_l = destination_radians(latr, lonr, radians(225), diag_dist)
     lat_t, lon_r = degrees(lat_t), degrees(lon_r)

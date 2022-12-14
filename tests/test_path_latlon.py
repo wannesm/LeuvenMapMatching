@@ -54,13 +54,13 @@ def prepare_files(verbose=False, force=False, download_from_osm=False):
                 zip_ref.extractall(str(zip_fn.parent))
 
 
-def test_path1():
+def test_path1(use_rtree=False):
     prepare_files()
     track = gpx_to_path(track_fn)
     track = [loc[:2] for loc in track]
     track = track[:5]
     track_int = interpolate_path(track, 5)
-    map_con = create_map_from_xml(osm_fn)
+    map_con = create_map_from_xml(osm_fn, use_rtree=use_rtree, index_edges=True)
 
     matcher = DistanceMatcher(map_con, max_dist=50, obs_noise=50, min_prob_norm=0.1)
     states, last_idx = matcher.match(track_int)
@@ -237,7 +237,7 @@ if __name__ == "__main__":
     print(f"Saving files to {directory}")
     import matplotlib as mpl
     mpl.use('MacOSX')
-    test_path1()
+    test_path1(use_rtree=True)
     # test_path1_full()
     # test_path2_proj()
     # test_path2()
