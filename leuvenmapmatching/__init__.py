@@ -4,7 +4,7 @@ leuvenmapmatching
 ~~~~~~~~~~~~~~~~~
 
 :author: Wannes Meert
-:copyright: Copyright 2015-2018 DTAI, KU Leuven and Sirris.
+:copyright: Copyright 2015-2022 DTAI, KU Leuven and Sirris.
 :license: Apache License, Version 2.0, see LICENSE for details.
 """
 import logging
@@ -13,5 +13,5 @@ from . import map, matcher, util
 
 logger = logging.getLogger("be.kuleuven.cs.dtai.mapmatching")
 
-__version__ = '1.1.3'
+__version__ = '1.1.4'
 
