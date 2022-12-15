@@ -497,6 +497,7 @@ class BaseMatcher:
         self.max_lattice_width = max_lattice_width  # type: Optional[int]
         self.only_edges = only_edges  # type: bool
         self.expand_now = 0  # all m.delayed <= expand_upto will be expanded
+        self.early_stop_idx = None
 
         # Penalties
         self.ne_length_factor_log = math.log(non_emitting_length_factor)
@@ -593,7 +594,7 @@ class BaseMatcher:
         iterator = range(1, len(path))
         if tqdm:
             iterator = tqdm(iterator)
-        early_stop_idx = None
+        self.early_stop_idx = None
         for obs_idx in iterator:
             if __debug__:
                 logger.debug("--- obs {} --- {} ---".format(obs_idx, self.path[obs_idx]))
@@ -607,8 +608,8 @@ class BaseMatcher:
             if not cnt_lat_size_not_zero:
                 if __debug__:
                     logger.debug("No solutions found anymore")
-                early_stop_idx = obs_idx - 1
-                logger.info(f'Stopped early at observation {early_stop_idx}')
+                self.early_stop_idx = obs_idx - 1
+                logger.info(f'Stopped early at observation {self.early_stop_idx}')
                 break
             # Expand matches
             self._match_states(obs_idx)
@@ -627,19 +628,19 @@ class BaseMatcher:
         logger.info("Build lattice in {} seconds".format(t_delta))
 
         # Backtrack to find best path
-        if not early_stop_idx:
+        if not self.early_stop_idx:
             one_no_stop = False
             for m in self.lattice[len(path) - 1].values_all():  # todo: could be values(0) ?
                 if not m.stop:
                     one_no_stop = True
                     break
             if not one_no_stop:
-                early_stop_idx = len(path) - 1
-        if early_stop_idx is not None:
-            if early_stop_idx == 0:
+                self.early_stop_idx = len(path) - 1
+        if self.early_stop_idx is not None:
+            if self.early_stop_idx == 0:
                 self.lattice_best = []
                 return [], 0
-            start_idx = early_stop_idx - 1
+            start_idx = self.early_stop_idx - 1
         else:
             start_idx = len(self.path) - 1
         node_path = self._build_node_path(start_idx, unique)
@@ -1417,6 +1418,26 @@ class BaseMatcher:
             for m in level.values_all():
                 counts[m.label] += 1
         return counts
+
+    def inspect_early_stopping(self):
+        """Analyze the lattice and try to find most plausible reason why the
+        matching stopped early and print to stdout."""
+        if self.early_stop_idx is None:
+            print("No early stopping.")
+            return
+        col = self.lattice[self.early_stop_idx - 1]
+        print("The last matched nodes or edges were:")
+        first_row = True
+        ignore = set()
+        for ne_i in range(len(col.o) - 1, -1, -1):
+            for v in col.o[ne_i].values():
+                if v.key not in ignore:
+                    if first_row:
+                        print(v.repr_header())
+                        first_row = False
+                    print(v)
+                ignore.update(r.key for r in v.prev)
+
 
     def copy_lastinterface(self, nb_interfaces=1):
         """Copy the current matcher and keep the last interface as the start point.
