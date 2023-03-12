@@ -322,6 +322,24 @@ class BaseMatching(object):
     def __hash__(self):
         return self.cname.__hash__()
 
+    def __lt__(self, o):
+        return self.logprob < o.logprob
+
+    def __le__(self, o):
+        return self.logprob <= o.logprob
+
+    def __eq__(self, o):
+        return self.logprob == o.logprob
+
+    def __ne__(self, o):
+        return self.logprob != o.logprob
+
+    def __ge__(self, o):
+        return self.logprob >= o.logprob
+
+    def __gt__(self, o):
+        return self.logprob > o.logprob
+
 
 class LatticeColumn:
 
@@ -710,22 +728,39 @@ class BaseMatcher:
             #     self._match_non_emitting_states(0, path)
         return len(self.lattice[0])
 
-    def _match_states(self, obs_idx):
+    def increase_delayed(self, expand_from=None):
+        if expand_from is None:
+            expand_from = self.expand_now + 1
+        for col in self.lattice.values():
+            for colo in col.o:
+                for m in colo.values():
+                    if m.delayed >= expand_from:
+                        m.delayed += 1
+
+    def _match_states(self, obs_idx, prev_lattice=None, max_dist=None, inc_delayed=False):
         """Match states
 
         :param obs_idx:
+        :param prev_lattice: Start from this list instead of the previous
+            column in the lattice
+        :param max_dist: Use map.*_closeto instead of map.*_nbrto
+        :param inc_delayed: Increase delayed property when new state is created
         :return: True is new states have been found, False otherwise.
         """
-        prev_lattice = [m for m in self.lattice[obs_idx - 1].values(0) if not m.stop and m.delayed == self.expand_now]
+        if prev_lattice is None:
+            prev_lattice = [m for m in self.lattice[obs_idx - 1].values(0) if not m.stop and m.delayed == self.expand_now]
         count = 0
         for m in prev_lattice:  # type: BaseMatching
             if m.stop:
-                assert(False)  # should not happen
+                assert False  # should not happen
                 continue
             count += 1
             if m.edge_m.is_point():
                 # == Move to neighbour from node ==
-                nbrs = self.map.nodes_nbrto(m.edge_m.l1)
+                if max_dist is None:
+                    nbrs = self.map.nodes_nbrto(m.edge_m.l1)
+                else:
+                    nbrs = self.map.nodes_closeto(m.edge_m.p1, max_dist=max_dist)
                 # print("Neighbours for {}: {}".format(m, nbrs))
                 if nbrs is None:
                     if __debug__:
@@ -741,6 +776,8 @@ class BaseMatcher:
                         edge_o = Segment(f"O{obs_idx}", self.path[obs_idx])
                         m_next = m.next(edge_m, edge_o, obs=obs_idx)
                         if m_next is not None:
+                            if inc_delayed:
+                                m_next.delayed += 1
                             self._insert(m_next)
                             if __debug__:
                                 logger.debug(str(m_next))
@@ -751,6 +788,8 @@ class BaseMatcher:
                         edge_o = Segment(f"O{obs_idx}", self.path[obs_idx])
                         m_next = m.next(edge_m, edge_o, obs=obs_idx)
                         if m_next is not None:
+                            if inc_delayed:
+                                m_next.delayed += 1
                             self._insert(m_next)
                             if __debug__:
                                 logger.debug(str(m_next))
@@ -769,6 +808,8 @@ class BaseMatcher:
                 edge_o = Segment(f"O{obs_idx}", self.path[obs_idx])
                 m_next = m.next(edge_m, edge_o, obs=obs_idx)
                 if m_next is not None:
+                    if inc_delayed:
+                        m_next.delayed += 1
                     self._insert(m_next)
                     if __debug__:
                         logger.debug(str(m_next))
@@ -779,13 +820,19 @@ class BaseMatcher:
                     edge_o = Segment(f"O{obs_idx}", self.path[obs_idx])
                     m_next = m.next(edge_m, edge_o, obs=obs_idx)
                     if m_next is not None:
+                        if inc_delayed:
+                            m_next.delayed += 1
                         self._insert(m_next)
                         if __debug__:
                             logger.debug(str(m_next))
 
                 else:
                     # === Move from edge to next edge ===
-                    nbrs = self.map.edges_nbrto((m.edge_m.l1, m.edge_m.l2))
+                    if max_dist is None:
+                        nbrs = self.map.edges_nbrto((m.edge_m.l1, m.edge_m.l2))  # type: list
+                    else:
+                        nbrs = [(l1, p1, l2, p2) for _, l1, p1, l2, p2, _, _
+                                in self.map.edges_closeto(m.edge_m.pi, max_dist=max_dist)]
                     if nbrs is None or len(nbrs) == 0:
                         if __debug__:
                             logger.debug(f"No neighbours found for edge {m.edge_m.label}")
@@ -797,9 +844,12 @@ class BaseMatcher:
                             edge_o = Segment(f"O{obs_idx}", self.path[obs_idx])
                             m_next = m.next(edge_m, edge_o, obs=obs_idx)
                             if m_next is not None:
+                                if inc_delayed:
+                                    m_next.delayed += 1
                                 self._insert(m_next)
                                 if __debug__:
-                                    logger.debug(str(m_next))
+                                    mstr = str(m_next)
+                                    logger.debug(mstr)
         if self.max_lattice_width:
             self.lattice[obs_idx].prune(0, self.max_lattice_width, self.expand_now)
         if count == 0:
@@ -1147,10 +1197,14 @@ class BaseMatcher:
             node_path = self.node_path_to_only_nodes(node_path)
         return node_path
 
-    def node_path_to_only_nodes(self, path):
+    def node_path_to_only_nodes(self, path, allow_jumps=False):
         """Path of nodes and edges to only nodes.
 
         :param path: List of node names or edges as (node name, node name)
+        :param allow_jumps: Allow a path over edges that are not connected.
+            This occurs when matches are added without an edge, for example,
+            when searching for edges in the distance neighborhood instead in
+            the graph.
         :return: List of node names
         """
         nodes = []
@@ -1178,8 +1232,12 @@ class BaseMatcher:
                     if state[0] != prev_node:
                         nodes.append(state[0])
                         prev_node = state[0]
-                else:
+                elif not allow_jumps:
                     raise Exception(f"State {state} does not have as previous node {prev_node}")
+                else:
+                    nodes.append(state[0])
+                    nodes.append(state[1])
+                    prev_node = state[1]
             else:
                 raise Exception(f"Unknown type of state: {state} ({type(state)})")
             prev_state = state
@@ -1259,6 +1317,26 @@ class BaseMatcher:
     def increase_max_lattice_width(self, max_lattice_width, unique=False, tqdm=None):
         self.max_lattice_width = max_lattice_width
         return self.match(self.path, unique=unique, tqdm=tqdm, expand=True)
+
+    def continue_with_distance(self, from_matches=None, k=2, nb_obs=2, max_dist=None):
+        """Continue the matcher but ignore edges and allow jumps
+        to nearby edged.
+
+        :param from_matches: Search in the neigborhood of these matches
+        :param k: If from_matches is not given, the k best matches are used
+            in the last nb_obs observations since last early_stop_idx
+        :praram nb_obs: If from_matches is not given, the k best matches are used
+            in the last nb_obs observations since last early_stop_idx
+        :param max_dist: Add edges that are maximally max_dist away from the previous
+            match. If none, self.max_dist * 3 is used.
+        """
+        if from_matches is None:
+            from_matches = self.best_last_matches(k=k, nb_obs=nb_obs)
+        self.increase_delayed()
+        if max_dist is None:
+            max_dist = self.max_dist * 3
+        for obs_idx, cur_matches in from_matches.items():
+            self._match_states(obs_idx, prev_lattice=cur_matches, max_dist=max_dist, inc_delayed=True)
 
     def path_bb(self):
         """Get boundig box of matched path (if it exists, otherwise return None)."""
@@ -1438,6 +1516,47 @@ class BaseMatcher:
                     print(v)
                 ignore.update(r.key for r in v.prev)
 
+    def best_last_matches(self, k=1, nb_obs=3):
+        """Return the k best last matches.
+
+        :param k: Number of best matches to keep for an observation
+        :param nb_obs: How many last matched observations to consider
+        """
+        import heapq
+        if self.early_stop_idx is None:
+            col_idx = len(self.lattice) - 1
+        else:
+            col_idx = self.early_stop_idx - 1
+        hh = []
+        obs_cnt = 0
+        while col_idx >= 0 and obs_cnt < nb_obs:
+            h = []
+            col = self.lattice[col_idx]
+            col_oneselected = False
+            for ne_i in range(len(col.o) - 1, -1, -1):
+                for v in col.o[ne_i].values():
+                    if v.stop:
+                        continue
+                    if len(h) < k:
+                        heapq.heappush(h, (v.logprob, v))
+                        col_oneselected = True
+                    elif v.logprob > h[0][0]:
+                        heapq.heappop(h)
+                        heapq.heappush(h, (v.logprob, v))
+                        col_oneselected = True
+            hh.extend(h)
+            if col_oneselected is False:
+                print(f'break in {col_idx=}')
+                break
+            col_idx -= 1
+            obs_cnt += 1
+        result = defaultdict(list)
+        for m in hh:
+            m = m[1]
+            result[m.obs + 1].append(m)
+        # return [m[1] for m in hh]
+        return result
+
 
     def copy_lastinterface(self, nb_interfaces=1):
         """Copy the current matcher and keep the last interface as the start point.
@@ -1480,6 +1599,13 @@ class BaseMatcher:
         if self.node_path is None or len(self.node_path) == 0:
             return []
         return self.node_path_to_only_nodes(self.node_path)
+
+    @property
+    def path_pred_onlynodes_withjumps(self):
+        """A list with all the nodes (no edges) the matched path passes through."""
+        if self.node_path is None or len(self.node_path) == 0:
+            return []
+        return self.node_path_to_only_nodes(self.node_path, allow_jumps=True)
 
     def path_pred_distance(self):
         """Total distance of the matched path."""

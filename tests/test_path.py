@@ -379,6 +379,11 @@ def test_path4_dist_inc():
     matcher = DistanceMatcher(map_con, max_dist=2, obs_noise=1, min_prob_norm=0.5)
     matcher.match(path[:5])
     if directory:
+        import matplotlib
+        # matplotlib.use('macosx')
+        # print(matplotlib.matplotlib_fname())
+        # import matplotlib.pyplot as plt
+        # print(plt.get_backend())
         from leuvenmapmatching import visualization as mmviz
         mmviz.plot_map(map_con, matcher=matcher,
                        show_labels=True, show_matching=True, show_graph=True,
@@ -395,8 +400,55 @@ def test_path4_dist_inc():
     assert nodes == nodes_sol, "Nodes not equal:\n{}\n{}".format(nodes, nodes_sol)
 
 
+def test_path4_dist_inc_missing():
+    map_con = InMemMap("mymap", graph={
+        "A": ((1, 1), ["B", "C", "X"]),
+        "B": ((1, 3), ["A", "C"]),
+        "C": ((2, 2), ["A", "B", "X", "Y"]),
+        "D": ((2, 4), ["E", "K", "L"]),
+        "E": ((3, 3), ["D", "F"]),
+        "F": ((3, 5), ["D", "E", "L"]),
+        "X": ((2, 0), ["A", "C", "Y"]),
+        "Y": ((3, 1), ["X", "C"]),
+        "K": ((1, 5), ["D", "L"]),
+        "L": ((2, 6), ["K", "D", "F"])
+    }, use_latlon=False)
+
+    path = [(0.8, 0.7), (0.9, 0.7), (1.1, 1.0), (1.2, 1.5), (1.2, 1.6), (1.1, 2.0),
+            (1.1, 2.3), (1.3, 2.9), (1.2, 3.1), (1.5, 3.2), (1.8, 3.5), (2.0, 3.7),
+            (2.3, 3.5), (2.4, 3.2), (2.6, 3.1), (2.9, 3.1), (3.0, 3.2),
+            (3.1, 3.8), (3.0, 4.0), (3.1, 4.3), (3.1, 4.6), (3.0, 4.9)]
+
+    matcher = DistanceMatcher(map_con, max_dist=0.5, obs_noise=1, min_prob_norm=0.5,
+                              max_lattice_width=3)
+    matcher.match(path)
+    if directory:
+        import matplotlib
+        # matplotlib.use('macosx')
+        # print(matplotlib.matplotlib_fname())
+        # import matplotlib.pyplot as plt
+        # print(plt.get_backend())
+        from leuvenmapmatching import visualization as mmviz
+        mmviz.plot_map(map_con, matcher=matcher,
+                       show_labels=True, show_matching=True, show_graph=True,
+                       filename=str(directory / "test_path4_dist_inc_missing_1.png"))
+
+    matcher.continue_with_distance()
+
+    # return
+    matcher.match(path, expand=True)
+    nodes = matcher.path_pred_onlynodes_withjumps
+    if directory:
+        from leuvenmapmatching import visualization as mmviz
+        mmviz.plot_map(map_con, matcher=matcher,
+                       show_labels=True, show_matching=True, show_graph=True,
+                       filename=str(directory / "test_path4_dist_inc_missing_2.png"))
+    nodes_sol = ['A', 'B', 'C', 'D', 'E', 'F']
+    assert nodes == nodes_sol, "Nodes not equal:\n{}\n{}".format(nodes, nodes_sol)
+
+
 if __name__ == "__main__":
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.INFO)
     logger.addHandler(logging.StreamHandler(sys.stdout))
     directory = Path(os.environ.get('TESTDIR', Path(__file__).parent))
     print(f"Saving files to {directory}")
@@ -410,4 +462,5 @@ if __name__ == "__main__":
     # test_path_outlier_dist()
     # test_path3()
     # test_path3_dist()
-    test_path4_dist_inc()
+    # test_path4_dist_inc()
+    test_path4_dist_inc_missing()
