@@ -1197,6 +1197,19 @@ class BaseMatcher:
             node_path = self.node_path_to_only_nodes(node_path)
         return node_path
 
+    def get_path(self, only_nodes=True, allow_jumps=False, only_closest=True):
+        """A list with all the nodes (no edges) the matched path passes through."""
+        if only_nodes is False:
+            return self.node_path
+        if self.node_path is None or len(self.node_path) == 0:
+            return []
+        path = self.node_path_to_only_nodes(self.node_path, allow_jumps=allow_jumps)
+        if only_closest:
+            m = self.lattice_best[0]
+            if m.edge_m.ti > 0.5:
+                path.pop(0)
+        return path
+
     def node_path_to_only_nodes(self, path, allow_jumps=False):
         """Path of nodes and edges to only nodes.
 
@@ -1557,7 +1570,6 @@ class BaseMatcher:
         # return [m[1] for m in hh]
         return result
 
-
     def copy_lastinterface(self, nb_interfaces=1):
         """Copy the current matcher and keep the last interface as the start point.
 
@@ -1596,16 +1608,12 @@ class BaseMatcher:
     @property
     def path_pred_onlynodes(self):
         """A list with all the nodes (no edges) the matched path passes through."""
-        if self.node_path is None or len(self.node_path) == 0:
-            return []
-        return self.node_path_to_only_nodes(self.node_path)
+        return self.get_path(only_nodes=True, allow_jumps=False)
 
     @property
     def path_pred_onlynodes_withjumps(self):
         """A list with all the nodes (no edges) the matched path passes through."""
-        if self.node_path is None or len(self.node_path) == 0:
-            return []
-        return self.node_path_to_only_nodes(self.node_path, allow_jumps=True)
+        return self.get_path(only_nodes=True, allow_jumps=True)
 
     def path_pred_distance(self):
         """Total distance of the matched path."""
