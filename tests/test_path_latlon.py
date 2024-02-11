@@ -10,6 +10,7 @@ tests.test_path_latlon
 """
 import sys
 import os
+import pickle
 import logging
 from pathlib import Path
 import pytest
@@ -19,6 +20,7 @@ from leuvenmapmatching.util.gpx import gpx_to_path
 from leuvenmapmatching.util.dist_latlon import interpolate_path
 from leuvenmapmatching.util.openstreetmap import create_map_from_xml, download_map_xml
 from leuvenmapmatching.matcher.distance import DistanceMatcher
+from leuvenmapmatching.map.inmem import InMemMap
 
 logger = mm.logger
 this_path = Path(os.path.realpath(__file__)).parent / "rsrc" / "path_latlon"
@@ -68,6 +70,38 @@ def test_path1(use_rtree=False):
     if directory:
         # matcher.print_lattice_stats()
         mm_viz.plot_map(map_con, matcher=matcher, use_osm=True,
+                        zoom_path=True, show_graph=True,
+                        filename=str(directory / "test_path_latlon_path1.png"))
+    assert len(states) == len(track_int), f"Path ({len(track_int)}) not fully matched by best path ({len(states)}), " + \
+                                          f"last index = {last_idx}"
+    states_sol = [(2963305939, 249348325), (2963305939, 249348325), (2963305939, 249348325), (2963305939, 249348325),
+                  (2963305939, 249348325), (2963305939, 249348325), (249348325, 1545679243), (249348325, 1545679243),
+                  (1545679243, 3663115134), (1545679243, 3663115134), (1545679243, 3663115134),
+                  (3663115134, 1545679251), (1545679251, 20910628), (1545679251, 20910628), (1545679251, 20910628),
+                  (1545679251, 20910628), (20910628, 3663115130)]
+    assert states == states_sol, f"Got states: {states}"
+
+
+def test_path1_serialization(use_rtree=False):
+    prepare_files()
+    track = gpx_to_path(track_fn)
+    track = [loc[:2] for loc in track]
+    track = track[:5]
+    track_int = interpolate_path(track, 5)
+    map_con = create_map_from_xml(osm_fn, use_rtree=use_rtree, index_edges=True)
+
+    to_serialize = map_con.serialize()
+    map_con.dir = this_path
+    map_con.dump()
+
+    map_con2 = InMemMap.from_pickle(filename = map_con.dir / (map_con.name + ".pkl"))
+
+    matcher = DistanceMatcher(map_con2, max_dist=50, obs_noise=50, min_prob_norm=0.1)
+    states, last_idx = matcher.match(track_int)
+
+    if directory:
+        # matcher.print_lattice_stats()
+        mm_viz.plot_map(map_con2, matcher=matcher, use_osm=True,
                         zoom_path=True, show_graph=True,
                         filename=str(directory / "test_path_latlon_path1.png"))
     assert len(states) == len(track_int), f"Path ({len(track_int)}) not fully matched by best path ({len(states)}), " + \
@@ -237,7 +271,8 @@ if __name__ == "__main__":
     print(f"Saving files to {directory}")
     import matplotlib as mpl
     mpl.use('MacOSX')
-    test_path1(use_rtree=True)
+    # test_path1(use_rtree=True)
+    test_path1_serialization(use_rtree=True)
     # test_path1_full()
     # test_path2_proj()
     # test_path2()
