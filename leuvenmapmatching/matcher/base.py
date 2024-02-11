@@ -1328,6 +1328,18 @@ class BaseMatcher:
         return self.node_path
 
     def increase_max_lattice_width(self, max_lattice_width, unique=False, tqdm=None):
+        """Increase the value for max_lattice_width and continue the matching with all
+        paths that were ignored so far (up to the new max_lattice_width).
+
+        This is useful when the matcher is first run with a small max_lattice_width
+        to be fast, but when the true path is not obvious and excluded from the first
+        guesses. When the matcher stops early, this method allows to easily expand the
+        search space.
+
+        :param max_lattice_width: New maximal number of paths to consider
+        :param unique: See match method
+        :param tqdm: See match method
+        """
         self.max_lattice_width = max_lattice_width
         return self.match(self.path, unique=unique, tqdm=tqdm, expand=True)
 
