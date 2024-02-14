@@ -51,7 +51,7 @@ Optional (only loaded when methods are called to rely on these packages):
     To import GPX files
 - [pykalman](https://pykalman.github.io):
     So smooth paths using a Kalman filter
-- [pyproj](https://jswhit.github.io/pyproj/):
+- [pyproj](https://pyproj4.github.io/pyproj/):
     To project latitude-longitude coordinates to an XY-plane
 - [rtree](http://toblerity.org/rtree/):
     To quickly search locations

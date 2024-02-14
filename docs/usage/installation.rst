@@ -14,7 +14,7 @@ Optional (only loaded when methods are called that rely on these packages):
 -  `rtree <http://toblerity.org/rtree/>`__
 -  `nvector <https://github.com/pbrod/Nvector>`__
 -  `gpxpy <https://github.com/tkrajina/gpxpy>`__
--  `pyproj <https://jswhit.github.io/pyproj/>`__
+-  `pyproj <https://pyproj4.github.io/pyproj/>`__
 -  `pykalman <https://pykalman.github.io>`__
 -  `matplotlib <http://matplotlib.org>`__
 -  `smopy <https://github.com/rossant/smopy>`__
